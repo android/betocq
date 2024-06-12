@@ -1,0 +1,129 @@
+x-test-params: &test-params
+  # for 2G wifi SSID - channel 6, frequency 2437, comment out if it is not available.
+  wifi_2g_ssid: "AP2437"
+  wifi_2g_password: "AP2437"
+  # for 5G wifi SSID - channel 36, frequency 5180, comment out if it is not available.
+  wifi_5g_ssid: "AP5180"
+  wifi_5g_password: "AP5180"
+  # for DFS 5G wifi SSID - channel 52, frequency 5260, comment out if it is not available.
+  wifi_dfs_5g_ssid: "AP5260"
+  wifi_dfs_5g_password: "AP5260"
+  # use the AP controlled by programming dynamically
+  use_auto_controlled_wifi_ap: False
+  run_function_tests_with_performance_tests: True
+  run_bt_performance_test: True
+  run_directed_test: True
+  run_compound_test: True
+  run_bt_coex_test: True
+  run_iperf_test: True
+  allow_unrooted_device: False
+  skip_bug_report: False
+
+x-controllers: &controllers
+  Controllers:
+    AndroidDevice:
+      - serial: "33141FDJH0002A"
+        role: "source_device"
+        wifi_chipset: "" # WiFi/BT chipset model, for example, wcn6710, MT7922
+        # The max number of spatial streams
+        max_num_streams: 2
+        # The max PHY rate at 5G, in Mbps
+        max_phy_rate_5g_mbps: 2402
+        # The max PHY rate at 2G, in Mbps
+        max_phy_rate_2g_mbps: 287
+        # if the device supports 5G Wifi
+        supports_5g: True
+        # if the device supports DBS (Dual Band Simultaneous) in STA + WiFi-Direct concurrency mode
+        supports_dbs_sta_wfd: True
+        # The max number of spatial streams in DBS mode.
+        max_num_streams_dbs: 2
+        # if the device supports to start WFD group owner at a STA-associated DFS channel
+        enable_sta_dfs_channel_for_peer_network: False
+        # if the device supports to start WFD group owner at a STA-associated indoor channel
+        enable_sta_indoor_channel_for_peer_network: False
+        # 14 - U, 13 - T, 12 - S
+        android_version: 14
+      - serial: "35081FDJG000FC"
+        role: "target_device"
+        wifi_chipset: "" # WiFi/BT chipset model, for example, wcn6710, MT7922
+        # The max number of spatial streams
+        max_num_streams: 2
+        # The max PHY rate at 5G, in Mbps
+        max_phy_rate_5g_mbps: 2402
+        # The max PHY rate at 2G, in Mbps
+        max_phy_rate_2g_mbps: 287
+        # if the device supports 5G Wifi
+        supports_5g: True
+        # if the device supports DBS (Dual Band Simultaneous) in STA + WiFi-Direct concurrency mode
+        supports_dbs_sta_wfd: True
+        # The max number of spatial streams in DBS mode.
+        max_num_streams_dbs: 2
+        # if the device supports to start WFD group owner at a STA-associated DFS channel
+        enable_sta_dfs_channel_for_peer_network: False
+        # if the device supports to start WFD group owner at a STA-associated indoor channel
+        enable_sta_indoor_channel_for_peer_network: False
+        # 14 - U, 13 - T, 12 - S
+        android_version: 14
+
+TestBeds:
+- Name: Default
+  <<: *controllers
+  TestParams:
+      <<: *test-params
+
+- Name: Quickstart
+  <<: *controllers
+  TestParams:
+      <<: *test-params
+      target_cuj_name: "quick_start"
+      # before the performance test, run the function tests first
+      run_function_tests_with_performance_tests: True
+      # if the function tests is failed, abort the performance test
+      abort_all_tests_on_function_tests_fail: True
+
+- Name: Quickshare
+  <<: *controllers
+  TestParams:
+      <<: *test-params
+      target_cuj_name: "quick_share"
+      # before the performance test, run the function tests first
+      run_function_tests_with_performance_tests: True
+      # if the function tests is failed, abort the performance test
+      abort_all_tests_on_function_tests_fail: True
+      run_ble_performance_test: True
+
+- Name: EsimTransfer
+  <<: *controllers
+  TestParams:
+      <<: *test-params
+      target_cuj_name: "setting_based_esim_transfer"
+
+- Name: QuickstartFunction
+  Controllers:
+    <<: *controllers
+  TestParams:
+      <<: *test-params
+      target_cuj_name: "quick_start"
+
+- Name: NearbyConnectionsFunction
+  <<: *controllers
+  TestParams:
+    <<: *test-params
+    target_cuj_name: "nearby_connections_function"
+    requires_3p_api_test: True
+    connect_to_wifi_before_test: True
+    run_function_tests_with_performance_tests: False
+    run_bt_performance_test: False
+    run_ble_performance_test: False
+    run_bt_coex_test: False
+    run_directed_test: False
+    run_compound_test: False
+    run_iperf_test: False
+    run_nearby_connections_function_tests: True
+
+- Name: QuickshareFunctionTest
+  Controllers:
+    <<: *controllers
+  TestParams:
+      <<: *test-params
+      target_cuj_name: "quick_share"
