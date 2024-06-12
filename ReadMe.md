@@ -317,21 +317,6 @@ in a local directory:
 
 
 ### Run the test {:#run-test}
-To run the test on Linux directly from AOSP repo:
-
-  - Refer to release instructions below to set up the build environment.
-
-    ```
-    source build/envsetup.sh
-    lunch aosp_arm-trunk_staging-eng
-    ```
-
-  - Run the test with atest:
-
-    ```
-    atest -v betocq_test_suite -- --config <local_testbed_directory>/cuj_and_test_config.yml --testbed Quickstart
-    ```
-
 To run the test on Linux and macOS with test binary, run the following commands from the local
 directory:
 
@@ -485,47 +470,3 @@ To run the test on Windows:
 8. If the issue can't be resolved by the internal engineering team and there is
   strong evidence that there might be an issue on the Google side, create an issue
   for Google. Be sure to include all test artifacts.
-
-## Linux and Windows release instructions {:#test-codes}
-
-Skip this unless you want to release the test binary from AOSP.
-
-- Get AOSP codes from
-  [AOSP](https://cs.android.com/android/platform/superproject/+/master:platform_testing/tests/bettertogether/betocq/;l=1).
-
-- Build the test binary for Linux and macOS:
-
-  ```
-  source build/envsetup.sh
-  lunch aosp_arm-trunk_staging-eng
-  make betocq_test_suite
-  outmod betocq_test_suite
-  ```
-
-- Upload these files to a shared drive:
-
-  ```
-  tools/test/mobly_extensions/scripts/local_mobly_runner.py
-  out/host/linux-x86/nativetest64/betocq_test_suite/betocq_test_suite
-  out/host/linux-x86/nativetest64/betocq_test_suite/cuj_and_test_config.yml
-  ```
-
-- Generate the zip file for Windows execution:
-
-  ```
-  mkdir ~/betocq_windows
-  cp platform_testing/tests/bettertogether/betocq/betocq_test_suite.py ~/betocq_windows/__main__.py
-  echo mobly > ~/betocq_windows/requirements.txt
-  cp -r platform_testing/tests/bettertogether/betocq ~/betocq_windows
-  cp out/host/linux-x86/nativetest64/betocq_test_suite/*.apk ~/betocq_windows
-  cd ~/betocq_windows
-  zip -r ~/betocq_test_suite_windows.zip ./
-  ```
-
-- Upload these files to a shared drive:
-
-  ```
-  tools/test/mobly_extensions/scripts/local_mobly_runner.py
-  out/host/linux-x86/nativetest64/betocq_test_suite/cuj_and_test_config.yml
-  ~/betocq_test_suite_windows.zip
-  ```
