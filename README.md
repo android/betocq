@@ -15,7 +15,7 @@ latency, transfer speed, and overall success rate.
 Depending on the device capabilities, the test takes two to six hours to
 complete.
 
-## Test types {:#test-types}
+## Test types
 
 BeToCQ consists of three parts:
 
@@ -49,7 +49,7 @@ BeToCQ consists of three parts:
   The test suite currently supports three CUJs: Quick Start, Quick Share, and eSIM
   transfer. We plan to add more CUJs in later releases.
 
-## Device capabilities {:#device-capabilities}
+## Device capabilities
 
 The exact connectivity performance depends on the device capability.
 For example, the low-cost 2&nbsp;GHz-only Wi-Fi device achieves a lower speed
@@ -61,7 +61,7 @@ device-to-device transfer speed.
 As a result, this test suite uses the wireless capabilities of test devices as
 inputs to customize the test case and set the right performance expectations.
 
-## Test cases {:#test-cases}
+## Test cases
 
 In the directed and CUJ tests, depending on the device capabilities,
 test cases are defined to cover:
@@ -113,7 +113,7 @@ The test cases execution depends on the device capability, so it's
 important to fill in the device capabilities section correctly in the test
 configuration file. We'll discuss this in more detail in the following sections.
 
-## Actionable test results {:#actional-test-results}
+## Actionable test results
 
 Running the test is straightforward, but it can be difficult to get insights out
 of the test results and determine further action to take.
@@ -130,7 +130,7 @@ BetoCQ takes three steps to address this issue:
   to a single component. The tool also provides the most likely failure
   reasons and suggest next steps for debugging and appropriate component owner.
 
-## Prerequisites {:#test-prerequisites}
+## Prerequisites
 
 *   **Environment.**
 
@@ -178,15 +178,15 @@ BetoCQ takes three steps to address this issue:
     than 5G or 6G signal.
 
 
-## Test steps {:#test-steps}
+## Test steps
 
 Follow these steps to prepare and execute tests and review test results.
 
-### Prepare the test {:#test-prep}
+### Prepare the test
 
 Prepare the following materials to be used for the tests.
 
-#### Get the test codes, tools, and configure build {:#test-codes}
+#### Get the test codes, tools, and configure build
 
 1.  Download the release test binary files (see release instructions) and save them
 in a local directory:
@@ -220,7 +220,7 @@ in a local directory:
 4. Windows only: Download [adb](https://developer.android.com/tools/releases/platform-tools)
    and add its path to the [`Path` environment variable](https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho).
 
-#### Configure Wi-Fi AP and test {:#config}
+#### Configure Wi-Fi AP and test
 
 1. Configure Wi-Fi AP channel frequency:
 
@@ -316,7 +316,7 @@ in a local directory:
       Check with the Wi-Fi engineering team about device capabilities details.
 
 
-### Run the test {:#run-test}
+### Run the test
 To run the test on Linux and macOS with test binary, run the following commands from the local
 directory:
 
@@ -343,7 +343,7 @@ To run the test on Windows:
   python3 local_mobly_runner.py -p ./betocq_test_suite_windows.zip -tb Quickstart -i -c cuj_and_test_config.yml
   ```
 
-### Check the test result and debug failure {:#check-result}
+### Check the test result and debug failure
 
 1.  Verify that these lines appear at the end of the test console output:
 
