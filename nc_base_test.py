@@ -37,14 +37,18 @@ from betocq import version
 
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
-NEARBY_SNIPPET_3P_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.thirdparty'
+NEARBY_SNIPPET_3P_PACKAGE_NAME = (
+    'com.google.android.nearby.mobly.snippet.thirdparty'
+)
 
-# TODO(b/330803934): Need to design external path for OEM.
+# TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
 
 
 class NCBaseTestClass(base_test.BaseTestClass):
   """The Base of Nearby Connection E2E tests."""
+
+  _run_identifier_is_set = False
 
   def __init__(self, configs):
     super().__init__(configs)
@@ -70,8 +74,12 @@ class NCBaseTestClass(base_test.BaseTestClass):
     return None
 
   def setup_class(self) -> None:
+    self._set_run_identifier()
     self._setup_openwrt_wifi()
     self.ads = self.register_controller(android_device, min_number=2)
+    for ad in self.ads:
+      if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
+        ad.role = ad.dimensions['role']
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'
@@ -100,6 +108,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
       ):
         skipped_test_class_reason = 'wifi_chipset is empty in the config file'
         ad.log.warning(skipped_test_class_reason)
+
     if skipped_test_class_reason:
       self.__skipped_test_class = True
       asserts.abort_class(skipped_test_class_reason)
@@ -132,38 +141,64 @@ class NCBaseTestClass(base_test.BaseTestClass):
         raise_on_exception=True,
     )
 
+  def _set_run_identifier(self) -> None:
+    """Set a run_identifier property describing the test run context.
+
+    This property is only set once, even if multiple test classes are run as
+    part of a test suite.
+    """
+    if NCBaseTestClass._run_identifier_is_set:
+      return
+    run_identifier = {}
+    run_identifier['test_version'] = version.TEST_SCRIPT_VERSION
+    run_identifier['target_cuj'] = self.test_parameters.target_cuj_name
+    run_identifier_str = ', '.join(
+        [f'{key}:{value}' for key, value in run_identifier.items()]
+    )
+    run_identifier_str = f'{{{run_identifier_str}}}'
+    self.record_data({'properties': {'run_identifier': run_identifier_str}})
+    NCBaseTestClass._run_identifier_is_set = True
+
   def _setup_openwrt_wifi(self):
     """Sets up the wifi connection with OpenWRT."""
     if not self.user_params.get('use_auto_controlled_wifi_ap', False):
       return
 
-    self.openwrt = self.register_controller(openwrt_device)[0]
+    openwrt_devices = self.register_controller(openwrt_device)
+    if len(openwrt_devices) >= 2:
+      self.openwrt, self.sniffer = openwrt_devices[:2]
+      logging.debug(
+          'Using device %s as AP and %s as sniffer.',
+          self.openwrt,
+          self.sniffer,
+      )
+    else:
+      self.openwrt = openwrt_devices[0]
+      logging.debug('Using device %s as router.', self.openwrt)
+
     if 'wifi_channel' in self.user_params:
       wifi_channel = self.user_params['wifi_channel']
-      self.wifi_info = self.openwrt.start_wifi(
-          config=wifi_configs.WiFiConfig(
-              channel=wifi_channel,
-              country_code=self._get_country_code(),
-          )
+      self.openwrt_wifi_config = wifi_configs.WiFiConfig(
+          channel=wifi_channel,
+          country_code=self._get_country_code(),
       )
     else:
       wifi_channel = None
-      self.wifi_info = self.openwrt.start_wifi(
-          config=wifi_configs.WiFiConfig(
-              country_code=self._get_country_code(),
-          )
+      self.openwrt_wifi_config = wifi_configs.WiFiConfig(
+          country_code=self._get_country_code(),
       )
+    self.wifi_info = self.openwrt.start_wifi(config=self.openwrt_wifi_config)
 
     if wifi_channel is None:
       self.test_parameters.wifi_ssid = self.wifi_info.ssid
       self.test_parameters.wifi_password = self.wifi_info.password
-    elif wifi_channel == 6:
+    elif wifi_channel == nc_constants.CHANNEL_2G:
       self.test_parameters.wifi_2g_ssid = self.wifi_info.ssid
       self.test_parameters.wifi_2g_password = self.wifi_info.password
-    elif wifi_channel == 36:
+    elif wifi_channel == nc_constants.CHANNEL_5G:
       self.test_parameters.wifi_5g_ssid = self.wifi_info.ssid
       self.test_parameters.wifi_5g_password = self.wifi_info.password
-    elif wifi_channel == 52:
+    elif wifi_channel == nc_constants.CHANNEL_5G_DFS:
       self.test_parameters.wifi_dfs_5g_ssid = self.wifi_info.ssid
       self.test_parameters.wifi_dfs_5g_password = self.wifi_info.password
     else:
@@ -174,11 +209,10 @@ class NCBaseTestClass(base_test.BaseTestClass):
   ) -> None:
     ad.android_version = int(ad.adb.getprop('ro.build.version.release'))
 
-    # TODO(b/330803934): Need to design external path for OEM.
     if not os.path.isfile(_CONFIG_EXTERNAL_PATH):
       return
-
     config_path = _CONFIG_EXTERNAL_PATH
+
     with open(config_path, 'r') as f:
       rule = yaml.safe_load(f).get(ad.model, None)
       if rule is None:
@@ -210,7 +244,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
           'nearby_snippet apk is not specified, '
           'make sure it is installed in the device'
       )
-
     ad.log.info('grant manage external storage permission')
     setup_utils.grant_manage_external_storage_permission(
         ad, NEARBY_SNIPPET_PACKAGE_NAME
@@ -245,7 +278,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
       )
       ad.load_snippet('nearby3p', NEARBY_SNIPPET_3P_PACKAGE_NAME)
       self.__loaded_3p_nearby_snippets = True
-
     if not ad.nearby.wifiIsEnabled():
       ad.nearby.wifiEnable()
     setup_utils.disconnect_from_wifi(ad)
@@ -253,12 +285,22 @@ class NCBaseTestClass(base_test.BaseTestClass):
     setup_utils.disable_redaction(ad)
     setup_utils.enable_wifi_aware(ad)
     setup_utils.disable_wlan_deny_list(ad)
+    setup_utils.enable_instant_connection(
+        ad, self.test_parameters.enable_instant_connection
+    )
+    setup_utils.disable_usb_medium(ad)
 
     setup_utils.enable_ble_scan_throttling_during_2g_transfer(
         ad, self.test_parameters.enable_2g_ble_scan_throttling
     )
+    setup_utils.force_flag_sync(ad)
+    setup_utils.restart_gms(ad)
 
-    setup_utils.set_country_code(ad, self._get_country_code())
+    setup_utils.set_country_code(
+        ad, self._get_country_code(), self.test_parameters.force_telephony_cc
+    )
+    if not self.test_parameters.bypass_airplane_mode_toggling:
+      setup_utils.toggle_airplane_mode(ad)
 
   def setup_test(self):
     self.record_data({
@@ -269,6 +311,19 @@ class NCBaseTestClass(base_test.BaseTestClass):
         },
     })
     self._reset_nearby_connection()
+    self._stop_packet_capture(ignore_packets=True)
+    self._start_packet_capture()
+
+  def _start_packet_capture(self) -> None:
+    """Starts packet capture if this test is using a sniffer."""
+    if hasattr(self, 'sniffer'):
+      self.sniffer.start_packet_capture(wifi_config=self.openwrt_wifi_config)
+
+  def _stop_packet_capture(self, ignore_packets: bool):
+    """Stops packet capture if this test is using a sniffer."""
+    if hasattr(self, 'sniffer'):
+      test_info = None if ignore_packets else self.current_test_info
+      self.sniffer.stop_packet_capture(test_info)
 
   def _reset_wifi_connection(self) -> None:
     """Resets wifi connections on both devices."""
@@ -333,13 +388,66 @@ class NCBaseTestClass(base_test.BaseTestClass):
     if hasattr(self, 'openwrt') and hasattr(self, 'wifi_info'):
       self.openwrt.stop_wifi(self.wifi_info)
 
-  def _summary_test_results(self) -> None:
-    pass
+  def _dict_to_list(self, dic_str_str: dict[str, str]) -> list[str]:
+    return [f' {str1}: {str2}' for str1, str2 in dic_str_str.items()]
+
+  def _get_device_attributes(
+      self, ad: android_device.AndroidDevice
+  ) -> list[str]:
+    return [
+        f'serial: {ad.serial}',
+        f'model: {ad.model}',
+        f'build_info: {ad.build_info}',
+        f'gms_version: {setup_utils.dump_gms_version(ad)}',
+        f'wifi_chipset: {ad.wifi_chipset}',
+        f'wifi_fw: {ad.adb.getprop("vendor.wlan.firmware.version")}',
+        f'support_5g: {ad.supports_5g}',
+        f'support_dbs_sta_wfd: {ad.supports_dbs_sta_wfd}',
+        (
+            'enable_sta_dfs_channel_for_wfd:'
+            f' {ad.enable_sta_dfs_channel_for_peer_network}'
+        ),
+        (
+            'enable_sta_indoor_channel_for_wfd:'
+            f' {ad.enable_sta_indoor_channel_for_peer_network}'
+        ),
+        f'max_num_streams: {ad.max_num_streams}',
+        f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
+    ]
+
+  def _get_test_summary_dict(self, test_result: str) -> dict[str, str]:
+    """Returns test summary dictionary."""
+    return {
+        '00_test_script_verion': version.TEST_SCRIPT_VERSION,
+        '01_test_result': test_result,
+        '02_device_source': '\n'.join(
+            self._get_device_attributes(self.discoverer)
+        ),
+        '03_device_target': '\n'.join(
+            self._get_device_attributes(self.advertiser)
+        ),
+        '04_target_build_id': f'{self.advertiser.build_info["build_id"]}',
+        '05_target_model': f'{self.advertiser.model}',
+        '06_target_gms_version': (
+            f'{setup_utils.dump_gms_version(self.advertiser)}'
+        ),
+        '07_target_wifi_chipset': f'{self.advertiser.wifi_chipset}',
+    }
+
+  def _summary_test_results(self):
+    """Summarizes test results of all tests."""
+
+    test_result = '\n'.join(self._dict_to_list(self._test_result_messages))
+    self.record_data({
+        'Test Class': self.TAG,
+        'properties': self._get_test_summary_dict(test_result),
+    })
 
   def on_fail(self, record: records.TestResultRecord) -> None:
     if self.__skipped_test_class:
       logging.info('Skipping on_fail.')
       return
+    self._stop_packet_capture(ignore_packets=False)
     if self.test_parameters.skip_bug_report:
       logging.info('Skipping bug report.')
       return
@@ -350,3 +458,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
           self.ads,
           destination=self.current_test_info.output_path,
       )
+
+  def on_pass(self, record: records.TestResultRecord) -> None:
+    self._stop_packet_capture(ignore_packets=True)

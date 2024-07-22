@@ -28,8 +28,13 @@ SCC_PERFORMANCE_TEST_COUNT = 10
 SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
 BT_PERFORMANCE_TEST_COUNT = 100
 BT_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
-
+BT_COEX_PERFORMANCE_TEST_COUNT = 100
+BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC = 10
+
+CHANNEL_2G = 6
+CHANNEL_5G = 36
+CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
 WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=1)
@@ -76,6 +81,8 @@ UNSET_LATENCY = datetime.timedelta.max
 UNSET_THROUGHPUT_KBPS = -1.0
 MAX_NUM_BUG_REPORT = 5
 INVALID_INT = -1
+INVALID_RSSI = -128
+RSSI_HIGH_THRESHOLD = -15
 
 TRANSFER_FILE_SIZE_500MB = 500 * 1024  # kB
 TRANSFER_FILE_SIZE_200MB = 200 * 1024  # kB
@@ -83,8 +90,16 @@ TRANSFER_FILE_SIZE_20MB = 20 * 1024  # kB
 TRANSFER_FILE_SIZE_1MB = 1024  # kB
 TRANSFER_FILE_SIZE_500KB = 512  # kB
 TRANSFER_FILE_SIZE_1KB = 1  # kB
+TRANSFER_FILE_SIZE_20KB = 20  # kB
+TRANSFER_FILE_SIZE_10KB = 10  # kB
+
+TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
+TRANSFER_FILE_NUM_DEFAULT = 1
+TRANSFER_FILE_NUM_FUNC_TEST = 100
+TRANSFER_TIMEOUT_FUNC_TEST_SEC = datetime.timedelta(seconds=100)
 
 TARGET_CUJ_QUICK_START = 'quick_start'
+TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
 TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
 TARGET_CUJ_QUICK_SHARE = 'quick_share'
 
@@ -98,18 +113,18 @@ class PayloadType(enum.IntEnum):
 @enum.unique
 class NearbyMedium(enum.IntEnum):
   """Medium options for discovery, advertising, connection and upgrade."""
-
+  # need to align with MediumSettingsFactory.java in snippet
   AUTO = 0
   BT_ONLY = 1
   BLE_ONLY = 2
   WIFILAN_ONLY = 3
-  WIFIAWARE_ONLY = 4
+  WIFIAWARE_ONLY = 4  # connect or upgrade to aware medium
   UPGRADE_TO_WEBRTC = 5
-  UPGRADE_TO_WIFIHOTSPOT = 6
-  UPGRADE_TO_WIFIDIRECT = 7
+  UPGRADE_TO_WIFIHOTSPOT = 6  # connect or upgrade to hotspot medium
+  UPGRADE_TO_WIFIDIRECT = 7  # connect or upgrade to wifi direct medium
   BLE_L2CAP_ONLY = 8
-  # including WIFI_LAN, WIFI_HOTSPOT, WIFI_DIRECT
-  UPGRADE_TO_ALL_WIFI = 9
+  # including WIFI_LAN, WIFI_HOTSPOT, WIFI_DIRECT or WIFI_AWARE
+  UPGRADE_TO_ALL_WIFI = 9  # connect or upgrade to any wifi medium
 
 
 @dataclasses.dataclass(frozen=False)
@@ -141,6 +156,7 @@ class TestParameters:
   keep_alive_timeout_ms: int = KEEP_ALIVE_TIMEOUT_WIFI_MS
   keep_alive_interval_ms: int = KEEP_ALIVE_INTERVAL_WIFI_MS
   enable_2g_ble_scan_throttling: bool = True
+  enable_instant_connection: bool = False
   target_post_wifi_connection_idle_time_sec: int = (
       TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC
   )
@@ -152,10 +168,14 @@ class TestParameters:
   run_directed_test: bool = True
   run_compound_test: bool = True
   run_aware_test: bool = False
-  run_iperf_test: bool = True
+  run_iperf_test: bool = False
+  run_iperf_test_if_nc_speed_is_low: bool = True
   run_nearby_connections_function_tests: bool = False
-  skip_test_if_wifi_chipset_is_empty: bool = True
+  # keep it to True in AOSP as wifi_chipset info is required for OEM test.
+  skip_test_if_wifi_chipset_is_empty: bool = False
   skip_bug_report: bool = False
+  force_telephony_cc: bool = False
+  bypass_airplane_mode_toggling: bool = False
 
   @classmethod
   def from_user_params(
@@ -196,7 +216,7 @@ class TestParameters:
 
 @enum.unique
 class NearbyConnectionMedium(enum.IntEnum):
-  """The final connection medium selected, see BandWidthInfo.Medium."""
+  """Copied from com.google.android.gms.nearby.connection."""
   UNKNOWN = 0
   # reserved 1, it's Medium.MDNS, not used now
   BLUETOOTH = 2
@@ -207,7 +227,7 @@ class NearbyConnectionMedium(enum.IntEnum):
   NFC = 7
   WIFI_DIRECT = 8
   WEB_RTC = 9
-  # 10 is reserved.
+  BLE_L2CAP = 10
   USB = 11
 
 
@@ -259,12 +279,12 @@ class SingleTestFailureReason(enum.IntEnum):
   DEVICE_CONFIG_ERROR = 14
   SUCCESS = 15
 
-
 COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
     ' 1) Check if the wifi ssid or password is correct;\n',
     ' 2) Try to remove any saved wifi network from wifi settings;\n',
     ' 3) Check if other device can connect to the same AP\n',
     ' 4) Check the wifi connection related log on the device.\n',
+    ' 5) Check if RSSI is too high and device is too close to the AP.\n',
 )
 
 COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
@@ -324,7 +344,10 @@ COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
 }
 
 COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
-    'If WFD GO fails to start, check your factory build to ensure that',
+    (
+        'If WFD group owner fails to start, check your factory build to ensure'
+        ' that'
+    ),
     (
         ' 1) includes the wpa_supplicant patch to avoid scan before starting GO'
         ' https://w1.fi/cgit/hostap/commit/?id=b18d95759375834b6ca6f864c898f27d161b14ca.'
@@ -343,7 +366,12 @@ COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
     ),
     (
         'Also check if BT socket is still connected and read/write is normal'
-        ' when the upgrade failure happens'
+        ' when the upgrade failure happens.'
+    ),
+    (
+        ' If WFD group client fails to connect, check if the devices are too'
+        ' close to each other. The recommended minimum device is 10cm (4'
+        ' inches).'
     ),
 ])
 

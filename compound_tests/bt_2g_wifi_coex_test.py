@@ -20,23 +20,12 @@ The AP requirements:
 
 import datetime
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
 
 from mobly  import base_test
 from mobly import test_runner
 
 from betocq import d2d_performance_test_base
 from betocq import nc_constants
-
-_PERFORMANCE_TEST_COUNT = 100
-_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 10
 
 
 class Bt2gWifiCoexTest(d2d_performance_test_base.D2dPerformanceTestBase):
@@ -58,8 +47,8 @@ class Bt2gWifiCoexTest(d2d_performance_test_base.D2dPerformanceTestBase):
     )
 
   @base_test.repeat(
-      count=_PERFORMANCE_TEST_COUNT,
-      max_consecutive_error=_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
+      count=nc_constants.BT_COEX_PERFORMANCE_TEST_COUNT,
+      max_consecutive_error=nc_constants.BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
   )
   def test_bt_2g_wifi_coex(self):
     """Test the BT and 2G wifi coex with a stress test."""

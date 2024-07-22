@@ -12,22 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""This test is to test the Aware MCC when STAs are connected to 2G/5G.
+"""This test is to test the Aware MCC when STAs are connected to two 5G channels.
+
 
 The device requirements:
   support 5G: true
 The AP requirements:
-  wifi channel: 36 (5180) and 6 (2437) in the same subnet
+  wifi channel: 36 (5180) and 52 (5260) in the same subnet
 """
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
 
 from mobly  import base_test
 from mobly import test_runner
@@ -36,8 +29,8 @@ from betocq import d2d_performance_test_base
 from betocq import nc_constants
 
 
-class MccAware2g5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
-  """Test class for Aware MCC with the STA connected to 2G/5G channels."""
+class MccAwareStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
+  """Test class for Aware MCC with the STA connected to two 5G channels."""
 
   def _get_country_code(self) -> str:
     return 'US'
@@ -46,7 +39,7 @@ class MccAware2g5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
     super().setup_class()
     self._is_mcc = True
     self.performance_test_iterations = getattr(
-        self.test_mcc_aware_2g_5g_sta, base_test.ATTR_REPEAT_CNT
+        self.test_mcc_aware_sta, base_test.ATTR_REPEAT_CNT
     )
     logging.info(
         'performance test iterations: %s', self.performance_test_iterations
@@ -56,7 +49,7 @@ class MccAware2g5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
       count=nc_constants.MCC_PERFORMANCE_TEST_COUNT,
       max_consecutive_error=nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
   )
-  def test_mcc_aware_2g_5g_sta(self):
+  def test_mcc_aware_sta(self):
     """Test the performance for Aware MCC."""
     self._test_connection_medium_performance(
         upgrade_medium_under_test=nc_constants.NearbyMedium.WIFIAWARE_ONLY,
@@ -66,7 +59,7 @@ class MccAware2g5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
         connection_medium=nc_constants.NearbyMedium(
             self.test_parameters.connection_medium
         ),
-        wifi_ssid2=self.test_parameters.wifi_2g_ssid,
+        wifi_ssid2=self.test_parameters.wifi_dfs_5g_ssid,
     )
 
   def _get_file_transfer_failure_tip(self) -> str:
@@ -88,7 +81,7 @@ class MccAware2g5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
     return (
         True
         if self.test_parameters.wifi_5g_ssid
-        and self.test_parameters.wifi_2g_ssid
+        and self.test_parameters.wifi_dfs_5g_ssid
         else False
     )
 

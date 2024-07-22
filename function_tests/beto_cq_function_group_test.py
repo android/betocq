@@ -14,21 +14,11 @@
 
 """Group all function tests."""
 
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
-
+import time
 from mobly import test_runner
 
 from betocq import nc_base_test
 from betocq import nc_constants
-from betocq import setup_utils
-from betocq import version
 from betocq.function_tests import bt_ble_function_test_actor
 from betocq.function_tests import bt_multiplex_function_test_actor
 from betocq.function_tests import fixed_wifi_medium_function_test_actor
@@ -57,22 +47,36 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
     """
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.connect_to_wifi()
+    # Let scan, DHCP and internet validation complete before NC.
+    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
         nc_constants.NearbyMedium.WIFILAN_ONLY)
 
   def test_d2d_hotspot_function(self):
-    """Test the NC with upgrading to the HOTSPOT as connection medium.
+    """Test the NC with upgrading to the HOTSPOT as upgrade medium.
     """
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT)
 
   def test_wifi_direct_function(self):
-    """Test the NC with upgrading to the WiFi Direct as connection medium.
+    """Test the NC with upgrading to the WiFi Direct as upgrade medium.
     """
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT)
+
+  def test_wifi_aware_function(self):
+    """Test the NC with upgrading to the WiFi Aware as upgrade medium.
+    """
+    if (
+        self.test_parameters.target_cuj_name
+        is not nc_constants.TARGET_CUJ_QUICK_SHARE
+    ):
+      return
+    self._current_test_actor = self.fixed_wifi_medium_test_actor
+    self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
+        nc_constants.NearbyMedium.WIFIAWARE_ONLY)
 
   def test_bt_multiplex_connections(self):
     """Test the BT multiplex function of nearby connection.
@@ -113,27 +117,6 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
         },
     })
     super().teardown_test()
-
-  # @typing.override
-  def _summary_test_results(self):
-    """Summarizes test results of all function tests."""
-
-    self.record_data({
-        'Test Class': self.TAG,
-        'properties': {
-            '00_test_script_verion': version.TEST_SCRIPT_VERSION,
-            '01_source_device_serial': self.discoverer.serial,
-            '02_target_device_serial': self.advertiser.serial,
-            '03_source_GMS_version': setup_utils.dump_gms_version(
-                self.discoverer
-            ),
-            '04_target_GMS_version': setup_utils.dump_gms_version(
-                self.advertiser
-            ),
-            '05_test_result': self._test_result_messages,
-        },
-    })
-
 
 if __name__ == '__main__':
   test_runner.main()

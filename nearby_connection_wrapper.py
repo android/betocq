@@ -29,7 +29,8 @@ from betocq import nc_constants
 
 # This number should be large enough to cover advertising interval, firmware
 # scheduling timing interval and user action delay
-ADVERTISING_TO_DISCOVERY_MAX_DELAY_SEC = 4
+ADV_TO_DISCOVERY_MAX_DELAY_SEC = 4
+ADV_TO_DISCOVERY_MIN_DELAY_SEC = 2
 
 
 class NearbyConnectionWrapper:
@@ -92,7 +93,9 @@ class NearbyConnectionWrapper:
     )
     self._advertiser_connection_lifecycle_callback = advertiser_callback
 
-  def start_discovery(self, timeout: datetime.timedelta) -> None:
+  def start_discovery(
+      self, timeout: datetime.timedelta, enable_target_discovery: bool = False
+  ) -> None:
     """Starts Nearby Connection discovery."""
     self.discoverer.log.info(
         f'Start discovery {self.advertising_discovery_medium.name}'
@@ -102,6 +105,14 @@ class NearbyConnectionWrapper:
             self.service_id, self.advertising_discovery_medium.value
         )
     )
+
+    if enable_target_discovery:
+      self.advertiser.log.info(
+          f'Start discovery {self.advertising_discovery_medium.name}'
+      )
+      self.advertiser_nearby.startDiscovery(
+          self.service_id, self.advertising_discovery_medium.value
+      )
 
     endpoint_found_event = (
         self._discoverer_endpoint_discovery_callback.waitAndGet(
@@ -128,10 +139,13 @@ class NearbyConnectionWrapper:
     self.advertiser_nearby.stopAdvertising()
     self.advertiser.log.info('Stop advertising')
 
-  def stop_discovery(self) -> None:
+  def stop_discovery(self, enable_target_discovery: bool = False) -> None:
     """Stops Nearby Connection discovery."""
     self.discoverer_nearby.stopDiscovery()
     self.discoverer.log.info('Stop discovery')
+    if enable_target_discovery:
+      self.advertiser_nearby.stopDiscovery()
+      self.advertiser.log.info('Stop discovery')
 
   def request_connection(
       self,
@@ -307,6 +321,7 @@ class NearbyConnectionWrapper:
       medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DEFAULT,
       keep_alive_timeout_ms: int = 0,
       keep_alive_interval_ms: int = 0,
+      enable_target_discovery: bool = False,
   ) -> None:
     """Starts Nearby Connection between two Android devices."""
     self.test_failure_reason = (
@@ -315,12 +330,19 @@ class NearbyConnectionWrapper:
     self.start_advertising()
     # Add a random delay between adversting and discovery
     # to mimic the random delay between two devices' user action
-    time.sleep(ADVERTISING_TO_DISCOVERY_MAX_DELAY_SEC * random.random())
+    time.sleep(
+        ADV_TO_DISCOVERY_MIN_DELAY_SEC
+        + (ADV_TO_DISCOVERY_MAX_DELAY_SEC - ADV_TO_DISCOVERY_MIN_DELAY_SEC)
+        * random.random()
+    )
 
     self.test_failure_reason = (
         nc_constants.SingleTestFailureReason.SOURCE_START_DISCOVERY)
     # Start discovery.
-    self.start_discovery(timeout=timeouts.discovery_timeout)
+    self.start_discovery(
+        timeout=timeouts.discovery_timeout,
+        enable_target_discovery=enable_target_discovery,
+    )
 
     # Request connection.
     self.test_failure_reason = (
@@ -332,7 +354,7 @@ class NearbyConnectionWrapper:
         keep_alive_interval_ms=keep_alive_interval_ms)
 
     # Stop discovery.
-    self.stop_discovery()
+    self.stop_discovery(enable_target_discovery=enable_target_discovery)
 
     # Accept connection.
     self.test_failure_reason = (
@@ -348,15 +370,23 @@ class NearbyConnectionWrapper:
       file_size_kb: int,
       timeout: datetime.timedelta,
       payload_type: nc_constants.PayloadType,
+      num_files: int = nc_constants.TRANSFER_FILE_NUM_DEFAULT,
   ) -> float:
-    """Sends payloads and returns the transfer speed in kBS."""
+    """Sends payloads and returns the transfer speed in kilo byte per second."""
     try:
       self.test_failure_reason = (
           nc_constants.SingleTestFailureReason.FILE_TRANSFER_FAIL
       )
-      transfer_speed_kbs = self._transfer_file(
-          file_size_kb, timeout, payload_type
+      self.discoverer.log.info(
+          f'sending {num_files} payloads with type: {payload_type.name}'
       )
+      transfer_speed_acc_kbs = 0
+      for _ in range(num_files):
+        transfer_speed_acc_kbs = transfer_speed_acc_kbs + self._transfer_file(
+            file_size_kb, timeout, payload_type
+        )
+      transfer_speed_kbs = transfer_speed_acc_kbs / num_files
+      self.advertiser.log.info(f'{num_files} payloads received')
       self.test_failure_reason = nc_constants.SingleTestFailureReason.SUCCESS
     finally:
       # clean up
@@ -373,9 +403,7 @@ class NearbyConnectionWrapper:
     """Sends payloads and returns the transfer speed in kBS."""
     # Creates a file and send it to the advertiser.
     file_name = utils.rand_ascii_str(8)
-    self.discoverer.log.info(
-        f'Start sending payloads with type: {payload_type.name}'
-    )
+
     payload_id = self.discoverer_nearby.sendPayloadWithType(
         self._advertiser_endpoint_id, file_name, file_size_kb, payload_type
     )
@@ -410,7 +438,6 @@ class NearbyConnectionWrapper:
         predicate=lambda event: event.data['update']['isSuccess'],
         timeout=timeout.total_seconds(),
     )
-    self.advertiser.log.info('payload received')
 
     transfer_time = datetime.timedelta(
         microseconds=payload_transfer_event.data['transferTimeNs'] / 1_000)

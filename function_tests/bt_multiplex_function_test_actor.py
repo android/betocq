@@ -68,7 +68,7 @@ class BtMultiplexFunctionTestActor(
           medium_upgrade_type=nc_constants.MediumUpgradeType.NON_DISRUPTIVE)
     finally:
       self._test_failure_reason = nearby_snippet_2.test_failure_reason
-      self._test_result.quality_info = (
+      self._test_result.prior_nc_quality_info = (
           nearby_snippet_2.connection_quality_info
       )
     # 2nd bt connection
@@ -92,7 +92,7 @@ class BtMultiplexFunctionTestActor(
           medium_upgrade_type=nc_constants.MediumUpgradeType.NON_DISRUPTIVE)
     finally:
       self._test_failure_reason = nearby_snippet.test_failure_reason
-      self._test_result.prior_nc_quality_info = (
+      self._test_result.file_transfer_nc_setup_quality_info = (
           nearby_snippet.connection_quality_info
       )
 

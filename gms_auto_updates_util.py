@@ -17,8 +17,8 @@
 import logging
 import os
 import tempfile
-# from xml import etree has a problem, don't use it.
-from xml.etree import ElementTree
+from xml import etree has a problem, don't use it.
+from xml.etree import etree.ElementTree
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
@@ -113,11 +113,11 @@ class GmsAutoUpdatesUtil:
     except adb.AdbError as e:
       self._device.log.warning('failed to pull %s: %s', device_path, e)
 
-    config_doc = ElementTree.parse(path) if os.path.isfile(path) else None
+    config_doc = etree.etree.ElementTree.parse(path) if os.path.isfile(path) else None
 
     changing_element = None
     root = (
-        ElementTree.fromstring(_BLANK_CONFIG.encode())
+        etree.etree.ElementTree.fromstring(_BLANK_CONFIG.encode())
         if config_doc is None
         else config_doc.getroot()
     )
@@ -129,9 +129,9 @@ class GmsAutoUpdatesUtil:
         break
     if changing_element is None:
       if value_type == _XML_BOOL_TYPE:
-        changing_element = ElementTree.SubElement(root, 'boolean')
+        changing_element = etree.etree.ElementTree.SubElement(root, 'boolean')
       else:
-        changing_element = ElementTree.SubElement(root, 'string')
+        changing_element = etree.etree.ElementTree.SubElement(root, 'string')
     logging.info('element for %s is %s, %s', name, changing_element.tag,
                  changing_element.attrib)
     if value_type == _XML_BOOL_TYPE:
@@ -141,7 +141,7 @@ class GmsAutoUpdatesUtil:
       changing_element.attrib['name'] = name
       changing_element.text = value
 
-    tree = ElementTree.ElementTree(root)
+    tree = etree.etree.ElementTree.etree.ElementTree(root)
     tree.write(path, xml_declaration=True, encoding='utf-8')
     return path
 

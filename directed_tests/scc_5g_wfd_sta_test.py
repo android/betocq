@@ -23,14 +23,6 @@ The AP requirements:
   wifi channel: 36 (5180)
 """
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
 
 from mobly  import base_test
 from mobly import test_runner
@@ -75,17 +67,26 @@ class Scc5gWfdStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
   def _get_throughput_low_tip(self) -> str:
     return (
         f'{self._throughput_low_string}. This is a SCC 5G test case with WFD'
-        ' and STA operating at the same 5G channel.Check with the wifi chip'
-        ' vendor about the possible firmware Tx/Rx issues inthis mode. Also'
-        ' check if the AP channel is set correctly and is supported bythe used'
-        ' wifi medium.'
+        ' and STA operating at the same 5G channel. Check STA and WFD GO'
+        ' frequencies in the target logs (dumpsys wifip2p) and ensure they'
+        ' have the same value. Check with the wifi chip vendor about the'
+        ' possible firmware Tx/Rx issues in this mode. Also check if the AP'
+        ' channel is set correctly and is supported by the used wifi medium.'
     )
 
   def _is_wifi_ap_ready(self) -> bool:
     return True if self.test_parameters.wifi_5g_ssid else False
 
-  def _are_devices_capabilities_ok(self) -> bool:
-    return self.discoverer.supports_5g and self.advertiser.supports_5g
+  @property
+  def _devices_capabilities_definition(self) -> dict[str, dict[str, bool]]:
+    return {
+        'discoverer': {
+            'supports_5g': True,
+        },
+        'advertiser': {
+            'supports_5g': True,
+        },
+    }
 
 
 if __name__ == '__main__':

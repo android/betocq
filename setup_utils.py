@@ -18,11 +18,13 @@ import base64
 import dataclasses
 import datetime
 import time
-from typing import Mapping
 
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
+import yaml
 
+from google3.pyglib import resources
+from google3.testing.mobly.platforms.android.utils import phenotype_utils
 from betocq import gms_auto_updates_util
 from betocq import nc_constants
 
@@ -34,10 +36,14 @@ ADB_RETRY_WAIT_TIME_SEC = 2
 
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
+# override flags
+_FLAGS_FILE_PATH = 'google3/wireless/android/platform/testing/bettertogether/betocq/flags/nearby_flags.yaml'
+_NEARBY_FLAG_NAME = 'nearby_flags_for_test'
+_WAIT_FOR_FLAG_TAKE_EFFECT = datetime.timedelta(seconds=60)
 
 read_ph_flag_failed = False
 
-LOG_TAGS = [
+NEARBY_LOG_TAGS = [
     'Nearby',
     'NearbyMessages',
     'NearbyDiscovery',
@@ -48,7 +54,9 @@ LOG_TAGS = [
 
 
 def set_country_code(
-    ad: android_device.AndroidDevice, country_code: str
+    ad: android_device.AndroidDevice,
+    country_code: str,
+    force_telephony_cc: bool = False,
 ) -> None:
   """Sets Wi-Fi and Telephony country code.
 
@@ -61,9 +69,10 @@ def set_country_code(
   Args:
     ad: AndroidDevice, Mobly Android Device.
     country_code: WiFi and Telephony Country Code.
+    force_telephony_cc: True to force Telephony Country Code.
   """
   try:
-    _do_set_country_code(ad, country_code)
+    _do_set_country_code(ad, country_code, force_telephony_cc)
   except adb.AdbError:
     ad.log.exception(
         f'Failed to set country code on device "{ad.serial}, try again.'
@@ -73,7 +82,9 @@ def set_country_code(
 
 
 def _do_set_country_code(
-    ad: android_device.AndroidDevice, country_code: str
+    ad: android_device.AndroidDevice,
+    country_code: str,
+    force_telephony_cc: bool = False,
 ) -> None:
   """Sets Wi-Fi and Telephony country code."""
   if not ad.is_adb_root:
@@ -83,31 +94,41 @@ def _do_set_country_code(
     )
     return
 
-  ad.log.info(f'Set Wi-Fi and Telephony country code to {country_code}.')
+  ad.log.info(f'Set Wi-Fi country code to {country_code}.')
   ad.adb.shell('cmd wifi set-wifi-enabled disabled')
   time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
-  ad.adb.shell(
-      'am broadcast -a com.android.internal.telephony.action.COUNTRY_OVERRIDE'
-      f' --es country {country_code}'
-  )
+  if force_telephony_cc:
+    ad.log.info(f'Set Telephony country code to {country_code}.')
+    ad.adb.shell(
+        'am broadcast -a com.android.internal.telephony.action.COUNTRY_OVERRIDE'
+        f' --es country {country_code}'
+    )
+    toggle_airplane_mode(ad)
   ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
-  enable_airplane_mode(ad)
-  time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
-  disable_airplane_mode(ad)
   ad.adb.shell('cmd wifi set-wifi-enabled enabled')
-  telephony_country_code = (
-      ad.adb.shell('dumpsys wifi | grep mTelephonyCountryCode')
-      .decode('utf-8')
-      .strip()
-  )
-  ad.log.info(f'Telephony country code: {telephony_country_code}')
+  if force_telephony_cc:
+    telephony_country_code = (
+        ad.adb.shell('dumpsys wifi | grep mTelephonyCountryCode')
+        .decode('utf-8')
+        .strip()
+    )
+    ad.log.info(f'Telephony country code: {telephony_country_code}')
 
 
 def enable_logs(ad: android_device.AndroidDevice) -> None:
-  """Enables Nearby related logs."""
+  """Enables Nearby, WiFi and BT detailed logs."""
   ad.log.info('Enable Nearby loggings.')
-  for tag in LOG_TAGS:
+  for tag in NEARBY_LOG_TAGS:
     ad.adb.shell(f'setprop log.tag.{tag} VERBOSE')
+
+  # Enable WiFi verbose logging.
+  ad.adb.shell('cmd wifi set-verbose-logging enabled')
+
+  # Enable Bluetooth HCI logs.
+  ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
+
+  # Enable Bluetooth verbose logs.
+  ad.adb.shell('setprop persist.log.tag.bluetooth VERBOSE')
 
 
 def grant_manage_external_storage_permission(
@@ -138,7 +159,7 @@ def _do_grant_manage_external_storage_permission(
   _grant_manage_external_storage_permission(ad, package_name)
 
 
-def dump_gms_version(ad: android_device.AndroidDevice) -> Mapping[str, str]:
+def dump_gms_version(ad: android_device.AndroidDevice) -> int:
   """Dumps GMS version from dumpsys to sponge properties."""
   try:
     gms_version = _do_dump_gms_version(ad)
@@ -151,7 +172,7 @@ def dump_gms_version(ad: android_device.AndroidDevice) -> Mapping[str, str]:
   return gms_version
 
 
-def _do_dump_gms_version(ad: android_device.AndroidDevice) -> Mapping[str, str]:
+def _do_dump_gms_version(ad: android_device.AndroidDevice) -> int:
   """Dumps GMS version from dumpsys to sponge properties."""
   out = (
       ad.adb.shell(
@@ -160,7 +181,11 @@ def _do_dump_gms_version(ad: android_device.AndroidDevice) -> Mapping[str, str]:
       .decode('utf-8')
       .strip()
   )
-  return {f'GMS core version on {ad.serial}': out}
+  ad.log.info(f'GMS version: {out}')
+  prefix = 'versionCode='
+  postfix = 'minSdk'
+  search_last = False
+  return get_int_between_prefix_postfix(out, prefix, postfix, search_last)
 
 
 def toggle_airplane_mode(ad: android_device.AndroidDevice) -> None:
@@ -188,6 +213,7 @@ def connect_to_wifi(
     ssid: str,
     password: str | None = None,
 ) -> None:
+  """Connects to the specified wifi AP and raise exception if failed."""
   if not ad.nearby.wifiIsEnabled():
     ad.nearby.wifiEnable()
   # return until the wifi is connected.
@@ -362,15 +388,6 @@ def check_and_try_to_write_ph_flag(
     ad.log.info(f'failed to configure {flag_name}.')
 
 
-def enable_bluetooth_multiplex(ad: android_device.AndroidDevice) -> None:
-  """Enable bluetooth multiplex on the given device."""
-  pname = 'com.google.android.gms.nearby'
-  flag_name = 'mediums_supports_bluetooth_multiplex_socket'
-  flag_type = 'boolean'
-  flag_value = 'true'
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
 def enable_wifi_aware(ad: android_device.AndroidDevice) -> None:
   """Enable wifi aware on the given device."""
   pname = 'com.google.android.gms.nearby'
@@ -381,18 +398,23 @@ def enable_wifi_aware(ad: android_device.AndroidDevice) -> None:
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
 
 
-def enable_dfs_scc(ad: android_device.AndroidDevice) -> None:
-  """Enable WFD/WIFI_HOTSPOT in a STA-associated DFS channel."""
+def enable_instant_connection(
+    ad: android_device.AndroidDevice, enable: bool = False
+) -> None:
+  """Enable instant connection on the given device."""
   pname = 'com.google.android.gms.nearby'
-  flag_name = 'mediums_lower_dfs_channel_priority'
+  flag_name = 'connections_support_instant_connection'
   flag_type = 'boolean'
-  flag_value = 'false'
+  if enable:
+    flag_value = 'true'
+  else:
+    flag_value = 'false'
 
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
 
 
 def disable_wlan_deny_list(ad: android_device.AndroidDevice) -> None:
-  """Enable WFD/WIFI_HOTSPOT in a STA-associated DFS channel."""
+  """Disable wlan deny list on the given device."""
   pname = 'com.google.android.gms.nearby'
   flag_name = 'wifi_lan_blacklist_verify_bssid_interval_hours'
   flag_type = 'long'
@@ -401,6 +423,16 @@ def disable_wlan_deny_list(ad: android_device.AndroidDevice) -> None:
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
 
   flag_name = 'mediums_wifi_lan_temporary_blacklist_verify_bssid_interval_hours'
+  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
+
+
+def disable_usb_medium(ad: android_device.AndroidDevice) -> None:
+  """Disable USB medium on the given device as it interferes ADB connection."""
+  pname = 'com.google.android.gms.nearby'
+  flag_name = 'mediums_supports_usb'
+  flag_type = 'boolean'
+  flag_value = 'false'
+
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
 
 
@@ -437,6 +469,23 @@ def disable_redaction(ad: android_device.AndroidDevice) -> None:
   flag_value = 'false'
 
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
+
+
+def force_flag_sync(ad: android_device.AndroidDevice) -> None:
+  """Force flag sync on the given device."""
+  ad.log.info('Force flag sync.')
+  ad.adb.shell(
+      'am broadcast -a "com.google.android.gms.gcm.ACTION_TRIGGER_TASK" -e'
+      ' component'
+      ' "com.google.android.gms/.phenotype.service.sync.PhenotypeConfigurator"'
+      ' -e tag "oneoff"'
+  )
+
+
+def restart_gms(ad: android_device.AndroidDevice) -> None:
+  """Restarts GMS on the given device."""
+  ad.log.info('Restart GMS.')
+  ad.adb.shell('am force-stop com.google.android.gms')
 
 
 def install_apk(ad: android_device.AndroidDevice, apk_path: str) -> None:
@@ -497,11 +546,16 @@ def get_wifi_sta_max_link_speed(ad: android_device.AndroidDevice) -> int:
 
 
 def get_int_between_prefix_postfix(
-    string: str, prefix: str, postfix: str
+    string: str, prefix: str, postfix: str, search_last: bool = True
 ) -> int:
-  left_index = string.rfind(prefix)
-  right_index = string.rfind(postfix)
-  if left_index > 0 and right_index > left_index:
+  """Get int between prefix and postfix by searching prefix and then postfix."""
+  if search_last:
+    left_index = string.rfind(prefix)
+    right_index = string.rfind(postfix)
+  else:
+    left_index = string.find(prefix)
+    right_index = string.find(postfix)
+  if left_index >= 0 and right_index > left_index:
     try:
       return int(string[left_index + len(prefix): right_index].strip())
     except ValueError:
@@ -532,3 +586,87 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
 def get_hardware(ad: android_device.AndroidDevice) -> str:
   """Gets hardware information on the given device."""
   return ad.adb.getprop('ro.hardware')
+
+
+def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
+  """get the scan rssi of the given device and SSID."""
+  try:
+    scan_result = (
+        ad.adb.shell(f'cmd wifi list-scan-results|grep {ssid}')
+        .decode('utf-8')
+        .strip()
+    )
+    if scan_result:
+      return int(scan_result.split()[2].strip())
+    return nc_constants.INVALID_RSSI
+  except adb.AdbError:
+    return nc_constants.INVALID_RSSI
+
+
+@dataclasses.dataclass(frozen=True)
+class PhenotypeFlag:
+  type: phenotype_utils.FlagTypes
+  value: str
+
+
+def _get_phenotype_flag(
+    value: bool | bytes | float | int | str,
+) -> PhenotypeFlag:
+  """Gets Phenotype flag type and value."""
+  if isinstance(value, bool):
+    return PhenotypeFlag(
+        type=phenotype_utils.FlagTypes.BOOLEAN,
+        value='true' if value else 'false',
+    )
+  elif isinstance(value, bytes):
+    return PhenotypeFlag(
+        type=phenotype_utils.FlagTypes.BYTES,
+        value=base64.b64encode(value).decode('utf-8'),
+    )
+  elif isinstance(value, float):
+    return PhenotypeFlag(
+        type=phenotype_utils.FlagTypes.DOUBLE,
+        value=str(value),
+    )
+  elif isinstance(value, int):
+    return PhenotypeFlag(
+        type=phenotype_utils.FlagTypes.LONG,
+        value=str(value),
+    )
+  else:
+    raise ValueError(f'Invalid type for PhenotypeOverride {type(value)}.')
+
+
+def flip_nearby_flags(ad: android_device.AndroidDevice) -> None:
+  """Flips Nearby flags.
+
+  Flags definition:
+  cs/file:testing/bettertogether/betocq/flags/nearby_flags.yaml%20content:nearby_flags_for_test
+
+  Args:
+    ad: Android device for fliping flags to enable nearby features for e2e
+      tests.
+  """
+  data = yaml.safe_load(resources.GetResource(_FLAGS_FILE_PATH))
+  for package in data[_NEARBY_FLAG_NAME].keys():
+    phenotype_names = []
+    phenotype_values = []
+    phenotype_types = []
+    for name, value in data[_NEARBY_FLAG_NAME][package].items():
+      flag = _get_phenotype_flag(value)
+      phenotype_names.append(name)
+      phenotype_values.append(flag.value)
+      phenotype_types.append(flag.type)
+      ad.log.info(
+          'Found new flag:\n\tpackage: %s\n\tname: %s\n\tvalue: %s\n\ttype: %s',
+          package,
+          name,
+          flag.value,
+          flag.type,
+      )
+    ad.log.info('Overriding flags...')
+    phenotype_utils.overrides(
+        ad, package, phenotype_names, phenotype_values, phenotype_types
+    )
+  phenotype_utils.trigger_sync(ad)
+  time.sleep(_WAIT_FOR_FLAG_TAKE_EFFECT.total_seconds())

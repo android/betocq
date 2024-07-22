@@ -26,15 +26,6 @@ The AP requirements:
 """
 
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
-
 from mobly  import base_test
 from mobly import test_runner
 
@@ -80,7 +71,7 @@ class Scc5gWfdDbs2gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
     return (
         f'{self._throughput_low_string}. This is a SCC 5G test case with WFD'
         ' medium operating at 5G and STA operating at 2G. In the configuration'
-        ' file, DBS support is set to true. Check if the device does support'
+        ' file, DBS support is set to true. Check if thedevice does support'
         ' DBS with STA + WFD concurrency. Check with the wifi chipvendor about'
         ' the possible firmware Tx/Rx issues in this mode.'
     )

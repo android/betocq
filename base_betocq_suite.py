@@ -48,11 +48,11 @@ class BaseBetocqSuite(base_suite.BaseSuite):
         and records.TestResultEnums.RECORD_NAME not in entry
     ]
     class_results = {
-      'suite_name': _BETOCQ_SUITE_NAME,
-      'run_identifier': f'v{version.TEST_SCRIPT_VERSION}',
+        'suite_name': _BETOCQ_SUITE_NAME,
+        'run_identifier': f'v{version.TEST_SCRIPT_VERSION}',
     }
     for entry in class_data:
-      properties = entry.get('properties', {})
+      properties = entry.get('properties', entry.get('properties', {}))
       for key, value in properties.items():
         # prepend '0'/'1' so the properties appear first in lexicographic order
         if key.endswith('source_device'):

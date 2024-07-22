@@ -27,14 +27,6 @@ The AP requirements:
 """
 
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
 
 from mobly  import base_test
 from mobly import test_runner

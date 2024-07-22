@@ -16,7 +16,6 @@
 import time
 from mobly import utils
 from mobly.controllers import android_device
-
 from betocq import nc_constants
 
 # IPv4, 10 sec, 1 stream
@@ -170,7 +169,6 @@ def get_wlan_ifname(ad: android_device.AndroidDevice) -> str:
   return ''
 
 
-
 def get_p2p_ifname(ad: android_device.AndroidDevice) -> str:
   """Get P2P interface name from ifconfig."""
   return  get_ifconfig_p2p(ad).split()[0].strip()
@@ -226,7 +224,7 @@ def get_ifconfig_wlan(
     ad: android_device.AndroidDevice,
 ) -> str:
   """Get wlan network info from adb shell ifconfig."""
-  return ad.adb.shell('ifconfig | grep -A5 wlan').decode('utf-8').strip()
+  return ad.adb.shell('ifconfig | grep -A6 wlan').decode('utf-8').strip()
 
 
 def get_ifconfig_p2p(

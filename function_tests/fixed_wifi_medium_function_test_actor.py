@@ -65,9 +65,10 @@ class FixedWifiMediumFunctionTestActor(
     try:
       self._test_result.file_transfer_throughput_kbps = (
           nearby_snippet.transfer_file(
-              nc_constants.TRANSFER_FILE_SIZE_1KB,
-              nc_constants.WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT,
-              nc_constants.PayloadType.FILE))
+              nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+              nc_constants.TRANSFER_TIMEOUT_FUNC_TEST_SEC,
+              nc_constants.PayloadType.FILE,
+              nc_constants.TRANSFER_FILE_NUM_FUNC_TEST))
     finally:
       self._test_failure_reason = nearby_snippet.test_failure_reason
 
@@ -148,5 +149,8 @@ class FixedWifiMediumFunctionTestActor(
 
   def _get_file_transfer_failure_tip(self) -> str:
     if self._wifi_medium_under_test is not None:
-      return f'{self._wifi_medium_under_test.name}: the performance is too bad.'
+      return (
+          f'{self._wifi_medium_under_test.name}: the transfer times out. Check'
+          ' if medium is still connected and review logcats for more details.'
+      )
     asserts.fail('unexpected calling of _get_file_transfer_failure_tip')

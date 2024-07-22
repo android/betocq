@@ -16,15 +16,6 @@
 
 import datetime
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
-
 from mobly  import base_test
 from mobly import test_runner
 
@@ -55,7 +46,9 @@ class BtPerformanceTest(d2d_performance_test_base.D2dPerformanceTestBase):
     """Test the performance of the classic BT connetion."""
     self._test_connection_medium_performance(
         upgrade_medium_under_test=nc_constants.NearbyMedium.BT_ONLY,
-        force_disable_bt_multiplex=True
+        force_disable_bt_multiplex=True,
+        keep_alive_timeout_ms=nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
+        keep_alive_interval_ms=nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
     )
 
   def _get_transfer_file_size(self) -> int:

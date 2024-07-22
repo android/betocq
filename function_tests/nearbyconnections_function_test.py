@@ -21,8 +21,6 @@ from mobly.snippet import errors
 from betocq import nc_base_test
 from betocq import nc_constants
 from betocq import nearby_connection_wrapper
-from betocq import setup_utils
-from betocq import version
 
 
 class NearbyConnectionsFunctionTest(nc_base_test.NCBaseTestClass):
@@ -95,30 +93,11 @@ class NearbyConnectionsFunctionTest(nc_base_test.NCBaseTestClass):
     )
     self.record_data({
         'Test Name': self.current_test_info.name,
-        'sponge_properties': {
+        'properties': {
             'result': self._get_test_result_message(),
         },
     })
     super().teardown_test()
-
-  def _summary_test_results(self):
-    """Summarizes test results of all function tests."""
-
-    self.record_data({
-        'Test Class': self.TAG,
-        'sponge_properties': {
-            '00_test_script_verion': version.TEST_SCRIPT_VERSION,
-            '01_source_device_serial': self.discoverer.serial,
-            '02_target_device_serial': self.advertiser.serial,
-            '03_source_GMS_version': setup_utils.dump_gms_version(
-                self.discoverer
-            ),
-            '04_target_GMS_version': setup_utils.dump_gms_version(
-                self.advertiser
-            ),
-            '05_test_result': self._test_result_messages,
-        },
-    })
 
   def _get_test_result_message(self) -> str:
     if self._skipped:

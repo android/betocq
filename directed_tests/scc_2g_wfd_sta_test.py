@@ -19,18 +19,12 @@ Note that The country code is set to JP so that 5G is not available for
 any D2D mediums.
 
 The device requirements: N/A.
+The AP requirements:
+  wifi channel: 6 (2437)
 """
 
 import datetime
 import logging
-import os
-import sys
-
-# Allows local imports to be resolved via relative path, so the test can be run
-# without building.
-_betocq_dir = os.path.dirname(os.path.dirname(__file__))
-if _betocq_dir not in sys.path:
-  sys.path.append(_betocq_dir)
 
 from mobly  import base_test
 from mobly import test_runner
@@ -89,6 +83,7 @@ class Scc2gWfdStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
 
   def _is_wifi_ap_ready(self) -> bool:
     return True if self.test_parameters.wifi_2g_ssid else False
+
 
 if __name__ == '__main__':
   test_runner.main()
