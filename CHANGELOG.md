@@ -1,5 +1,28 @@
 # BetoCQ test suite release history
 
+## 2.3.1 (06/24/2024)
+
+## New
+* Reformat and unify the test summary field definitions for all tests
+* Enable WiFi/BT verbose logging and BT HCI full log.
+* Add target model, build_id, wifi_chipset, gms_versions to suite-level
+  properties.
+* Add the devices-too-close issue to the common known issue list.
+* Set AP's country code when using OpenWrt AP device.
+
+
+### Bug fixes
+* Add idle time after wifi connection for WLAN function test.
+* Fix the keepAlive timeout and interval for BLE/BT performance tests which now
+  use 30s timeout instead of 10s.
+* Report per-iteration test info with a separate line for each field.
+* Don't force telephony country code by default as it changes timestamp which
+  makes debugging difficult.
+* Add an option to run iperf test only if NC speed is low.
+* Disable iperf speed test by default.
+* Disable iperf speed check even if the test is done.
+* Disable max_link_speed check in AP frequency check.
+
 ## 2.3 (05/28/2024)
 
 ## New
