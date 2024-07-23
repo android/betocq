@@ -171,8 +171,7 @@ class TestParameters:
   run_iperf_test: bool = False
   run_iperf_test_if_nc_speed_is_low: bool = True
   run_nearby_connections_function_tests: bool = False
-  # keep it to True in AOSP as wifi_chipset info is required for OEM test.
-  skip_test_if_wifi_chipset_is_empty: bool = False
+  skip_test_if_wifi_chipset_is_empty: bool = True
   skip_bug_report: bool = False
   force_telephony_cc: bool = False
   bypass_airplane_mode_toggling: bool = False
