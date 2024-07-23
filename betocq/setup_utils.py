@@ -14,17 +14,12 @@
 
 """Android Nearby device setup."""
 
-import base64
-import dataclasses
 import datetime
 import time
 
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
-import yaml
 
-from google3.pyglib import resources
-from google3.testing.mobly.platforms.android.utils import phenotype_utils
 from betocq import gms_auto_updates_util
 from betocq import nc_constants
 
@@ -37,7 +32,6 @@ ADB_RETRY_WAIT_TIME_SEC = 2
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
 # override flags
-_FLAGS_FILE_PATH = 'google3/wireless/android/platform/testing/bettertogether/betocq/flags/nearby_flags.yaml'
 _NEARBY_FLAG_NAME = 'nearby_flags_for_test'
 _WAIT_FOR_FLAG_TAKE_EFFECT = datetime.timedelta(seconds=60)
 
@@ -602,71 +596,3 @@ def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
   except adb.AdbError:
     return nc_constants.INVALID_RSSI
 
-
-@dataclasses.dataclass(frozen=True)
-class PhenotypeFlag:
-  type: phenotype_utils.FlagTypes
-  value: str
-
-
-def _get_phenotype_flag(
-    value: bool | bytes | float | int | str,
-) -> PhenotypeFlag:
-  """Gets Phenotype flag type and value."""
-  if isinstance(value, bool):
-    return PhenotypeFlag(
-        type=phenotype_utils.FlagTypes.BOOLEAN,
-        value='true' if value else 'false',
-    )
-  elif isinstance(value, bytes):
-    return PhenotypeFlag(
-        type=phenotype_utils.FlagTypes.BYTES,
-        value=base64.b64encode(value).decode('utf-8'),
-    )
-  elif isinstance(value, float):
-    return PhenotypeFlag(
-        type=phenotype_utils.FlagTypes.DOUBLE,
-        value=str(value),
-    )
-  elif isinstance(value, int):
-    return PhenotypeFlag(
-        type=phenotype_utils.FlagTypes.LONG,
-        value=str(value),
-    )
-  else:
-    raise ValueError(f'Invalid type for PhenotypeOverride {type(value)}.')
-
-
-def flip_nearby_flags(ad: android_device.AndroidDevice) -> None:
-  """Flips Nearby flags.
-
-  Flags definition:
-  cs/file:testing/bettertogether/betocq/flags/nearby_flags.yaml%20content:nearby_flags_for_test
-
-  Args:
-    ad: Android device for fliping flags to enable nearby features for e2e
-      tests.
-  """
-  data = yaml.safe_load(resources.GetResource(_FLAGS_FILE_PATH))
-  for package in data[_NEARBY_FLAG_NAME].keys():
-    phenotype_names = []
-    phenotype_values = []
-    phenotype_types = []
-    for name, value in data[_NEARBY_FLAG_NAME][package].items():
-      flag = _get_phenotype_flag(value)
-      phenotype_names.append(name)
-      phenotype_values.append(flag.value)
-      phenotype_types.append(flag.type)
-      ad.log.info(
-          'Found new flag:\n\tpackage: %s\n\tname: %s\n\tvalue: %s\n\ttype: %s',
-          package,
-          name,
-          flag.value,
-          flag.type,
-      )
-    ad.log.info('Overriding flags...')
-    phenotype_utils.overrides(
-        ad, package, phenotype_names, phenotype_values, phenotype_types
-    )
-  phenotype_utils.trigger_sync(ad)
-  time.sleep(_WAIT_FOR_FLAG_TAKE_EFFECT.total_seconds())
