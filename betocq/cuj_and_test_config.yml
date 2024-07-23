@@ -14,10 +14,10 @@ x-test-params: &test-params
   run_bt_performance_test: True
   run_directed_test: True
   run_compound_test: True
-  run_iperf_test: True
+  run_bt_coex_test: True
+  run_iperf_test: False
   allow_unrooted_device: False
   skip_bug_report: False
-
 x-controllers: &controllers
   Controllers:
     AndroidDevice:
@@ -58,18 +58,16 @@ x-controllers: &controllers
         # The max number of spatial streams in DBS mode.
         max_num_streams_dbs: 2
         # if the device supports to start WFD group owner at a STA-associated DFS channel
-        enable_sta_dfs_channel_for_peer_network: True
+        enable_sta_dfs_channel_for_peer_network: False
         # if the device supports to start WFD group owner at a STA-associated indoor channel
-        enable_sta_indoor_channel_for_peer_network: True
+        enable_sta_indoor_channel_for_peer_network: False
         # 14 - U, 13 - T, 12 - S
         android_version: 14
-
 TestBeds:
 - Name: Default
   <<: *controllers
   TestParams:
       <<: *test-params
-
 - Name: Quickstart
   <<: *controllers
   TestParams:
@@ -79,22 +77,6 @@ TestBeds:
       run_function_tests_with_performance_tests: True
       # if the function tests is failed, abort the performance test
       abort_all_tests_on_function_tests_fail: True
-
-- Name: NearbyConnectionsFunction
-  <<: *controllers
-  TestParams:
-      <<: *test-params
-      target_cuj_name: "nearby_connections_function"
-      requires_3p_api_test: True
-      run_function_tests_with_performance_tests: False
-      run_bt_performance_test: False
-      run_ble_performance_test: False
-      run_bt_coex_test: False
-      run_directed_test: False
-      run_compound_test: False
-      run_iperf_test: False
-      run_nearby_connections_function_tests: True
-
 - Name: Quickshare
   <<: *controllers
   TestParams:
@@ -105,20 +87,32 @@ TestBeds:
       # if the function tests is failed, abort the performance test
       abort_all_tests_on_function_tests_fail: True
       run_ble_performance_test: True
-
 - Name: EsimTransfer
   <<: *controllers
   TestParams:
       <<: *test-params
       target_cuj_name: "setting_based_esim_transfer"
-
 - Name: QuickstartFunction
   Controllers:
     <<: *controllers
   TestParams:
       <<: *test-params
       target_cuj_name: "quick_start"
-
+- Name: NearbyConnectionsFunction
+  <<: *controllers
+  TestParams:
+    <<: *test-params
+    target_cuj_name: "nearby_connections_function"
+    requires_3p_api_test: True
+    connect_to_wifi_before_test: True
+    run_function_tests_with_performance_tests: False
+    run_bt_performance_test: False
+    run_ble_performance_test: False
+    run_bt_coex_test: False
+    run_directed_test: False
+    run_compound_test: False
+    run_iperf_test: False
+    run_nearby_connections_function_tests: True
 - Name: QuickshareFunctionTest
   Controllers:
     <<: *controllers
