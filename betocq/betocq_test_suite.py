@@ -236,6 +236,11 @@ class BetoCqPerformanceTestSuite(base_betocq_suite.BaseBetocqSuite):
     self.add_enabled_test_classes_from_selection()
 
 
-if __name__ == '__main__':
+def main() -> None:
+  """Explicitly define a main() to serve as entry point from pip install."""
   # Use suite_runner's `main`.
   suite_runner.run_suite_class()
+
+
+if __name__ == '__main__':
+  main()

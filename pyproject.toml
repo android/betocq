@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "betocq"
+version = "2.3.1"
+description = "Better Together Connectivity Quality test suite."
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "mobly",
+  "mobly-wifi",
+]
+
+[project.scripts]
+betocq_test_suite = "betocq.betocq_test_suite:main"
+
+[project.urls]
+Homepage = "https://github.com/android/betocq"
