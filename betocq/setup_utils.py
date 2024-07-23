@@ -31,10 +31,6 @@ ADB_RETRY_WAIT_TIME_SEC = 2
 
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
-# override flags
-_NEARBY_FLAG_NAME = 'nearby_flags_for_test'
-_WAIT_FOR_FLAG_TAKE_EFFECT = datetime.timedelta(seconds=60)
-
 read_ph_flag_failed = False
 
 NEARBY_LOG_TAGS = [
