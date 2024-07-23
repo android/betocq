@@ -237,7 +237,13 @@ class BetoCqPerformanceTestSuite(base_betocq_suite.BaseBetocqSuite):
 
 
 def main() -> None:
-  """Explicitly define a main() to serve as entry point from pip install."""
+  """Entry point for execution as pip installed script."""
+  # Mobly's suite_runner searches for suite classes in the __main__ namespace,
+  # which breaks when main() is called from a module import. Manually add the
+  # suite class to the __main__ module namespace as a workaround.
+  import sys
+  sys.modules['__main__'].__dict__[
+      BetoCqPerformanceTestSuite.__name__] = BetoCqPerformanceTestSuite
   # Use suite_runner's `main`.
   suite_runner.run_suite_class()
 
