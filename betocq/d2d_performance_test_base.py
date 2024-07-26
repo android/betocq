@@ -207,7 +207,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
       ):
         nc_min_throughput_mbyte_per_sec = min(
             nc_min_throughput_mbyte_per_sec,
-            nc_constants.WLAN_THROUGHPUT_CAP_MBPS,
+            nc_constants.WLAN_MEDIUM_THROUGHPUT_CAP_MBPS,
         )
 
     self.advertiser.log.info(
@@ -773,11 +773,12 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     ]
     if not filtered:
       # all test cases are failed
-      return nc_constants.TestResultStats(0, 0, 0, 0)
+      return nc_constants.TestResultStats(0, 0, 0, 0, 0)
     # use the descenting order of the throughput
     filtered.sort(reverse=True)
     return nc_constants.TestResultStats(
         len(filtered),
+        0,
         self.__convert_kbps_to_mbps(filtered[len(filtered) - 1]),
         self.__convert_kbps_to_mbps(
             filtered[int(len(filtered) * nc_constants.PERCENTILE_50_FACTOR)]
@@ -795,7 +796,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     ]
     if not filtered:
       # All test cases are failed.
-      return nc_constants.TestResultStats(0, 0, 0, 0)
+      return nc_constants.TestResultStats(0, 0, 0, 0, 0)
 
     filtered.sort()
 
@@ -805,6 +806,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     )
     return nc_constants.TestResultStats(
         len(filtered),
+        filtered.count(0),
         round(filtered[0], nc_constants.LATENCY_PRECISION_DIGITS),
         percentile_50,
         round(
@@ -969,6 +971,9 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
           self._performance_test_metrics.medium_upgrade_latencies
       )
       stats.append(f'upgrade_count: {upgrade_latency_stats.success_count}')
+      stats.append(
+          f'instant_connection_count: {upgrade_latency_stats.zero_count}'
+      )
       stats.append(f'upgrade_latency_min: {upgrade_latency_stats.min_val}')
       stats.append(f'upgrade_latency_med: {upgrade_latency_stats.median_val}')
       stats.append(f'upgrade_latency_max: {upgrade_latency_stats.max_val}')
