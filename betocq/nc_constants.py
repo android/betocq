@@ -63,7 +63,9 @@ MAX_PHY_RATE_PER_STREAM_N_20_MBPS = 72
 MCC_THROUGHPUT_MULTIPLIER = 0.25
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
-WLAN_THROUGHPUT_CAP_MBPS = 20  # cap for WLAN medium due to encryption overhead
+WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
+    15  # cap for WLAN medium due to encryption overhead
+)
 
 CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
 BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
@@ -498,6 +500,7 @@ class NcPerformanceTestMetrics:
 class TestResultStats:
   """The test result stats."""
   success_count: int | None = None
+  zero_count: int | None = None
   min_val: float | None = None
   median_val: float | None = None
   max_val: float | None = None

@@ -20,6 +20,8 @@ This requires 3 APs to be ready and configured in testbed.
 DFS 5G AP(wifi_dfs_5g_ssid): channel 52 (5260)
 """
 
+import sys
+
 from mobly import suite_runner
 
 from betocq import base_betocq_suite
@@ -52,6 +54,7 @@ from betocq.function_tests import nearbyconnections_function_test
 class BetoCqPerformanceTestSuite(base_betocq_suite.BaseBetocqSuite):
   """Add all BetoCQ tests to run in sequence."""
 
+  # pylint: disable=line-too-long
   def __init__(self, runner, config):
     super().__init__(runner, config)
     self._enabled_test_classes = {}
@@ -79,6 +82,7 @@ class BetoCqPerformanceTestSuite(base_betocq_suite.BaseBetocqSuite):
       self.add_test_class( # DO_NOT_TRANSFORM
           test_class, config=self._enabled_test_classes[test_class], tests=tests
       )
+  # pylint: enable=line-too-long
 
   def setup_suite(self, config):
     """Add all BetoCQ tests to the suite."""
@@ -241,7 +245,6 @@ def main() -> None:
   # Mobly's suite_runner searches for suite classes in the __main__ namespace,
   # which breaks when main() is called from a module import. Manually add the
   # suite class to the __main__ module namespace as a workaround.
-  import sys
   sys.modules['__main__'].__dict__[
       BetoCqPerformanceTestSuite.__name__] = BetoCqPerformanceTestSuite
   # Use suite_runner's `main`.
