@@ -17,7 +17,6 @@
 import logging
 import os
 import tempfile
-# from xml import etree has a problem, don't use it.
 from xml.etree import ElementTree
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
