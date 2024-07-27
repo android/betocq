@@ -31,6 +31,7 @@ ADB_RETRY_WAIT_TIME_SEC = 2
 
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
+
 read_ph_flag_failed = False
 
 NEARBY_LOG_TAGS = [
@@ -212,12 +213,22 @@ def connect_to_wifi(
   ad.nearby.wifiConnectSimple(ssid, password)
 
 
-def disconnect_from_wifi(ad: android_device.AndroidDevice) -> None:
+def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
+  """Removes and disconnects all wifi network on the given device."""
   if not ad.is_adb_root:
     ad.log.info("Can't clear wifi network in non-rooted device")
     return
+  was_wifi_enabled = ad.nearby.wifiIsEnabled()
+  if was_wifi_enabled:
+    # wifiClearConfiguredNetworks() calls getConfiguredNetworks() and
+    # removeNetworks() which could take a long time to complete because these
+    # calls have the complicated ownership check and wifi thread could be busy
+    # with other tasks. Wifi thread is optimized in V but not in old releases.
+    # Therefore let's disable wifi so that these calls can be completed on time.
+    ad.nearby.wifiDisable()
   ad.nearby.wifiClearConfiguredNetworks()
-  time.sleep(WIFI_DISCONNECTION_DELAY_SEC)
+  if was_wifi_enabled:
+    ad.nearby.wifiEnable()
 
 
 def _grant_manage_external_storage_permission(
@@ -591,4 +602,3 @@ def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
     return nc_constants.INVALID_RSSI
   except adb.AdbError:
     return nc_constants.INVALID_RSSI
-
