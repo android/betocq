@@ -15,7 +15,7 @@
 """Define the Beto CQ test script version."""
 
 
-TEST_SCRIPT_VERSION = '2.3.1'
+TEST_SCRIPT_VERSION = '2.3.2'
 
 # VERSION_LOG (only add new description for new version, keep the history log)
 # '2.0.0': 'initial version'
@@ -23,3 +23,4 @@ TEST_SCRIPT_VERSION = '2.3.1'
 # '2.2.0': 'add iperf for AWARE,HOTSPOT mode and disable WLAN deny list.'
 # '2.3.0': 'fix the low NC speed issue.'
 # '2.3.1': 'fix WLAN function test and improve the report format.'
+# '2.3.2': 'fix network removal and other various issues.'
