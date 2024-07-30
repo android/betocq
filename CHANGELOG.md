@@ -1,5 +1,22 @@
 # BetoCQ test suite release history
 
+## 2.3.2 (07/29/2024)
+
+## New
+* Add sniffer capture with 2nd programmable AP. The sniffer capture has the
+  known issue of missing ACK sometimes.
+* Add the support of sending multiple files and enable them in function test.
+* Add the support of instant connection. This is disabled by default.
+
+## Bug fixes
+* Fix the occasional connection issue by disabling WiFi before removing all
+  network. When WiFi is active, it is sometimes too busy and leads to the
+  network removal or config read timing out after 4s.
+* Lower WLAN medium speed from 20 to 15MB/s as it is limited by the encryption
+  overhead.
+* Disable USB medium to avoid interfering ADB connection.
+* Add high RSSI check and warning after the connection failure.
+
 ## 2.3.1 (06/24/2024)
 
 ## New
