@@ -326,22 +326,43 @@ def check_if_ph_flag_committed(
   Returns:
     True if the P/H flag is committed.
   """
-  global read_ph_flag_failed
   if read_ph_flag_failed:
     return False
+  flag_result = get_committed_ph_flags(ad, pname)
+  return flag_name in flag_result
+
+
+def get_committed_ph_flags(
+    ad: android_device.AndroidDevice,
+    pname: str,
+) -> str:
+  """Get committed P/H flags.
+
+  Some devices don't support to check the flag with sqlite3. After the flag
+  check fails for the first time, it won't try it again.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+    pname: The package name of the P/H flag.
+
+  Returns:
+    List of committed P/H flags
+  """
+  global read_ph_flag_failed
+  if read_ph_flag_failed:
+    return ''
   sql_str = (
       'sqlite3 /data/data/com.google.android.gms/databases/phenotype.db'
       ' "select name, quote(coalesce(intVal, boolVal, floatVal, stringVal,'
       ' extensionVal)) from FlagOverrides where committed=1 AND'
-      f' packageName=\'{pname}\';"'
+      f" packageName='{pname}';\""
   )
   try:
-    flag_result = ad.adb.shell(sql_str).decode('utf-8').strip()
-    return flag_name in flag_result
+    return ad.adb.shell(sql_str).decode('utf-8').strip()
   except adb.AdbError:
     read_ph_flag_failed = True
-    ad.log.exception('Failed to check PH flag')
-  return False
+    ad.log.exception('Failed to get committed P/H flags')
+  return ''
 
 
 def write_ph_flag(
