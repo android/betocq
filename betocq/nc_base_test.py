@@ -51,6 +51,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
   """The Base of Nearby Connection E2E tests."""
 
   _run_identifier_is_set = False
+  _committed_ph_flags_is_set = False
 
   def __init__(self, configs):
     super().__init__(configs)
@@ -83,6 +84,8 @@ class NCBaseTestClass(base_test.BaseTestClass):
     self._set_run_identifier()
     self._setup_openwrt_wifi()
     self.ads = self.register_controller(android_device, min_number=2)
+    # record the flags only for the first device
+    self._set_committed_ph_flags(self.ads[0])
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
@@ -164,6 +167,25 @@ class NCBaseTestClass(base_test.BaseTestClass):
     run_identifier_str = f'{{{run_identifier_str}}}'
     self.record_data({'properties': {'run_identifier': run_identifier_str}})
     NCBaseTestClass._run_identifier_is_set = True
+
+  def _set_committed_ph_flags(self, ad) -> None:
+    """Set a committed_ph_flags property describing the committed P/H flags.
+
+    This property is only set once, even if multiple test classes are run as
+    part of a test suite.
+
+    Args:
+      ad: AndroidDevice, Mobly Android Device.
+    """
+
+    if NCBaseTestClass._committed_ph_flags_is_set:
+      return
+
+    flags = setup_utils.get_committed_ph_flags(
+        ad, 'com.google.android.gms.nearby'
+    )
+    self.record_data({'properties': {'committed_ph_flags': flags}})
+    NCBaseTestClass._committed_ph_flags_is_set = True
 
   def _setup_openwrt_wifi(self):
     """Sets up the wifi connection with OpenWRT."""
