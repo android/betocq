@@ -91,6 +91,7 @@ class SccIndoor5gWfdStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
     return {
         'discoverer': {
             'supports_5g': True,
+            'enable_sta_indoor_channel_for_peer_network': True,
         },
         'advertiser': {
             'supports_5g': True,
