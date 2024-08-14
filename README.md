@@ -147,6 +147,7 @@ BetoCQ takes three steps to address this issue:
     installing a VPN app in devices.
 
 *   **Test host.**
+    
     The test host should be a Linux or Windows machine with the following
     libraries installed:
     - python3.11 or later
