@@ -146,6 +146,31 @@ BetoCQ takes three steps to address this issue:
     google.com. Note that in China, this test requires an office VPN network or
     installing a VPN app in devices.
 
+*   **Test host.**
+    The test host should be a Linux or Windows machine with the following
+    libraries installed:
+    - python3.11 or later
+      - Check your Python 3 version number:
+
+      ```
+      python3 --version
+      ```
+
+      - If your version is lower than Python 3.11, install the latest version:
+
+      ```
+      sudo apt install python3
+      ```
+      Or install the latest version from [python.org](https://www.python.org/downloads/windows) for Windows.
+    - ADB
+      - If you don't already have the `adb` command-line tool, download and
+        install it from
+        [Android SDK Platform Tools](https://developer.android.com/tools/releases/platform-tools#downloads).
+      - Make sure that the installed binary is in the host's `PATH`, so it can
+        be run directly with `adb` in the command line.
+        - For Windows, follow
+          [these instructions](https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho).
+
 *   **Target device.**
 
     The target device must run a userdebug image of the latest Android version,
@@ -186,33 +211,14 @@ Follow these steps to prepare and execute tests and review test results.
 
 Prepare the following materials to be used for the tests.
 
-#### Get the test codes, tools, and configure build
+#### Get the test codes and tools
 
-1.  Download the latest release test binary files from
-   https://github.com/android/betocq/releases and save them in a local
-   directory:
+Download the latest release test binary files from
+https://github.com/android/betocq/releases and save them in a local directory:
    - `betocq_x.y.z-py3-none-any.whl`
    - `local_mobly_runner.py`
    - `cuj_and_test_config.yml`
    where `x.y.z` stands for the latest release version.
-
-2.  Check and install Python version 3.11 or later:
-    -   Check your Python 3 version number:
-
-      ```
-      python3 --version
-      ```
-
-    -   If your version is lower than Python 3.11, install Python 3.11 or later:
-
-      ```
-      sudo apt install python3
-      ```
-      Or install the latest version from
-      [python.org](https://www.python.org/downloads/windows) for Windows.
-
-3. Windows only: Download [adb](https://developer.android.com/tools/releases/platform-tools)
-   and add its path to the [`Path` environment variable](https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho).
 
 #### Configure Wi-Fi AP and test
 
