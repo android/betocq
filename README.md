@@ -138,38 +138,35 @@ BetoCQ takes three steps to address this issue:
 
 *   **Wi-Fi Access Point (AP) and network.**
 
-    The test AP must be a dual-band capable Wi-Fi AP with two SSIDs (one at
-    2&nbsp;GHz and one at 5&nbsp;GHz) with support for DFS channels. Example of
-    routers that meet the testing requirements include NETGEAR RAX50 AX5400,
-    NETGEAR RAX120 AX6000, and NETGEAR R8000b AC3200. It's ideal to use two APs
-    to support all test cases. The test AP must have the access to
-    google.com. Note that in China, this test requires an office VPN network or
-    installing a VPN app in devices.
+    - The test AP must be a dual-band capable Wi-Fi AP with two SSIDs (one at
+    2&nbsp;GHz and one at 5&nbsp;GHz) with support for DFS channels. There are 
+    three Wi-Fi channels to be tested: 2437, 5180, and 5260.
+      - 5260 is a [DFS channel]
+        (https://en.wikipedia.org/wiki/List_of_WLAN_channels).
+    - Examples of routers that meet the testing requirements include NETGEAR 
+    RAX50 AX5400, NETGEAR RAX120 AX6000, and NETGEAR R8000b AC3200. It's ideal
+    to use two APs to support all test cases.
+    - The test AP must have the access to google.com. Note that in China, this
+    test requires an office VPN network or installing a VPN app in devices.
 
 *   **Test host.**
     
     The test host should have the following libraries installed:
-    - python3.11 or later
+    - python3.12 or later
       - Check your Python 3 version number:
 
       ```
       python3 --version
       ```
 
-      - If your version is lower than Python 3.11, install the latest version:
-
-      ```
-      sudo apt install python3
-      ```
-      Or install the latest version from [python.org](https://www.python.org/downloads/windows) for Windows.
+      - If your version is lower than Python 3.12, install the latest version
+      following https://wiki.python.org/moin/BeginnersGuide/Download.
     - ADB
       - If you don't already have the `adb` command-line tool, download and
         install it from
         [Android SDK Platform Tools](https://developer.android.com/tools/releases/platform-tools#downloads).
       - Make sure that the installed binary is in the host's `PATH`, so it can
         be run directly with `adb` in the command line.
-        - For Windows, follow
-          [these instructions](https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho).
 
 *   **Target device.**
 
@@ -211,7 +208,7 @@ Follow these steps to prepare and execute tests and review test results.
 
 Prepare the following materials to be used for the tests.
 
-#### Get the test codes and tools
+#### Get the test suite and tools
 
 Download the latest release test binary files from
 https://github.com/android/betocq/releases and save them in a local directory:
@@ -220,18 +217,9 @@ https://github.com/android/betocq/releases and save them in a local directory:
    - `cuj_and_test_config.yml`
    where `x.y.z` stands for the latest release version.
 
-#### Configure Wi-Fi AP and test
+#### Define testbed configurations
 
-1. Configure Wi-Fi AP channel frequency:
-
-  -   There are three Wi-Fi channels to be tested: 2437, 5180, and 5260.
-      5260 is a [DFS channel]
-        (https://en.wikipedia.org/wiki/List_of_WLAN_channels).
-
-  -   If there are two dual-band APs, all three Wi-Fi channels can be supported.
-
-
-2. Modify the test config file `cuj_and_test_config.yml` as follows:
+1. Modify the test config file `cuj_and_test_config.yml` as follows:
     -  Find device serial numbers:
 
         ```
@@ -280,7 +268,7 @@ https://github.com/android/betocq/releases and save them in a local directory:
       2. In the second run, define the 5G DFS SSID but leave the 2G and 5G SSID as empty
          strings to cover the 5G DFS test case.
 
-3. Configure device capabilities for both source and target devices.
+2. Configure device capabilities for both source and target devices.
 
       For example, the following configuration means the device uses Wi-Fi
       chipset WCN6710, and supports two spatial streams with the maximum PHY rate of
