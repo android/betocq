@@ -141,8 +141,7 @@ BetoCQ takes three steps to address this issue:
     - The test AP must be a dual-band capable Wi-Fi AP with two SSIDs (one at
     2&nbsp;GHz and one at 5&nbsp;GHz) with support for DFS channels. There are 
     three Wi-Fi channels to be tested: 2437, 5180, and 5260.
-      - 5260 is a [DFS channel]
-        (https://en.wikipedia.org/wiki/List_of_WLAN_channels).
+      - 5260 is a [DFS channel](https://en.wikipedia.org/wiki/List_of_WLAN_channels).
     - Examples of routers that meet the testing requirements include NETGEAR 
     RAX50 AX5400, NETGEAR RAX120 AX6000, and NETGEAR R8000b AC3200. It's ideal
     to use two APs to support all test cases.
