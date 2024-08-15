@@ -10,13 +10,6 @@ x-test-params: &test-params
   wifi_dfs_5g_password: "AP5260"
   # use the AP controlled by programming dynamically
   use_auto_controlled_wifi_ap: False
-  run_function_tests_with_performance_tests: True
-  run_bt_performance_test: True
-  run_directed_test: True
-  run_compound_test: True
-  run_bt_coex_test: True
-  run_iperf_test: False
-  allow_unrooted_device: False
   skip_bug_report: False
 x-controllers: &controllers
   Controllers:
@@ -34,7 +27,7 @@ x-controllers: &controllers
         supports_5g: True
         # if the device supports DBS (Dual Band Simultaneous) in STA + WiFi-Direct concurrency mode
         supports_dbs_sta_wfd: True
-        # The max number of spatial streams in DBS mode.
+        # The max number of spatial streams at 5G band in DBS mode.
         max_num_streams_dbs: 2
         # if the device supports to start WFD group owner at a STA-associated DFS channel
         enable_sta_dfs_channel_for_peer_network: False
@@ -55,7 +48,7 @@ x-controllers: &controllers
         supports_5g: True
         # if the device supports DBS (Dual Band Simultaneous) in STA + WiFi-Direct concurrency mode
         supports_dbs_sta_wfd: True
-        # The max number of spatial streams in DBS mode.
+        # The max number of spatial streams at 5G band in DBS mode.
         max_num_streams_dbs: 2
         # if the device supports to start WFD group owner at a STA-associated DFS channel
         enable_sta_dfs_channel_for_peer_network: False
