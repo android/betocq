@@ -314,13 +314,3 @@ To run the test, run the following commands from the local directory
 
 Note that `Quickstart` is the CUJ test name and there are
 a few other supported CUJ tests listed in `cuj_and_test_config.yml`.
-
-If there are more than two devices connected to USB ports, specify the device
-serial number explicitly:
-
-  ```
-  python3 local_mobly_runner.py --wheel <betocq_x.y.z-py3-none-any.whl> --bin betocq_test_suite -tb Quickstart -i -s <serial1>,<serial2> -c cuj_and_test_config.yml
-  ```
-
-Note that no space is allowed between two device serial numbers in the above
-command.
