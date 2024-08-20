@@ -76,9 +76,9 @@ class Mcc5gHotspotDfs5gStaTest(
   def _get_throughput_low_tip(self) -> str:
     return (
         f'{self._throughput_low_string}. This is a MCC test case where hotspot'
-        ' uses a 5G non-DFS channel and STA uses a5G DFS channel. Note that in'
-        ' hotspot mode, the target acts as a WFD GOwhile the source device'
-        ' acts as the legcy STA. Check with the wifi chip vendorabout the'
+        ' uses a 5G non-DFS channel and STA uses a 5G DFS channel. Note that in'
+        ' hotspot mode, the target acts as a WFD GO while the source device'
+        ' acts as the legacy STA. Check with the wifi chip vendor about the'
         ' possible firmware Tx/Rx issues in MCC mode.'
     )
 

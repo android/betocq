@@ -74,8 +74,9 @@ class Mcc5gWfdDfs5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
   def _get_throughput_low_tip(self) -> str:
     return (
         f'{self._throughput_low_string}. This is a MCC test case where WFD uses'
-        ' a 5G non-DFS channel and STA uses a5G DFS channel. Check with the'
-        ' wifi chip vendorabout the possible firmware Tx/Rx issues in MCC mode.'
+        ' a 5G non-DFS channel and STA uses a 5G DFS channel. Check with the'
+        ' wifi chip vendor about the possible firmware Tx/Rx issues in MCC'
+        ' mode.'
     )
 
   def _is_wifi_ap_ready(self) -> bool:

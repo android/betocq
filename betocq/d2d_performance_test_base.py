@@ -202,8 +202,8 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         )
       nc_min_throughput_mbyte_per_sec = min_throughput_mbyte_per_sec
       if (
-          self._current_test_result.quality_info.upgrade_medium
-          == nc_constants.NearbyConnectionMedium.WIFI_LAN
+          self._upgrade_medium_under_test
+          == nc_constants.NearbyMedium.WIFILAN_ONLY
       ):
         nc_min_throughput_mbyte_per_sec = min(
             nc_min_throughput_mbyte_per_sec,
@@ -499,6 +499,11 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         self._throughput_low_string = (
             f' file speed {nc_speed_mbps} < target {nc_speed_min_mbps} MB/s'
         )
+        if self._current_test_result.iperf_throughput_kbps > 0:
+          self._throughput_low_string += (
+              ' while iperf speed (MB/s) ='
+              f' {round(self._current_test_result.iperf_throughput_kbps/1024, 1)}'
+          )
         asserts.fail(self._throughput_low_string)
 
   def _is_valid_sta_frequency(self, wifi_ssid: str, sta_frequency: int) -> bool:
@@ -794,6 +799,10 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         for latency in latency_indicators
         if latency != nc_constants.UNSET_LATENCY
     ]
+    filtered_int = [
+        round(latency)
+        for latency in filtered
+    ]
     if not filtered:
       # All test cases are failed.
       return nc_constants.TestResultStats(0, 0, 0, 0, 0)
@@ -806,7 +815,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     )
     return nc_constants.TestResultStats(
         len(filtered),
-        filtered.count(0),
+        filtered_int.count(0),
         round(filtered[0], nc_constants.LATENCY_PRECISION_DIGITS),
         percentile_50,
         round(
