@@ -138,13 +138,34 @@ BetoCQ takes three steps to address this issue:
 
 *   **Wi-Fi Access Point (AP) and network.**
 
-    The test AP must be a dual-band capable Wi-Fi AP with two SSIDs (one at
-    2&nbsp;GHz and one at 5&nbsp;GHz) with support for DFS channels. Example of
-    routers that meet the testing requirements include NETGEAR RAX50 AX5400,
-    NETGEAR RAX120 AX6000, and NETGEAR R8000b AC3200. It's ideal to use two APs
-    to support all test cases. The test AP must have the access to
-    google.com. Note that in China, this test requires an office VPN network or
-    installing a VPN app in devices.
+    - The test AP must be a dual-band capable Wi-Fi AP with two SSIDs (one at
+    2&nbsp;GHz and one at 5&nbsp;GHz) with support for DFS channels. There are 
+    three Wi-Fi channels to be tested: 2437, 5180, and 5260.
+      - 5260 is a [DFS channel](https://en.wikipedia.org/wiki/List_of_WLAN_channels).
+    - Examples of routers that meet the testing requirements include NETGEAR 
+    RAX50 AX5400, NETGEAR RAX120 AX6000, and NETGEAR R8000b AC3200. It's ideal
+    to use two APs to support all test cases.
+    - The test AP must have the access to google.com. Note that in China, this
+    test requires an office VPN network or installing a VPN app in devices.
+
+*   **Test host.**
+    
+    The test host should have the following libraries installed:
+    - python3.12 or later
+      - Check your Python 3 version number:
+
+      ```
+      python3 --version
+      ```
+
+      - If your version is lower than Python 3.12, install the latest version
+      following https://wiki.python.org/moin/BeginnersGuide/Download.
+    - ADB
+      - If you don't already have the `adb` command-line tool, download and
+        install it from
+        [Android SDK Platform Tools](https://developer.android.com/tools/releases/platform-tools#downloads).
+      - Make sure that the installed binary is in the host's `PATH`, so it can
+        be run directly with `adb` in the command line.
 
 *   **Target device.**
 
@@ -186,52 +207,18 @@ Follow these steps to prepare and execute tests and review test results.
 
 Prepare the following materials to be used for the tests.
 
-#### Get the test codes, tools, and configure build
+#### Get the test suite and tools
 
-1.  Download the release test binary files (see release instructions) and save them
-in a local directory:
-  - `betocq_test_suite` (Linux and macOS)
-  - `betocq_test_suite_windows.zip` (Windows only)
-  - `local_mobly_runner.py`
-  - `cuj_and_test_config.yml`
+Download the latest release test binary files from
+https://github.com/android/betocq/releases and save them in a local directory:
+   - `betocq_x.y.z-py3-none-any.whl`
+   - `local_mobly_runner.py`
+   - `cuj_and_test_config.yml`
+   where `x.y.z` stands for the latest release version.
 
-2. Make these two files executable (Linux and macOS only):
+#### Define testbed configurations
 
-  ```
-  chmod +x betocq_test_suite
-  chmod +x local_mobly_runner.py
-  ```
-
-3.  Check and install Python version 3.11 or later:
-    -   Check your Python 3 version number:
-
-      ```
-      python3 --version
-      ```
-
-    -   If your version is lower than Python 3.11, install Python 3.11 or later:
-
-      ```
-      sudo apt install python3
-      ```
-      Or install the latest version from
-      [python.org](https://www.python.org/downloads/windows) for Windows.
-
-4. Windows only: Download [adb](https://developer.android.com/tools/releases/platform-tools)
-   and add its path to the [`Path` environment variable](https://stackoverflow.com/questions/44272416/how-to-add-a-folder-to-path-environment-variable-in-windows-10-with-screensho).
-
-#### Configure Wi-Fi AP and test
-
-1. Configure Wi-Fi AP channel frequency:
-
-  -   There are three Wi-Fi channels to be tested: 2437, 5180, and 5260.
-      5260 is a [DFS channel]
-        (https://en.wikipedia.org/wiki/List_of_WLAN_channels).
-
-  -   If there are two dual-band APs, all three Wi-Fi channels can be supported.
-
-
-2. Modify the test config file `cuj_and_test_config.yml` as follows:
+1. Modify the test config file `cuj_and_test_config.yml` as follows:
     -  Find device serial numbers:
 
         ```
@@ -280,7 +267,7 @@ in a local directory:
       2. In the second run, define the 5G DFS SSID but leave the 2G and 5G SSID as empty
          strings to cover the 5G DFS test case.
 
-3. Configure device capabilities for both source and target devices.
+2. Configure device capabilities for both source and target devices.
 
       For example, the following configuration means the device uses Wi-Fi
       chipset WCN6710, and supports two spatial streams with the maximum PHY rate of
@@ -317,156 +304,13 @@ in a local directory:
 
 
 ### Run the test
-To run the test on Linux and macOS with test binary, run the following commands from the local
-directory:
+
+To run the test, run the following commands from the local directory 
+(substituting in the actual downloaded `.whl` test package for `--wheel`):
 
   ```
-  python3 local_mobly_runner.py -p ./betocq_test_suite -tb Quickstart -i --novenv -c cuj_and_test_config.yml
+  python3 local_mobly_runner.py --wheel <betocq_x.y.z-py3-none-any.whl> --bin betocq_test_suite -tb Quickstart -i -c cuj_and_test_config.yml
   ```
 
 Note that `Quickstart` is the CUJ test name and there are
 a few other supported CUJ tests listed in `cuj_and_test_config.yml`.
-
-If there are more than two devices connected to USB ports, specify the device
-serial number explicitly:
-
-  ```
-  python3 local_mobly_runner.py -p ./betocq_test_suite -tb Quickstart -i --novenv -s <serial1>,<serial2> -c cuj_and_test_config.yml
-  ```
-
-Note that no space is allowed between
-two device serial numbers in the above commafnd.
-
-To run the test on Windows:
-
-  ```
-  python3 local_mobly_runner.py -p ./betocq_test_suite_windows.zip -tb Quickstart -i -c cuj_and_test_config.yml
-  ```
-
-### Check the test result and debug failure
-
-1.  Verify that these lines appear at the end of the test console output:
-
-  ```
-  Artifacts are saved in <TestResultDirectory>
-  Test summary saved in <TestResultDirectory>/test_summary.yaml
-  ```
-
-    Where `<TestResultDirectory>` is something like
-    `/tmp/logs/mobly/<CujTestName>/<TestDateTime>`.
-
-2.  Use Result Uploader to upload the artifact folder to Google's result storage
-  service so that the test results are visualized. The latest version of the tool
-  and instructions are provided in the
- [results_uploader](https://cs.android.com/android/platform/superproject/main/+/main:tools/test/mobly_extensions/tools/results_uploader/).
-    -   If this is your first time using the tool, file an issue with Google to
-        get onboarded.
-    -   Once you upload the artifacts, a link is displayed in the console
-        output. Click the link, then click **betocq_test_suite** to display
-        a dashboard view of your test results.
-
-3.  Click **MoblyTest** to display the overall test results.
-    -   Review the source and target device capability summary.
-    -   Review the completed function test result summary.
-    -   Review the completed directed and CUJ result summary.
-
-4. If the test passes, no further action is required.
-
-5.  Click each test case (for example, `test_scc_5g_wfd_sta`) to display the
-   status of each iteration under **Repeats**.
-    -   Green squares indicate passed tests, red squares indicate failed tests.
-
-6. If the test fails, follow the following steps to triage the results:
-   1. For each failed test case:
-
-      - Review the test case details including the transfer medium, concurrency
-        mode, the channel bands of STA, and the transfer medium.
-
-      - Check if the device capabilities are configured correctly.
-
-      - Review the failed iterations and reasons. Follow the debugging tips to
-        triage and work with the internal engineering team.
-
-   2. Click the failed (red) iterations to see the timestamp and detailed
-     failure signatures. Here is the list of failure signatures:
-      - Wi-Fi STA connection failure signature:
-
-          ```
-          Failed to connect to SSID
-          ```
-          or
-
-          ```
-          Failed to remove networks
-          ```
-      - Discovery failure signature:
-
-          ```
-          Timed out after waiting 30.0s for event "onEndpointFound" triggered by startDiscovery
-          ```
-      - BT connection failure signature:
-
-          ```
-          com.google.android.gms.common.api.ApiException: 8007: STATUS_RADIO_ERROR
-          at com.google.android.nearby.mobly.snippet.connection.ConnectionsClientSnippet.requestConnection(
-          ```
-      - Wi-Fi medium upgrade failure signature:
-
-          ```
-          Timed out after waiting 25.0s for event "onBandwidthChanged" triggered by requestConnection
-          ```
-      - Transfer failure signature:
-
-          ```
-          Timed out after 110.0s waiting for an "onPayloadTransferUpdate" event
-          ```
-
-      - Failure signature due to the GMS updates, which repeats a few times before the test exits:
-
-          ```
-          test_log.INFO:
-          In send_rpc_request
-          No response from server. Check the device logcat for crashes.
-          ```
-
-          ```
-          logcat and bug report:
-          stop com.google.android.gms due to installPackage
-          ```
-   3. Review the logcat and bug report of each failing iteration on both
-    source and target sides. You can find them as boxed links under the test
-    name.
-
-   4. Search the following keywords for the related logs in the bug report:
-    `WifiP2pService`, `wpa_supplicant`, `NearbyConnections`, and `NearbyMediums`.
-
-   5. Review the Wi-Fi Direct logs in the bug report if the `WIFI_DIRECT` medium is used.
-    Check if it's a group owner or client side error when bandwidth upgrade
-    fails.
-
-      ```
-      DUMP OF SERVICE wifip2p:
-      WifiP2pMetrics:
-      mConnectionEvents:
-      connectionType=FAST, groupRole=CLIENT, freq=5745, sta freq=2437, connectivityLevelFailureCode=NONE
-      ```
-
-   6. Check the above STA frequency and P2P frequency values. If both have valid
-    values but the values are different, the device likely operates in multiple
-    channel concurrency (MCC) mode unless it supports 2G + 5G concurrency.
-    In MCC mode, firmware could have the bugs resulting in bandwidth
-    upgrade failure or transfer issues. Check with the Wi-Fi chip vendor if there
-    are any known bug fixes for MCC mode.
-
-7. To rule out the test setup issue or device issue, repeat the test with a pair
-  of known good devices (or a pair of new devices).
-    - If the failure persists, check the test setup because it likely has the
-  issue. If possible, move the test to a clean environment to rule out the
-  interference issue.
-    - If the failure disappears, DUT likely has the issue. Work with the Wi-Fi/BT
-    engineering team to resolve the device issue. This might require getting
-    help from the Wi-Fi/BT chip vendor.
-
-8. If the issue can't be resolved by the internal engineering team and there is
-  strong evidence that there might be an issue on the Google side, create an issue
-  for Google. Be sure to include all test artifacts.
