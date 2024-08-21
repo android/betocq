@@ -22,9 +22,9 @@ DFS 5G AP(wifi_dfs_5g_ssid): channel 52 (5260)
 
 import sys
 
+from mobly import base_suite
 from mobly import suite_runner
 
-from betocq import base_betocq_suite
 from betocq import nc_constants
 from betocq.compound_tests import bt_2g_wifi_coex_test
 from betocq.compound_tests import mcc_5g_all_wifi_non_dbs_2g_sta_test
@@ -51,7 +51,7 @@ from betocq.function_tests import beto_cq_function_group_test
 from betocq.function_tests import nearbyconnections_function_test
 
 
-class BetoCqPerformanceTestSuite(base_betocq_suite.BaseBetocqSuite):
+class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
   """Add all BetoCQ tests to run in sequence."""
 
   # pylint: disable=line-too-long
