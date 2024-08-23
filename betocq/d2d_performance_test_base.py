@@ -98,6 +98,8 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
   def _get_skipped_test_class_reason(self) -> str | None:
     if not self._is_wifi_ap_ready():
       return 'Wifi AP is not ready for this test.'
+    if not self._is_upgrade_medium_supported():
+      return f'{self._upgrade_medium_under_test} is not supported.'
     skip_reason = self._check_devices_capabilities()
     if skip_reason is not None:
       return (
@@ -108,6 +110,9 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
   @abc.abstractmethod
   def _is_wifi_ap_ready(self) -> bool:
     pass
+
+  def _is_upgrade_medium_supported(self) -> bool:
+    return True
 
   def _check_devices_capabilities(self) -> str | None:
     """Checks if all devices capabilities meet requirements."""

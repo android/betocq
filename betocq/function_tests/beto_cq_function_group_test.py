@@ -15,10 +15,12 @@
 """Group all function tests."""
 
 import time
+from mobly import asserts
 from mobly import test_runner
 
 from betocq import nc_base_test
 from betocq import nc_constants
+from betocq import setup_utils
 from betocq.function_tests import bt_ble_function_test_actor
 from betocq.function_tests import bt_multiplex_function_test_actor
 from betocq.function_tests import fixed_wifi_medium_function_test_actor
@@ -82,9 +84,13 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
     """Test the NC with upgrading to the WiFi Aware as upgrade medium.
     """
     if (
-        self.test_parameters.target_cuj_name
-        is not nc_constants.TARGET_CUJ_QUICK_SHARE
+        not self.test_parameters.run_aware_test
+        or not setup_utils.is_wifi_aware_available(self.advertiser)
+        or not setup_utils.is_wifi_aware_available(self.discoverer)
     ):
+      asserts.skip(
+          'aware test is disabled or aware is not available in the device'
+      )
       return
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(

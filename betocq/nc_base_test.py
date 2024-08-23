@@ -108,19 +108,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
         raise_on_exception=True,
     )
 
-    skipped_test_class_reason = self._get_skipped_test_class_reason()
-    for ad in self.ads:
-      if (
-          not ad.wifi_chipset
-          and self.test_parameters.skip_test_if_wifi_chipset_is_empty
-      ):
-        skipped_test_class_reason = 'wifi_chipset is empty in the config file'
-        ad.log.warning(skipped_test_class_reason)
-
-    if skipped_test_class_reason:
-      self.__skipped_test_class = True
-      asserts.abort_class(skipped_test_class_reason)
-
     file_tag = 'files' if 'files' in self.user_params else 'mh_files'
     self._nearby_snippet_apk_path = self.user_params.get(file_tag, {}).get(
         'nearby_snippet', ['']
@@ -148,6 +135,19 @@ class NCBaseTestClass(base_test.BaseTestClass):
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=True,
     )
+
+    skipped_test_class_reason = self._get_skipped_test_class_reason()
+    for ad in self.ads:
+      if (
+          not ad.wifi_chipset
+          and self.test_parameters.skip_test_if_wifi_chipset_is_empty
+      ):
+        skipped_test_class_reason = 'wifi_chipset is empty in the config file'
+        ad.log.warning(skipped_test_class_reason)
+
+    if skipped_test_class_reason:
+      self.__skipped_test_class = True
+      asserts.abort_class(skipped_test_class_reason)
 
     self._set_run_identifier()
 
@@ -454,6 +454,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
         ),
         f'max_num_streams: {ad.max_num_streams}',
         f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
+        f'support_aware: {setup_utils.is_wifi_aware_available(ad)}'
     ]
 
   def _get_test_summary_dict(self, test_result: str) -> dict[str, str]:

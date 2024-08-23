@@ -605,6 +605,17 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
     return ''
 
 
+def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
+  """Checks if Aware is supported on the given device."""
+  try:
+    return (
+        ad.nearby.wifiAwareIsAvailable()
+    )
+  except Exception as e:  # pylint: disable=broad-except
+    ad.log.info('Aware is not supported due to %s', e)
+    return False
+
+
 def get_hardware(ad: android_device.AndroidDevice) -> str:
   """Gets hardware information on the given device."""
   return ad.adb.getprop('ro.hardware')
