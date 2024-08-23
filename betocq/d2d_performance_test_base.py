@@ -468,7 +468,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     ):
 
       nc_speed_mbps = round(
-          self._current_test_result.file_transfer_throughput_kbps / 1024, 2
+          self._current_test_result.file_transfer_throughput_kbps / 1024, 3
       )
 
       run_iperf_test = False
@@ -536,6 +536,9 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
 
   def _get_file_transfer_timeout(self) -> datetime.timedelta:
     return nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
+
+  def _get_success_rate_target(self) -> float:
+    return nc_constants.SUCCESS_RATE_TARGET
 
   def _write_current_test_report(self) -> None:
     """Writes test report for each iteration."""
@@ -837,7 +840,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         for test_result in self._test_results
     )
     passed = success_count >= round(
-        self.performance_test_iterations * nc_constants.SUCCESS_RATE_TARGET
+        self.performance_test_iterations * self._get_success_rate_target()
     )
     final_result_message = (
         'PASS'
@@ -845,7 +848,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         else (
             'FAIL: low successe rate: '
             f' {success_count / self.performance_test_iterations:.2%} is lower'
-            f' than the target {nc_constants.SUCCESS_RATE_TARGET:.2%}'
+            f' than the target {self._get_success_rate_target():.2%}'
         )
     )
     test_stats = [
