@@ -65,8 +65,8 @@ class BlePerformanceTest(d2d_performance_test_base.D2dPerformanceTestBase):
   # @typing.override
   def _get_throughput_benchmark(
       self, sta_frequency: int, sta_max_link_speed_mbps: int
-  ) -> tuple[float, float]:
-    return (
+  ) -> nc_constants.SpeedTarget:
+    return nc_constants.SpeedTarget(
         nc_constants.BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS,
         nc_constants.BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS,
     )

@@ -148,7 +148,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
 
   def _get_throughput_benchmark(
       self, sta_frequency: int, sta_max_link_speed_mbps: int
-  ) -> tuple[float, float]:
+  ) -> nc_constants.SpeedTarget:
     """Gets the throughput benchmark as MBps."""
     max_num_streams = min(
         self.discoverer.max_num_streams, self.advertiser.max_num_streams
@@ -205,13 +205,27 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
             min_throughput_mbyte_per_sec
             * nc_constants.MCC_THROUGHPUT_MULTIPLIER
         )
-      nc_min_throughput_mbyte_per_sec = min_throughput_mbyte_per_sec
+
+      nc_min_throughput_mbyte_per_sec = (
+          min_throughput_mbyte_per_sec
+          * nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO
+      )
       if (
           self._upgrade_medium_under_test
           == nc_constants.NearbyMedium.WIFILAN_ONLY
       ):
+
+        # Cut the speed target by half if TDLS is not supported.
+        if (
+            not self.advertiser.nearby.wifiIsTdlsSupported()
+            or not self.discoverer.nearby.wifiIsTdlsSupported()
+        ):
+          min_throughput_mbyte_per_sec = min_throughput_mbyte_per_sec / 2
+
+        # Limit NC min throughput due to encryption overhead
         nc_min_throughput_mbyte_per_sec = min(
-            nc_min_throughput_mbyte_per_sec,
+            min_throughput_mbyte_per_sec
+            * nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO,
             nc_constants.WLAN_MEDIUM_THROUGHPUT_CAP_MBPS,
         )
 
@@ -222,7 +236,9 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         f'min D2D speed (MB/s), iperf: {min_throughput_mbyte_per_sec}, '
         f'nc: {nc_min_throughput_mbyte_per_sec}'
     )
-    return (min_throughput_mbyte_per_sec, nc_min_throughput_mbyte_per_sec)
+    return nc_constants.SpeedTarget(
+        min_throughput_mbyte_per_sec, nc_min_throughput_mbyte_per_sec
+    )
 
   def _test_connection_medium_performance(
       self,
@@ -412,9 +428,12 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
           'Target device is disconnected from AP. Check AP DHCP config.'
       )
 
-    unused_, nc_speed_min_mbps = self._get_throughput_benchmark(
+    speed_target = self._get_throughput_benchmark(
         sta_frequency, max_link_speed_mbps
     )
+
+    nc_speed_min_mbps = speed_target.nc_speed_mbtye_per_sec
+    iperf_speed_min_mbps = speed_target.iperf_speed_mbtye_per_sec
 
     if wifi_ssid and not self._is_valid_sta_frequency(wifi_ssid, sta_frequency):
       self._active_nc_fail_reason = (
@@ -471,32 +490,21 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
           self._current_test_result.file_transfer_throughput_kbps / 1024, 3
       )
 
-      run_iperf_test = False
+      iperf_speed_mbps = 0
       if (
-          nc_speed_mbps < nc_speed_min_mbps
-          and self.test_parameters.run_iperf_test_if_nc_speed_is_low
-      ) or self.test_parameters.run_iperf_test:
-        run_iperf_test = True
-
-      if (
-          run_iperf_test
-          and not self._is_mcc
-          and upgrade_medium_under_test
-          in [
-              nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
-              nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
-              nc_constants.NearbyMedium.WIFILAN_ONLY,
-              nc_constants.NearbyMedium.WIFIAWARE_ONLY,
-          ]
+          (
+              nc_speed_mbps < nc_speed_min_mbps
+              and self.test_parameters.run_iperf_test_if_nc_speed_is_low
+          )
+          or self.test_parameters.run_iperf_test
+          or (
+              self.test_parameters.run_iperf_test_wlan
+              and upgrade_medium_under_test
+              == nc_constants.NearbyMedium.WIFILAN_ONLY
+          )
       ):
-        # TODO: (internal) - update this part for the connection over WFD.
-        self._current_test_result.iperf_throughput_kbps = (
-            iperf_utils.run_iperf_test(
-                self.discoverer,
-                self.advertiser,
-                self._current_test_result.quality_info.upgrade_medium,
-            )
-        )
+        iperf_speed_mbps = self.run_iperf_test(upgrade_medium_under_test)
+
       if nc_speed_mbps < nc_speed_min_mbps:
         self._active_nc_fail_reason = (
             nc_constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW
@@ -504,12 +512,50 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         self._throughput_low_string = (
             f' file speed {nc_speed_mbps} < target {nc_speed_min_mbps} MB/s'
         )
-        if self._current_test_result.iperf_throughput_kbps > 0:
+        if iperf_speed_mbps > 0:
           self._throughput_low_string += (
-              ' while iperf speed (MB/s) ='
-              f' {round(self._current_test_result.iperf_throughput_kbps/1024, 1)}'
+              f' while iperf speed (MB/s) = {iperf_speed_mbps}'
           )
         asserts.fail(self._throughput_low_string)
+
+      if (
+          iperf_speed_mbps > 0
+          and iperf_speed_mbps < iperf_speed_min_mbps
+          and self.test_parameters.check_iperf_speed
+      ):
+        self._active_nc_fail_reason = (
+            nc_constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW
+        )
+        self._throughput_low_string = (
+            f' iperf speed {iperf_speed_mbps} < target'
+            f' {iperf_speed_min_mbps} MB/s'
+        )
+        asserts.fail(self._throughput_low_string)
+
+  def run_iperf_test(
+      self, upgrade_medium_under_test: nc_constants.NearbyMedium
+  ) -> float:
+    iperf_speed_mbps = 0
+    if not self._is_mcc and upgrade_medium_under_test in [
+        nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
+        nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
+        nc_constants.NearbyMedium.WIFILAN_ONLY,
+        nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+    ]:
+      # TODO: (internal) - update this part for the connection over WFD.
+      self._current_test_result.iperf_throughput_kbps = (
+          iperf_utils.run_iperf_test(
+              self.discoverer,
+              self.advertiser,
+              self._current_test_result.quality_info.upgrade_medium,
+          )
+      )
+
+    if self._current_test_result.iperf_throughput_kbps > 0:
+      iperf_speed_mbps = round(
+          self._current_test_result.iperf_throughput_kbps / 1024, 1
+      )
+    return iperf_speed_mbps
 
   def _is_valid_sta_frequency(self, wifi_ssid: str, sta_frequency: int) -> bool:
     if wifi_ssid == self.test_parameters.wifi_2g_ssid:

@@ -73,9 +73,9 @@ class Bt2gWifiCoexTest(d2d_performance_test_base.D2dPerformanceTestBase):
   # @typing.override
   def _get_throughput_benchmark(
       self, sta_frequency: int, sta_max_link_speed_mbps: int
-  ) -> tuple[float, float]:
+  ) -> nc_constants.SpeedTarget:
     # no requirement for throughput.
-    return (0.0, 0.0)
+    return nc_constants.SpeedTarget(0.0, 0.0)
 
   def _get_throughput_low_tip(self) -> str:
     return (
