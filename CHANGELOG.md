@@ -1,10 +1,27 @@
 # BetoCQ test suite release history
 
+## 2.3.3 (08/27/2024)
+
+## New
+* Add TDLS support check.
+* Add Aware device capability check in Aware test which is disabled by default.
+* Enables both STREAM and FILE modes in the function test.
+
+## Bug fixes
+* Use upgrade_medium_under_test to set up the speed bar as
+  quality_info.upgrade_medium sometimes is not updated correctly.
+* Include iperf speed (if available) in the low throughput triaging tips.
+* Add the missing space to failure reasons.
+* bug fix of instant_connection_count with the correct rounding.
+* Add iperf test for WLAN medium as its current speed check is too loose.
+* Cut the WLAN speed target by half if TDLS is not supported.
+* Add a new test parameter check_iperf_speed to check iperf speed if it is available.
+* Allow NC speed to be 20% lower than iperf speed.
+  
 ## 2.3.2 (07/29/2024)
 
 ## New
-* Add sniffer capture with 2nd programmable AP. The sniffer capture has the
-  known issue of missing ACK sometimes.
+* Enable scc_indoor_5g_wfd_sta_test only if both sides support indoor channel feature.
 * Add the support of sending multiple files and enable them in function test.
 * Add the support of instant connection. This is disabled by default.
 
