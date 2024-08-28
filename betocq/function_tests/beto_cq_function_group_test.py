@@ -15,10 +15,12 @@
 """Group all function tests."""
 
 import time
+from mobly import asserts
 from mobly import test_runner
 
 from betocq import nc_base_test
 from betocq import nc_constants
+from betocq import setup_utils
 from betocq.function_tests import bt_ble_function_test_actor
 from betocq.function_tests import bt_multiplex_function_test_actor
 from betocq.function_tests import fixed_wifi_medium_function_test_actor
@@ -50,33 +52,55 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
     # Let scan, DHCP and internet validation complete before NC.
     time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
-        nc_constants.NearbyMedium.WIFILAN_ONLY)
+        nc_constants.NearbyMedium.WIFILAN_ONLY, nc_constants.PayloadType.FILE)
 
   def test_d2d_hotspot_function(self):
     """Test the NC with upgrading to the HOTSPOT as upgrade medium.
     """
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
-        nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT)
+        nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
+        nc_constants.PayloadType.FILE,
+    )
+    self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
+        nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
+        nc_constants.PayloadType.STREAM,
+    )
 
   def test_wifi_direct_function(self):
     """Test the NC with upgrading to the WiFi Direct as upgrade medium.
     """
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
-        nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT)
+        nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
+        nc_constants.PayloadType.FILE,
+    )
+    self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
+        nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
+        nc_constants.PayloadType.STREAM,
+    )
 
   def test_wifi_aware_function(self):
     """Test the NC with upgrading to the WiFi Aware as upgrade medium.
     """
     if (
-        self.test_parameters.target_cuj_name
-        is not nc_constants.TARGET_CUJ_QUICK_SHARE
+        not self.test_parameters.run_aware_test
+        or not setup_utils.is_wifi_aware_available(self.advertiser)
+        or not setup_utils.is_wifi_aware_available(self.discoverer)
     ):
+      asserts.skip(
+          'aware test is disabled or aware is not available in the device'
+      )
       return
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
-        nc_constants.NearbyMedium.WIFIAWARE_ONLY)
+        nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+        nc_constants.PayloadType.FILE,
+    )
+    self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
+        nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+        nc_constants.PayloadType.STREAM,
+    )
 
   def test_bt_multiplex_connections(self):
     """Test the BT multiplex function of nearby connection.

@@ -21,7 +21,10 @@ import enum
 import logging
 from typing import Any
 
+BETOCQ_SUITE_NAME = 'BeToCQ'
+
 SUCCESS_RATE_TARGET = 0.98
+BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
 MCC_PERFORMANCE_TEST_COUNT = 100
 MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 SCC_PERFORMANCE_TEST_COUNT = 10
@@ -44,7 +47,7 @@ FIRST_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=35)
 BT_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
-BLE_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
+BLE_20K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 SECOND_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=35)
 SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
@@ -62,6 +65,7 @@ MAX_PHY_RATE_PER_STREAM_N_20_MBPS = 72
 
 MCC_THROUGHPUT_MULTIPLIER = 0.25
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37
+IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
 WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
     15  # cap for WLAN medium due to encryption overhead
@@ -170,8 +174,10 @@ class TestParameters:
   run_directed_test: bool = True
   run_compound_test: bool = True
   run_aware_test: bool = False
-  run_iperf_test: bool = False
+  run_iperf_test: bool = False  # run iperf test for possible mediums
   run_iperf_test_if_nc_speed_is_low: bool = True
+  run_iperf_test_wlan: bool = True  # run iperf test for WLAN medium
+  check_iperf_speed: bool = True  # check iperf speed if it is available
   run_nearby_connections_function_tests: bool = False
   skip_test_if_wifi_chipset_is_empty: bool = True
   skip_bug_report: bool = False
@@ -504,3 +510,10 @@ class TestResultStats:
   min_val: float | None = None
   median_val: float | None = None
   max_val: float | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class SpeedTarget:
+  """The speed target in MB/s."""
+  iperf_speed_mbtye_per_sec: float
+  nc_speed_mbtye_per_sec: float

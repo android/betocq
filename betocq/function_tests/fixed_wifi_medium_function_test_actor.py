@@ -27,7 +27,10 @@ class FixedWifiMediumFunctionTestActor(
   """The base of actors for running the specified fixed wifi D2D medium."""
 
   def run_fixed_wifi_medium_test(
-      self, wifi_medium: nc_constants.NearbyMedium) -> None:
+      self,
+      wifi_medium: nc_constants.NearbyMedium,
+      payload_type: nc_constants.PayloadType = nc_constants.PayloadType.FILE,
+  ) -> None:
     """upgrade the medium from BT to the specified medium and transfer a sample data."""
     self._wifi_medium_under_test = wifi_medium
     self._test_result = nc_constants.SingleTestResult()
@@ -67,7 +70,7 @@ class FixedWifiMediumFunctionTestActor(
           nearby_snippet.transfer_file(
               nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
               nc_constants.TRANSFER_TIMEOUT_FUNC_TEST_SEC,
-              nc_constants.PayloadType.FILE,
+              payload_type,
               nc_constants.TRANSFER_FILE_NUM_FUNC_TEST))
     finally:
       self._test_failure_reason = nearby_snippet.test_failure_reason

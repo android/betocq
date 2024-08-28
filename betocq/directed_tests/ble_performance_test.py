@@ -54,16 +54,19 @@ class BlePerformanceTest(d2d_performance_test_base.D2dPerformanceTestBase):
     )
 
   def _get_transfer_file_size(self) -> int:
-    return nc_constants.TRANSFER_FILE_SIZE_500KB
+    return nc_constants.TRANSFER_FILE_SIZE_20KB
 
   def _get_file_transfer_timeout(self) -> datetime.timedelta:
-    return nc_constants.BLE_500K_PAYLOAD_TRANSFER_TIMEOUT
+    return nc_constants.BLE_20K_PAYLOAD_TRANSFER_TIMEOUT
+
+  def _get_success_rate_target(self) -> float:
+    return nc_constants.BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET
 
   # @typing.override
   def _get_throughput_benchmark(
       self, sta_frequency: int, sta_max_link_speed_mbps: int
-  ) -> tuple[float, float]:
-    return (
+  ) -> nc_constants.SpeedTarget:
+    return nc_constants.SpeedTarget(
         nc_constants.BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS,
         nc_constants.BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS,
     )

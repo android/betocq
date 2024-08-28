@@ -51,6 +51,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
   """The Base of Nearby Connection E2E tests."""
 
   _run_identifier_is_set = False
+  _committed_ph_flags_is_set = False
 
   def __init__(self, configs):
     super().__init__(configs)
@@ -80,9 +81,10 @@ class NCBaseTestClass(base_test.BaseTestClass):
     return None
 
   def setup_class(self) -> None:
-    self._set_run_identifier()
     self._setup_openwrt_wifi()
     self.ads = self.register_controller(android_device, min_number=2)
+    # record the flags only for the first device
+    self._set_committed_ph_flags(self.ads[0])
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
@@ -105,19 +107,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=True,
     )
-
-    skipped_test_class_reason = self._get_skipped_test_class_reason()
-    for ad in self.ads:
-      if (
-          not ad.wifi_chipset
-          and self.test_parameters.skip_test_if_wifi_chipset_is_empty
-      ):
-        skipped_test_class_reason = 'wifi_chipset is empty in the config file'
-        ad.log.warning(skipped_test_class_reason)
-
-    if skipped_test_class_reason:
-      self.__skipped_test_class = True
-      asserts.abort_class(skipped_test_class_reason)
 
     file_tag = 'files' if 'files' in self.user_params else 'mh_files'
     self._nearby_snippet_apk_path = self.user_params.get(file_tag, {}).get(
@@ -147,6 +136,21 @@ class NCBaseTestClass(base_test.BaseTestClass):
         raise_on_exception=True,
     )
 
+    skipped_test_class_reason = self._get_skipped_test_class_reason()
+    for ad in self.ads:
+      if (
+          not ad.wifi_chipset
+          and self.test_parameters.skip_test_if_wifi_chipset_is_empty
+      ):
+        skipped_test_class_reason = 'wifi_chipset is empty in the config file'
+        ad.log.warning(skipped_test_class_reason)
+
+    if skipped_test_class_reason:
+      self.__skipped_test_class = True
+      asserts.abort_class(skipped_test_class_reason)
+
+    self._set_run_identifier()
+
   def _set_run_identifier(self) -> None:
     """Set a run_identifier property describing the test run context.
 
@@ -155,15 +159,42 @@ class NCBaseTestClass(base_test.BaseTestClass):
     """
     if NCBaseTestClass._run_identifier_is_set:
       return
-    run_identifier = {}
-    run_identifier['test_version'] = version.TEST_SCRIPT_VERSION
-    run_identifier['target_cuj'] = self.test_parameters.target_cuj_name
-    run_identifier_str = ', '.join(
-        [f'{key}:{value}' for key, value in run_identifier.items()]
-    )
-    run_identifier_str = f'{{{run_identifier_str}}}'
-    self.record_data({'properties': {'run_identifier': run_identifier_str}})
+    suite_name_items = [
+        nc_constants.BETOCQ_SUITE_NAME,
+        self.test_parameters.target_cuj_name,
+    ]
+    suite_name = '-'.join(suite_name_items)
+    run_identifier_items = [
+        self.advertiser.adb.getprop('ro.product.manufacturer'),
+        self.advertiser.model,
+    ]
+    run_identifier = '-'.join(run_identifier_items)
+    self.record_data({
+        'properties': {
+            'suite_name': f'[{suite_name}]',
+            'run_identifier': run_identifier,
+        }
+    })
     NCBaseTestClass._run_identifier_is_set = True
+
+  def _set_committed_ph_flags(self, ad) -> None:
+    """Set a committed_ph_flags property describing the committed P/H flags.
+
+    This property is only set once, even if multiple test classes are run as
+    part of a test suite.
+
+    Args:
+      ad: AndroidDevice, Mobly Android Device.
+    """
+
+    if NCBaseTestClass._committed_ph_flags_is_set:
+      return
+
+    flags = setup_utils.get_committed_ph_flags(
+        ad, 'com.google.android.gms.nearby'
+    )
+    self.record_data({'properties': {'committed_ph_flags': flags}})
+    NCBaseTestClass._committed_ph_flags_is_set = True
 
   def _setup_openwrt_wifi(self):
     """Sets up the wifi connection with OpenWRT."""
@@ -423,6 +454,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
         ),
         f'max_num_streams: {ad.max_num_streams}',
         f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
+        f'support_aware: {setup_utils.is_wifi_aware_available(ad)}'
     ]
 
   def _get_test_summary_dict(self, test_result: str) -> dict[str, str]:

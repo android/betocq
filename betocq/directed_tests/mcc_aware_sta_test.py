@@ -27,6 +27,7 @@ from mobly import test_runner
 
 from betocq import d2d_performance_test_base
 from betocq import nc_constants
+from betocq import setup_utils
 
 
 class MccAwareStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
@@ -84,6 +85,12 @@ class MccAwareStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
         and self.test_parameters.wifi_dfs_5g_ssid
         else False
     )
+
+  # @typing.override
+  def _is_upgrade_medium_supported(self) -> bool:
+    return setup_utils.is_wifi_aware_available(
+        self.advertiser
+    ) and setup_utils.is_wifi_aware_available(self.discoverer)
 
   @property
   def _devices_capabilities_definition(self) -> dict[str, dict[str, bool]]:
