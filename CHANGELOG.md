@@ -3,7 +3,7 @@
 ## 2.3.3 (08/27/2024)
 
 ## New
-* Add TDLS support check  and cut the WLAN speed target by half if TDLS is not supported.
+* Add TDLS support check and cut the WLAN speed target by half if TDLS is not supported.
 * Add Aware device capability check in Aware test which is disabled by default.
 * Add Payload.Type.STREAM mode in the function test in addition to the existing FILE mode.
 
