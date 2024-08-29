@@ -325,6 +325,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
         ad, self.test_parameters.enable_instant_connection
     )
     setup_utils.disable_usb_medium(ad)
+    setup_utils.disable_op_mode_check(ad)
 
     setup_utils.enable_ble_scan_throttling_during_2g_transfer(
         ad, self.test_parameters.enable_2g_ble_scan_throttling

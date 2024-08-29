@@ -458,6 +458,16 @@ def disable_usb_medium(ad: android_device.AndroidDevice) -> None:
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
 
 
+def disable_op_mode_check(ad: android_device.AndroidDevice) -> None:
+  """Disable get_usable_channel() op mode check on the given device."""
+  pname = 'com.google.android.gms.nearby'
+  flag_name = 'connections_check_op_mode_for_usable_channels'
+  flag_type = 'boolean'
+  flag_value = 'false'
+
+  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
+
+
 def enable_ble_scan_throttling_during_2g_transfer(
     ad: android_device.AndroidDevice, enable_ble_scan_throttling: bool = False
 ) -> None:
