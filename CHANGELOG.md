@@ -3,9 +3,9 @@
 ## 2.3.3 (08/27/2024)
 
 ## New
-* Add TDLS support check.
+* Add TDLS support check  and cut the WLAN speed target by half if TDLS is not supported.
 * Add Aware device capability check in Aware test which is disabled by default.
-* Enables both STREAM and FILE modes in the function test.
+* Add Payload.Type.STREAM mode in the function test in addition to the existing FILE mode.
 
 ## Bug fixes
 * Use upgrade_medium_under_test to set up the speed bar as
@@ -14,7 +14,6 @@
 * Add the missing space to failure reasons.
 * bug fix of instant_connection_count with the correct rounding.
 * Add iperf test for WLAN medium as its current speed check is too loose.
-* Cut the WLAN speed target by half if TDLS is not supported.
 * Add a new test parameter check_iperf_speed to check iperf speed if it is available.
 * Allow NC speed to be 20% lower than iperf speed.
   
