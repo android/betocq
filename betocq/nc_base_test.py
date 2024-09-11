@@ -27,6 +27,7 @@ from mobly import base_test
 from mobly import records
 from mobly import utils
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import apk_utils
 from mobly.controllers.android_device_lib import errors
 from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
@@ -275,7 +276,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
     ad.debug_tag = ad.serial + '(' + ad.adb.getprop('ro.product.model') + ')'
     ad.log.info('try to install nearby_snippet_apk')
     if self._nearby_snippet_apk_path:
-      setup_utils.install_apk(ad, self._nearby_snippet_apk_path)
+      apk_utils.install(ad, self._nearby_snippet_apk_path)
     else:
       ad.log.warning(
           'nearby_snippet apk is not specified, '
@@ -290,7 +291,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
     if self._requires_2_snippet_apks:
       ad.log.info('try to install nearby_snippet_2_apk')
       if self._nearby_snippet_2_apk_path:
-        setup_utils.install_apk(ad, self._nearby_snippet_2_apk_path)
+        apk_utils.install(ad, self._nearby_snippet_2_apk_path)
       else:
         ad.log.warning(
             'nearby_snippet_2 apk is not specified, '
@@ -304,7 +305,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
     if self._requires_3p_snippet_apks:
       ad.log.info('try to install nearby_snippet_3p_apk')
       if self._nearby_snippet_3p_apk_path:
-        setup_utils.install_apk(ad, self._nearby_snippet_3p_apk_path)
+        apk_utils.install(ad, self._nearby_snippet_3p_apk_path)
       else:
         ad.log.warning(
             'nearby_snippet_3p apk is not specified, '

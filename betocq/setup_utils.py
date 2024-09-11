@@ -520,11 +520,6 @@ def restart_gms(ad: android_device.AndroidDevice) -> None:
   ad.adb.shell('am force-stop com.google.android.gms')
 
 
-def install_apk(ad: android_device.AndroidDevice, apk_path: str) -> None:
-  """Installs the apk on the given device."""
-  ad.adb.install(['-r', '-g', '-t', apk_path])
-
-
 def disable_gms_auto_updates(ad: android_device.AndroidDevice) -> None:
   """Disable GMS auto updates on the given device."""
   if not ad.is_adb_root:
