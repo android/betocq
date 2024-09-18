@@ -403,7 +403,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
           active_snippet.transfer_file(
               self._get_transfer_file_size(),
               self._get_file_transfer_timeout(),
-              self.test_parameters.payload_type,
+              nc_constants.PayloadType(self.test_parameters.payload_type),
               self.test_parameters.payload_file_num,
           )
       )

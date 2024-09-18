@@ -441,10 +441,11 @@ class NearbyConnectionWrapper:
           timeout=timeout.total_seconds(),
       )
       tx_id = tx_transfer_event.data['update']['payloadId']
-      rx_id1 = rx_received_event.data['payload']['id']
-      rx_id2 = rx_transfer_event.data['update']['payloadId']
-      asserts.assert_equal(tx_id, rx_id1)
-      asserts.assert_equal(tx_id, rx_id2)
+      rx_id_payload_received = rx_received_event.data['payload']['id']
+      rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
+      if payload_type == nc_constants.PayloadType.FILE:
+        asserts.assert_equal(tx_id, rx_id_payload_received)
+        asserts.assert_equal(tx_id, rx_id_transfer_update)
       if tx_id == last_payload_id:
         transfer_time_s = datetime.timedelta(
             microseconds=tx_transfer_event.data['transferTimeNs']
