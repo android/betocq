@@ -102,7 +102,7 @@ TRANSFER_FILE_SIZE_10KB = 10  # kB
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
 TRANSFER_FILE_NUM_FUNC_TEST = 100
-TRANSFER_TIMEOUT_FUNC_TEST_SEC = datetime.timedelta(seconds=100)
+TRANSFER_TIMEOUT_FUNC_TEST = datetime.timedelta(seconds=100)
 
 TARGET_CUJ_QUICK_START = 'quick_start'
 TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
@@ -158,6 +158,11 @@ class TestParameters:
   disconnect_bt_after_test: bool = False
   disconnect_wifi_after_test: bool = False
   payload_type: PayloadType = PayloadType.FILE
+  payload_file_num: int = 1
+  payload_file_size_kbyte: int = TRANSFER_FILE_SIZE_500MB
+  payload_transfer_timeout_sec: int = int(
+      WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT.total_seconds()
+  )
   allow_unrooted_device: bool = False
   keep_alive_timeout_ms: int = KEEP_ALIVE_TIMEOUT_WIFI_MS
   keep_alive_interval_ms: int = KEEP_ALIVE_INTERVAL_WIFI_MS

@@ -395,6 +395,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
               self._get_transfer_file_size(),
               self._get_file_transfer_timeout(),
               self.test_parameters.payload_type,
+              self.test_parameters.payload_file_num,
           )
       )
 
@@ -578,10 +579,12 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     return ssid_advertiser
 
   def _get_transfer_file_size(self) -> int:
-    return nc_constants.TRANSFER_FILE_SIZE_500MB
+    return self.test_parameters.payload_file_size_kbyte
 
   def _get_file_transfer_timeout(self) -> datetime.timedelta:
-    return nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
+    return datetime.timedelta(
+        seconds=self.test_parameters.payload_transfer_timeout_sec
+    )
 
   def _get_success_rate_target(self) -> float:
     return nc_constants.SUCCESS_RATE_TARGET
