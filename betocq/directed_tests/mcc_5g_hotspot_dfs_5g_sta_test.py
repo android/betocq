@@ -28,7 +28,7 @@ The device requirements:
 The AP requirements:
   wifi channel: 52 (5260)
 """
-
+import datetime
 import logging
 
 from mobly  import base_test
@@ -66,6 +66,18 @@ class Mcc5gHotspotDfs5gStaTest(
         wifi_ssid=self.test_parameters.wifi_dfs_5g_ssid,
         wifi_password=self.test_parameters.wifi_dfs_5g_password,
     )
+
+  # @typing.override
+  def _get_transfer_file_size(self) -> int:
+    return nc_constants.TRANSFER_FILE_SIZE_100MB
+
+  # @typing.override
+  def _get_file_transfer_timeout(self) -> datetime.timedelta:
+    return nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
+
+  # @typing.override
+  def _get_success_rate_target(self) -> float:
+    return nc_constants.MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET
 
   def _get_file_transfer_failure_tip(self) -> str:
     return (

@@ -25,6 +25,8 @@ BETOCQ_SUITE_NAME = 'BeToCQ'
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
+# MCC hotspot test is more flaky than other MCC tests due to the sync issue.
+MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET = 0.90
 MCC_PERFORMANCE_TEST_COUNT = 100
 MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 SCC_PERFORMANCE_TEST_COUNT = 10
@@ -54,6 +56,7 @@ SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
 WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
+WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=250)
 WIFI_STA_CONNECTING_TIME_OUT = datetime.timedelta(seconds=25)
@@ -64,6 +67,8 @@ MAX_PHY_RATE_PER_STREAM_AC_40_MBPS = 200
 MAX_PHY_RATE_PER_STREAM_N_20_MBPS = 72
 
 MCC_THROUGHPUT_MULTIPLIER = 0.25
+# MCC hotspot has lower throughput due to synchronization issue with STA.
+MCC_HOTSPOT_THROUGHPUT_MULTIPLIER = 0.2
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37
 IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
@@ -92,6 +97,7 @@ RSSI_HIGH_THRESHOLD = -15
 
 TRANSFER_FILE_SIZE_500MB = 500 * 1024  # kB
 TRANSFER_FILE_SIZE_200MB = 200 * 1024  # kB
+TRANSFER_FILE_SIZE_100MB = 100 * 1024  # kB
 TRANSFER_FILE_SIZE_20MB = 20 * 1024  # kB
 TRANSFER_FILE_SIZE_1MB = 1024  # kB
 TRANSFER_FILE_SIZE_500KB = 512  # kB
@@ -188,6 +194,7 @@ class TestParameters:
   skip_bug_report: bool = False
   force_telephony_cc: bool = False
   bypass_airplane_mode_toggling: bool = False
+  run_mcc_hotspot_test: bool = True
 
   @classmethod
   def from_user_params(

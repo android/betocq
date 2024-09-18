@@ -205,6 +205,15 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
             min_throughput_mbyte_per_sec
             * nc_constants.MCC_THROUGHPUT_MULTIPLIER
         )
+        # MCC hotspot has even lower throughput due to sync issue with STA.
+        if (
+            self._upgrade_medium_under_test
+            == nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT
+        ):
+          min_throughput_mbyte_per_sec = (
+              min_throughput_mbyte_per_sec
+              * nc_constants.MCC_HOTSPOT_THROUGHPUT_MULTIPLIER
+          )
 
       nc_min_throughput_mbyte_per_sec = (
           min_throughput_mbyte_per_sec
