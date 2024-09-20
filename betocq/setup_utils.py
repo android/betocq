@@ -116,6 +116,12 @@ def enable_logs(ad: android_device.AndroidDevice) -> None:
   ad.adb.shell('cmd wifi set-verbose-logging enabled')
 
   # Enable Bluetooth HCI logs.
+  if not ad.is_adb_root:
+    ad.log.info(
+        'Skipped setting Bluetooth HCI logs on device,'
+        'because we do not set Bluetooth HCI logs on unrooted phone.'
+    )
+    return
   ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
 
   # Enable Bluetooth verbose logs.
