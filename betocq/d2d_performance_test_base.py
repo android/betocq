@@ -637,6 +637,10 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
         f'{round(self._current_test_result.quality_info.connection_latency.total_seconds(), 1)}'
     )
     transfer_quality_info.append(
+        'connection_medium: '
+        f'{self._current_test_result.quality_info.get_connection_medium_name()}'
+    )
+    transfer_quality_info.append(
         'upgrade_latency: '
         f'{round(self._current_test_result.quality_info.medium_upgrade_latency.total_seconds(), 1)}'
     )

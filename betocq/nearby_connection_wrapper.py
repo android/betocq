@@ -257,7 +257,49 @@ class NearbyConnectionWrapper:
         self._advertiser_endpoint_id,
         f'Received an unexpected endpoint: {discoverer_connection_event}')
 
-    if nc_constants.is_high_quality_medium(self.upgrade_medium):
+    is_connection_medium_high_quality = False
+    discoverer_medium_connection_event = (
+        self._discoverer_connection_lifecycle_callback.waitAndGet(
+            'onBandwidthChanged',
+            nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
+        )
+    )
+    if self.connection_quality_info.connection_medium is None:
+      self.connection_quality_info.connection_medium = (
+          nc_constants.NearbyConnectionMedium(
+              discoverer_medium_connection_event.data['medium']
+          )
+      )
+      if discoverer_medium_connection_event.data['isHighBwQuality']:
+        is_connection_medium_high_quality = True
+      self.discoverer.log.info(
+          'connect to medium:'
+          f' {self.connection_quality_info.connection_medium.name}, is high'
+          f' quality: {is_connection_medium_high_quality}'
+      )
+
+    # check if it's instant connection
+    if (
+        is_connection_medium_high_quality
+        and nc_constants.is_high_quality_medium(self.upgrade_medium)
+    ):
+      self.connection_quality_info.medium_upgrade_latency = datetime.timedelta(
+          seconds=0
+      )
+      self.connection_quality_info.upgrade_medium = (
+          self.connection_quality_info.connection_medium
+      )
+      self.connection_quality_info.medium_upgrade_expected = True
+      self.discoverer.log.info(
+          "It's instant connection successfully connected to high quality"
+          f' medium: {self.connection_quality_info.upgrade_medium.name}'
+      )
+
+    # no upgrade happens after already connected to high quality medium
+    if (
+        not is_connection_medium_high_quality
+        and nc_constants.is_high_quality_medium(self.upgrade_medium)
+    ):
       self.test_failure_reason = (
           nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE
       )

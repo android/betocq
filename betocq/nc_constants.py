@@ -434,10 +434,13 @@ class ConnectionSetupQualityInfo:
   connection_latency: datetime.timedelta = UNSET_LATENCY
   medium_upgrade_latency: datetime.timedelta = UNSET_LATENCY
   medium_upgrade_expected: bool = False
+  connection_medium: NearbyConnectionMedium | None = None
   upgrade_medium: NearbyConnectionMedium | None = None
   medium_frequency: int = INVALID_INT
 
   def get_dict(self) -> dict[str, str]:
+    """The get dict representation of the quality info."""
+
     dict_repr = {
         'discovery': f'{round(self.discovery_latency.total_seconds(), 1)}s',
         'connection': f'{round(self.connection_latency.total_seconds(), 1)}s'
@@ -446,9 +449,16 @@ class ConnectionSetupQualityInfo:
       dict_repr['upgrade'] = (
           f'{round(self.medium_upgrade_latency.total_seconds(), 1)}s'
       )
+    if self.connection_medium is not None:
+      dict_repr['connection_medium'] = self.connection_medium.name
     if self.upgrade_medium:
       dict_repr['medium'] = self.upgrade_medium.name
     return dict_repr
+
+  def get_connection_medium_name(self) -> str:
+    if self.connection_medium is not None:
+      return self.connection_medium.name
+    return 'na'
 
   def get_medium_name(self) -> str:
     if self.upgrade_medium:
