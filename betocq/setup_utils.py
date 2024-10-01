@@ -440,6 +440,9 @@ def enable_instant_connection(
 
   check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
 
+  flag_name = 'connections_support_instant_connection_sender'
+  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
+
 
 def disable_wlan_deny_list(ad: android_device.AndroidDevice) -> None:
   """Disable wlan deny list on the given device."""
