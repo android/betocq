@@ -397,7 +397,8 @@ COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
 MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS: dict[NearbyMedium, str] = {
     NearbyMedium.WIFILAN_ONLY: (
         ' WLAN, check if AP blocks the mDNS traffic. Check if STA is connected'
-        ' to AP during WiFi upgrade.'
+        ' to AP during WiFi upgrade. For the sporadic upgrade failure, try to'
+        ' disable WiFi power saving and check if the failure is gone.'
     ),
     NearbyMedium.UPGRADE_TO_WIFIHOTSPOT: (
         ' HOTSPOT, check the related wifip2p and NearbyConnections logs to see'
