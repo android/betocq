@@ -12,11 +12,15 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""iperf test util."""
+"""Utilities for running iperf on the devices."""
+
+
+import logging
 import time
 from mobly import utils
 from mobly.controllers import android_device
 from betocq import nc_constants
+from betocq import setup_utils
 
 # IPv4, 10 sec, 1 stream
 DEFAULT_IPV4_CLIENT_ARGS = '-t 10 -P1'
@@ -214,10 +218,27 @@ def get_ifconfig_aware(
     ad: android_device.AndroidDevice,
 ) -> str:
   """Get aware network info from adb shell ifconfig."""
-  ifconfig = ad.adb.shell('ifconfig | grep -A5 aware').decode('utf-8').strip()
-  # Use the last one if there are multiple aware interfaces.
-  index = ifconfig.rfind('aware')
-  return ifconfig[index:]
+  logging.info(ad)
+  ifconfig = ad.adb.shell('ifconfig | grep aware').decode('utf-8')
+
+  iface_list = ifconfig.split()
+
+  for iface in iface_list:
+    str_list = iface.strip().split()
+    if not str_list:
+      continue
+    if_name = str_list[0].strip()
+    info = ad.adb.shell(f'ifconfig | grep -A7 {if_name}').decode('utf-8')
+
+    prefix = 'Tx packets'
+    postfix = 'errors'
+    tx_packets = setup_utils.get_int_between_prefix_postfix(
+        info, prefix, postfix
+    )
+    if tx_packets > 0:
+      return info
+
+  return (ifconfig)
 
 
 def get_ifconfig_wlan(
