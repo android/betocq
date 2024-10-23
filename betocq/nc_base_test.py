@@ -52,7 +52,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
   """The Base of Nearby Connection E2E tests."""
 
   _run_identifier_is_set = False
-  _committed_ph_flags_is_set = False
 
   def __init__(self, configs):
     super().__init__(configs)
@@ -84,8 +83,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
   def setup_class(self) -> None:
     self._setup_openwrt_wifi()
     self.ads = self.register_controller(android_device, min_number=2)
-    # record the flags only for the first device
-    self._set_committed_ph_flags(self.ads[0])
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
@@ -177,25 +174,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
         }
     })
     NCBaseTestClass._run_identifier_is_set = True
-
-  def _set_committed_ph_flags(self, ad) -> None:
-    """Set a committed_ph_flags property describing the committed P/H flags.
-
-    This property is only set once, even if multiple test classes are run as
-    part of a test suite.
-
-    Args:
-      ad: AndroidDevice, Mobly Android Device.
-    """
-
-    if NCBaseTestClass._committed_ph_flags_is_set:
-      return
-
-    flags = setup_utils.get_committed_ph_flags(
-        ad, 'com.google.android.gms.nearby'
-    )
-    self.record_data({'properties': {'committed_ph_flags': flags}})
-    NCBaseTestClass._committed_ph_flags_is_set = True
 
   def _setup_openwrt_wifi(self):
     """Sets up the wifi connection with OpenWRT."""
@@ -319,20 +297,12 @@ class NCBaseTestClass(base_test.BaseTestClass):
 
     setup_utils.remove_disconnect_wifi_network(ad)
     setup_utils.enable_logs(ad)
-    setup_utils.disable_redaction(ad)
-    setup_utils.enable_wifi_aware(ad)
-    setup_utils.disable_wlan_deny_list(ad)
-    setup_utils.enable_instant_connection(
-        ad, self.test_parameters.enable_instant_connection
+    setup_utils.set_flags(
+        ad,
+        self.current_test_info.output_path,
+        self.test_parameters.enable_instant_connection,
+        self.test_parameters.enable_2g_ble_scan_throttling,
     )
-    setup_utils.disable_usb_medium(ad)
-    setup_utils.disable_op_mode_check(ad)
-
-    setup_utils.enable_ble_scan_throttling_during_2g_transfer(
-        ad, self.test_parameters.enable_2g_ble_scan_throttling
-    )
-    setup_utils.force_flag_sync(ad)
-    setup_utils.restart_gms(ad)
 
     setup_utils.set_country_code(
         ad, self._get_country_code(), self.test_parameters.force_telephony_cc
@@ -456,7 +426,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
         ),
         f'max_num_streams: {ad.max_num_streams}',
         f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
-        f'support_aware: {setup_utils.is_wifi_aware_available(ad)}'
+        f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
     ]
 
   def _get_test_summary_dict(self, test_result: str) -> dict[str, str]:
