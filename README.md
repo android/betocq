@@ -83,19 +83,10 @@ For example, `scc_indoor_5g_wfd_sta_test` means:
 - Both STA and WFD are connected to 5G indoor channel (for example, 5180 in JP).
 
 Similarly, `mcc_5g_all_wifi_non_dbs_2g_sta_test` means:
-outmod betocq_test_suite
 
 - Transfer medium can be any 5G Wi-Fi medium.
 - STA is connected to the 2G band and the transfer medium is connected to the 5G band.
 - Device isn't capable of DBS and so it operates in MCC mode.
-
-Note that some test cases are skipped if they aren't supported by the device
-capabilities. For example:
-
-- `scc_indoor_5g_wfd_sta_test` is skipped if the device doesn't
- support WFD group owner (GO) at the 5G indoor channel.
-
-- `mcc_5g_all_wifi_non_dbs_2g_sta_test` is skipped for DBS capable devices.
 
 Each test case runs multiple iterations to collect the following stats:
 
@@ -108,6 +99,14 @@ Each test case runs multiple iterations to collect the following stats:
 
 MCC test cases run more iterations than SCC test cases.
 5G test cases transfer larger files than 2G test cases.
+
+Note that some test cases are skipped if they aren't supported by the device
+capabilities. For example:
+
+- `scc_indoor_5g_wfd_sta_test` is skipped if the device doesn't
+ support WFD group owner (GO) at the 5G indoor channel.
+
+- `mcc_5g_all_wifi_non_dbs_2g_sta_test` is skipped for DBS capable devices.
 
 The test cases execution depends on the device capability, so it's
 important to fill in the device capabilities section correctly in the test
