@@ -61,7 +61,7 @@ device-to-device transfer speed.
 As a result, this test suite uses the wireless capabilities of test devices as
 inputs to customize the test case and set the right performance expectations.
 
-## Test cases
+## Test cases definition
 
 In the directed and CUJ tests, depending on the device capabilities,
 test cases are defined to cover:
@@ -112,6 +112,95 @@ MCC test cases run more iterations than SCC test cases.
 The test cases execution depends on the device capability, so it's
 important to fill in the device capabilities section correctly in the test
 configuration file. We'll discuss this in more detail in the following sections.
+
+The DBS capable device pair with both `enable_sta_dfs_channel_for_peer_network`
+and `enable_sta_indoor_channel_for_peer_network` set to `False` executes
+the following list of test cases:
+
+<table>
+  <tr>
+   <th>Test case</th>
+   <th>Medium</th>
+   <th>Wi-Fi STA channel (MHz)</th>
+   <th>Wi-Fi country code</th>
+  </tr>
+  <tr>
+   <td>BetoCqFunctionGroupTest</td>
+   <td>Various</td>
+   <td>Various</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Bt2GWifiCoexTest</td>
+   <td>WFD</td>
+   <td>2437</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>BtPerformanceTest</td>
+   <td>BT classic</td>
+   <td>N/A</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Mcc2gWfdIndoor5gStaTest</td>
+   <td>WFD</td>
+   <td>5180</td>
+   <td>JP</td>
+  </tr>
+  <tr>
+   <td>Mcc5gHotspotDfs5gStaTest</td>
+   <td>Hotspot</td>
+   <td>5260</td>
+   <td>GB</td>
+  </tr>
+  <tr>
+   <td>Mcc5gWfdDfs5gStaTest</td>
+   <td>WFD</td>
+   <td>5260</td>
+   <td>GB</td>
+  </tr>
+  <tr>
+   <td>Scc2gWfdStaTest</td>
+   <td>WFD</td>
+   <td>2437</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Scc5gWfdDbs2gStaTest</td>
+   <td>WFD</td>
+   <td>2437</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Scc5gWfdStaTest</td>
+   <td>WFD</td>
+   <td>5180</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Scc5gWifiLanStaTest</td>
+   <td>WLAN</td>
+   <td>5180</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Scc5GAllWifiStaTest</td>
+   <td>All Wi-Fi mediums</td>
+   <td>5180</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Scc5gAllWifiDbs2gStaTest</td>
+   <td>All Wi-Fi mediums</td>
+   <td>2437</td>
+   <td>US</td>
+  </tr>
+</table>
+
+As explained later,
+if `wifi_dfs_5g_ssid` is empty or commented out,
+all DFS test cases with STA channel = 5260 are skipped.
 
 ## Actionable test results
 
@@ -179,7 +268,6 @@ BetoCQ takes three steps to address this issue:
     model with known good connectivity performance. Some options are:
     - A model that already passed the automated test suite as a target.
     - A flagship model with no known major Bluetooth and Wi-Fi issues.
-    - A Google Pixel 8
 
 *   **Prepare devices.**
 
@@ -216,7 +304,7 @@ https://github.com/android/betocq/releases and save them in a local directory:
    - `cuj_and_test_config.yml`
    where `x.y.z` stands for the latest release version.
 
-#### Define testbed configurations
+#### Configure Wi-Fi AP and test
 
 1. Modify the test config file `cuj_and_test_config.yml` as follows:
     -  Find device serial numbers:
