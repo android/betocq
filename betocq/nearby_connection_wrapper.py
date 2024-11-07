@@ -30,7 +30,7 @@ from betocq import nc_constants
 # This number should be large enough to cover advertising interval, firmware
 # scheduling timing interval and user action delay
 ADV_TO_DISCOVERY_MAX_DELAY_SEC = 4
-ADV_TO_DISCOVERY_MIN_DELAY_SEC = 2
+ADV_TO_DISCOVERY_MIN_DELAY_SEC = 3
 
 
 class NearbyConnectionWrapper:
@@ -257,7 +257,49 @@ class NearbyConnectionWrapper:
         self._advertiser_endpoint_id,
         f'Received an unexpected endpoint: {discoverer_connection_event}')
 
-    if nc_constants.is_high_quality_medium(self.upgrade_medium):
+    is_connection_medium_high_quality = False
+    discoverer_medium_connection_event = (
+        self._discoverer_connection_lifecycle_callback.waitAndGet(
+            'onBandwidthChanged',
+            nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
+        )
+    )
+    if self.connection_quality_info.connection_medium is None:
+      self.connection_quality_info.connection_medium = (
+          nc_constants.NearbyConnectionMedium(
+              discoverer_medium_connection_event.data['medium']
+          )
+      )
+      if discoverer_medium_connection_event.data['isHighBwQuality']:
+        is_connection_medium_high_quality = True
+      self.discoverer.log.info(
+          'connect to medium:'
+          f' {self.connection_quality_info.connection_medium.name}, is high'
+          f' quality: {is_connection_medium_high_quality}'
+      )
+
+    # check if it's instant connection
+    if (
+        is_connection_medium_high_quality
+        and nc_constants.is_high_quality_medium(self.upgrade_medium)
+    ):
+      self.connection_quality_info.medium_upgrade_latency = datetime.timedelta(
+          seconds=0
+      )
+      self.connection_quality_info.upgrade_medium = (
+          self.connection_quality_info.connection_medium
+      )
+      self.connection_quality_info.medium_upgrade_expected = True
+      self.discoverer.log.info(
+          "It's instant connection successfully connected to high quality"
+          f' medium: {self.connection_quality_info.upgrade_medium.name}'
+      )
+
+    # no upgrade happens after already connected to high quality medium
+    if (
+        not is_connection_medium_high_quality
+        and nc_constants.is_high_quality_medium(self.upgrade_medium)
+    ):
       self.test_failure_reason = (
           nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE
       )
@@ -380,12 +422,9 @@ class NearbyConnectionWrapper:
       self.discoverer.log.info(
           f'sending {num_files} payloads with type: {payload_type.name}'
       )
-      transfer_speed_acc_kbs = 0
-      for _ in range(num_files):
-        transfer_speed_acc_kbs = transfer_speed_acc_kbs + self._transfer_file(
-            file_size_kb, timeout, payload_type
-        )
-      transfer_speed_kbs = transfer_speed_acc_kbs / num_files
+      transfer_speed_kbps = self._transfer_file(
+          file_size_kb, timeout, payload_type, num_files
+      )
       self.advertiser.log.info(f'{num_files} payloads received')
       self.test_failure_reason = nc_constants.SingleTestFailureReason.SUCCESS
     finally:
@@ -394,26 +433,24 @@ class NearbyConnectionWrapper:
           lambda nb: nb.transferFilesCleanup(),
           param_list=[[self.discoverer_nearby], [self.advertiser_nearby]],
           raise_on_exception=True)
-    return transfer_speed_kbs
+    return transfer_speed_kbps
 
   def _transfer_file(
       self, file_size_kb: int, timeout: datetime.timedelta,
-      payload_type: nc_constants.PayloadType
+      payload_type: nc_constants.PayloadType,
+      num_files: int = nc_constants.TRANSFER_FILE_NUM_DEFAULT,
   ) -> float:
     """Sends payloads and returns the transfer speed in kBS."""
     # Creates a file and send it to the advertiser.
     file_name = utils.rand_ascii_str(8)
 
-    payload_id = self.discoverer_nearby.sendPayloadWithType(
-        self._advertiser_endpoint_id, file_name, file_size_kb, payload_type
+    last_payload_id = self.discoverer_nearby.sendMultiplePayloadWithType(
+        self._advertiser_endpoint_id,
+        file_name,
+        file_size_kb,
+        payload_type,
+        num_files,
     )
-
-    # Waits for the advertiser received.
-    def on_receive(event: callback_event.CallbackEvent) -> bool:
-      return (
-          event.data['endpointId'] == self._discoverer_endpoint_id
-          and event.data['payload']['id'] == payload_id
-      )
 
     asserts.assert_is_not_none(
         self._advertiser_payload_callback,
@@ -421,24 +458,41 @@ class NearbyConnectionWrapper:
     asserts.assert_is_not_none(
         self._discoverer_payload_callback,
         'No nearby connection is set up, discoverer payload cb is none.')
+    def on_receive(event: callback_event.CallbackEvent) -> bool:
+      return (
+          event.data['endpointId'] == self._discoverer_endpoint_id
+      )
+    transfer_time_s = 0
+    for _ in range(num_files):
+      # Ensure the order of payload transfer events are the same on both sides.
 
-    self._advertiser_payload_callback.waitForEvent(
-        'onPayloadReceived',
-        predicate=on_receive,
-        timeout=timeout.total_seconds())
+      rx_received_event = self._advertiser_payload_callback.waitForEvent(
+          'onPayloadReceived',
+          predicate=on_receive,
+          timeout=timeout.total_seconds())
 
-    # Waits for complete transfer.
-    self._advertiser_payload_callback.waitForEvent(
-        'onPayloadTransferUpdate',
-        predicate=lambda event: event.data['update']['isSuccess'],
-        timeout=timeout.total_seconds())
+      rx_transfer_event = self._advertiser_payload_callback.waitForEvent(
+          'onPayloadTransferUpdate',
+          predicate=lambda event: event.data['update']['isSuccess'],
+          timeout=timeout.total_seconds())
 
-    payload_transfer_event = self._discoverer_payload_callback.waitForEvent(
-        'onPayloadTransferUpdate',
-        predicate=lambda event: event.data['update']['isSuccess'],
-        timeout=timeout.total_seconds(),
-    )
+      tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
+          'onPayloadTransferUpdate',
+          predicate=lambda event: event.data['update']['isSuccess'],
+          # and event.data['update']['payloadId'] == last_payload_id,
+          timeout=timeout.total_seconds(),
+      )
+      tx_id = tx_transfer_event.data['update']['payloadId']
+      rx_id_payload_received = rx_received_event.data['payload']['id']
+      rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
+      if payload_type == nc_constants.PayloadType.FILE:
+        asserts.assert_equal(tx_id, rx_id_payload_received)
+        asserts.assert_equal(tx_id, rx_id_transfer_update)
+      if tx_id == last_payload_id:
+        transfer_time_s = datetime.timedelta(
+            microseconds=tx_transfer_event.data['transferTimeNs']
+            / 1_000
+        ).total_seconds()
 
-    transfer_time = datetime.timedelta(
-        microseconds=payload_transfer_event.data['transferTimeNs'] / 1_000)
-    return round(file_size_kb/transfer_time.total_seconds())
+    asserts.assert_true(transfer_time_s > 0, 'Transfer time is 0')
+    return round(file_size_kb * num_files / transfer_time_s)

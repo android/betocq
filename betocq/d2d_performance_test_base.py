@@ -205,6 +205,15 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
             min_throughput_mbyte_per_sec
             * nc_constants.MCC_THROUGHPUT_MULTIPLIER
         )
+        # MCC hotspot has even lower throughput due to sync issue with STA.
+        if (
+            self._upgrade_medium_under_test
+            == nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT
+        ):
+          min_throughput_mbyte_per_sec = (
+              min_throughput_mbyte_per_sec
+              * nc_constants.MCC_HOTSPOT_THROUGHPUT_MULTIPLIER
+          )
 
       nc_min_throughput_mbyte_per_sec = (
           min_throughput_mbyte_per_sec
@@ -394,7 +403,8 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
           active_snippet.transfer_file(
               self._get_transfer_file_size(),
               self._get_file_transfer_timeout(),
-              self.test_parameters.payload_type,
+              nc_constants.PayloadType(self.test_parameters.payload_type),
+              self.test_parameters.payload_file_num,
           )
       )
 
@@ -578,10 +588,12 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     return ssid_advertiser
 
   def _get_transfer_file_size(self) -> int:
-    return nc_constants.TRANSFER_FILE_SIZE_500MB
+    return self.test_parameters.payload_file_size_kbyte
 
   def _get_file_transfer_timeout(self) -> datetime.timedelta:
-    return nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
+    return datetime.timedelta(
+        seconds=self.test_parameters.payload_transfer_timeout_sec
+    )
 
   def _get_success_rate_target(self) -> float:
     return nc_constants.SUCCESS_RATE_TARGET
@@ -623,6 +635,10 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
     transfer_quality_info.append(
         'connection_latency: '
         f'{round(self._current_test_result.quality_info.connection_latency.total_seconds(), 1)}'
+    )
+    transfer_quality_info.append(
+        'connection_medium: '
+        f'{self._current_test_result.quality_info.get_connection_medium_name()}'
     )
     transfer_quality_info.append(
         'upgrade_latency: '

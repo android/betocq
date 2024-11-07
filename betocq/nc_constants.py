@@ -25,6 +25,8 @@ BETOCQ_SUITE_NAME = 'BeToCQ'
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
+# MCC hotspot test is more flaky than other MCC tests due to the sync issue.
+MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET = 0.90
 MCC_PERFORMANCE_TEST_COUNT = 100
 MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 SCC_PERFORMANCE_TEST_COUNT = 10
@@ -54,6 +56,7 @@ SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
 WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
+WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=250)
 WIFI_STA_CONNECTING_TIME_OUT = datetime.timedelta(seconds=25)
@@ -64,6 +67,8 @@ MAX_PHY_RATE_PER_STREAM_AC_40_MBPS = 200
 MAX_PHY_RATE_PER_STREAM_N_20_MBPS = 72
 
 MCC_THROUGHPUT_MULTIPLIER = 0.25
+# MCC hotspot has lower throughput due to synchronization issue with STA.
+MCC_HOTSPOT_THROUGHPUT_MULTIPLIER = 0.2
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37
 IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
@@ -92,6 +97,7 @@ RSSI_HIGH_THRESHOLD = -15
 
 TRANSFER_FILE_SIZE_500MB = 500 * 1024  # kB
 TRANSFER_FILE_SIZE_200MB = 200 * 1024  # kB
+TRANSFER_FILE_SIZE_100MB = 100 * 1024  # kB
 TRANSFER_FILE_SIZE_20MB = 20 * 1024  # kB
 TRANSFER_FILE_SIZE_1MB = 1024  # kB
 TRANSFER_FILE_SIZE_500KB = 512  # kB
@@ -102,7 +108,7 @@ TRANSFER_FILE_SIZE_10KB = 10  # kB
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
 TRANSFER_FILE_NUM_FUNC_TEST = 100
-TRANSFER_TIMEOUT_FUNC_TEST_SEC = datetime.timedelta(seconds=100)
+TRANSFER_TIMEOUT_FUNC_TEST = datetime.timedelta(seconds=100)
 
 TARGET_CUJ_QUICK_START = 'quick_start'
 TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
@@ -158,6 +164,11 @@ class TestParameters:
   disconnect_bt_after_test: bool = False
   disconnect_wifi_after_test: bool = False
   payload_type: PayloadType = PayloadType.FILE
+  payload_file_num: int = 1
+  payload_file_size_kbyte: int = TRANSFER_FILE_SIZE_500MB
+  payload_transfer_timeout_sec: int = int(
+      WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT.total_seconds()
+  )
   allow_unrooted_device: bool = False
   keep_alive_timeout_ms: int = KEEP_ALIVE_TIMEOUT_WIFI_MS
   keep_alive_interval_ms: int = KEEP_ALIVE_INTERVAL_WIFI_MS
@@ -183,6 +194,7 @@ class TestParameters:
   skip_bug_report: bool = False
   force_telephony_cc: bool = False
   bypass_airplane_mode_toggling: bool = False
+  run_mcc_hotspot_test: bool = True
 
   @classmethod
   def from_user_params(
@@ -385,7 +397,8 @@ COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
 MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS: dict[NearbyMedium, str] = {
     NearbyMedium.WIFILAN_ONLY: (
         ' WLAN, check if AP blocks the mDNS traffic. Check if STA is connected'
-        ' to AP during WiFi upgrade.'
+        ' to AP during WiFi upgrade. For the sporadic upgrade failure, try to'
+        ' disable WiFi power saving and check if the failure is gone.'
     ),
     NearbyMedium.UPGRADE_TO_WIFIHOTSPOT: (
         ' HOTSPOT, check the related wifip2p and NearbyConnections logs to see'
@@ -422,10 +435,13 @@ class ConnectionSetupQualityInfo:
   connection_latency: datetime.timedelta = UNSET_LATENCY
   medium_upgrade_latency: datetime.timedelta = UNSET_LATENCY
   medium_upgrade_expected: bool = False
+  connection_medium: NearbyConnectionMedium | None = None
   upgrade_medium: NearbyConnectionMedium | None = None
   medium_frequency: int = INVALID_INT
 
   def get_dict(self) -> dict[str, str]:
+    """The get dict representation of the quality info."""
+
     dict_repr = {
         'discovery': f'{round(self.discovery_latency.total_seconds(), 1)}s',
         'connection': f'{round(self.connection_latency.total_seconds(), 1)}s'
@@ -434,9 +450,16 @@ class ConnectionSetupQualityInfo:
       dict_repr['upgrade'] = (
           f'{round(self.medium_upgrade_latency.total_seconds(), 1)}s'
       )
+    if self.connection_medium is not None:
+      dict_repr['connection_medium'] = self.connection_medium.name
     if self.upgrade_medium:
       dict_repr['medium'] = self.upgrade_medium.name
     return dict_repr
+
+  def get_connection_medium_name(self) -> str:
+    if self.connection_medium is not None:
+      return self.connection_medium.name
+    return 'na'
 
   def get_medium_name(self) -> str:
     if self.upgrade_medium:

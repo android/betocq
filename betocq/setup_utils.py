@@ -20,8 +20,18 @@ import time
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
+from betocq.gms import hermetic_overrides_partner
 from betocq import gms_auto_updates_util
 from betocq import nc_constants
+from betocq import resources
+
+_DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
+_BLE_SCAN_THROTTLING_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:ble_scan_throttling_off_overrides'
+_BLE_SCAN_THROTTLING_ON_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:ble_scan_throttling_on_overrides'
+_INSTANT_CONNECTION_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:instant_connection_off_overrides'
+_INSTANT_CONNECTION_ON_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:instant_connection_on_overrides'
+_FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
+_GMS_PACKAGE = 'com.google.android.gms'
 
 WIFI_COUNTRYCODE_CONFIG_TIME_SEC = 3
 TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC = 2
@@ -116,6 +126,12 @@ def enable_logs(ad: android_device.AndroidDevice) -> None:
   ad.adb.shell('cmd wifi set-verbose-logging enabled')
 
   # Enable Bluetooth HCI logs.
+  if not ad.is_adb_root:
+    ad.log.info(
+        'Skipped setting Bluetooth HCI logs on device,'
+        'because we do not set Bluetooth HCI logs on unrooted phone.'
+    )
+    return
   ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
 
   # Enable Bluetooth verbose logs.
@@ -273,11 +289,16 @@ def enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
 
 
 def _do_enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
-  if (ad.is_adb_root):
+  if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '1'])
     ad.adb.shell([
-        'am', 'broadcast', '-a', 'android.intent.action.AIRPLANE_MODE', '--ez',
-        'state', 'true'
+        'am',
+        'broadcast',
+        '-a',
+        'android.intent.action.AIRPLANE_MODE',
+        '--ez',
+        'state',
+        'true',
     ])
   ad.adb.shell(['svc', 'wifi', 'disable'])
   ad.adb.shell(['svc', 'bluetooth', 'disable'])
@@ -297,211 +318,20 @@ def disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
 
 
 def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
-  if (ad.is_adb_root):
+  if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '0'])
     ad.adb.shell([
-        'am', 'broadcast', '-a', 'android.intent.action.AIRPLANE_MODE', '--ez',
-        'state', 'false'
+        'am',
+        'broadcast',
+        '-a',
+        'android.intent.action.AIRPLANE_MODE',
+        '--ez',
+        'state',
+        'false',
     ])
   ad.adb.shell(['svc', 'wifi', 'enable'])
   ad.adb.shell(['svc', 'bluetooth', 'enable'])
   time.sleep(TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC)
-
-
-def check_if_ph_flag_committed(
-    ad: android_device.AndroidDevice,
-    pname: str,
-    flag_name: str,
-) -> bool:
-  """Check if P/H flag is committed.
-
-  Some devices don't support to check the flag with sqlite3. After the flag
-  check fails for the first time, it won't try it again.
-
-  Args:
-    ad: AndroidDevice, Mobly Android Device.
-    pname: The package name of the P/H flag.
-    flag_name: The name of the P/H flag.
-
-  Returns:
-    True if the P/H flag is committed.
-  """
-  if read_ph_flag_failed:
-    return False
-  flag_result = get_committed_ph_flags(ad, pname)
-  return flag_name in flag_result
-
-
-def get_committed_ph_flags(
-    ad: android_device.AndroidDevice,
-    pname: str,
-) -> str:
-  """Get committed P/H flags.
-
-  Some devices don't support to check the flag with sqlite3. After the flag
-  check fails for the first time, it won't try it again.
-
-  Args:
-    ad: AndroidDevice, Mobly Android Device.
-    pname: The package name of the P/H flag.
-
-  Returns:
-    List of committed P/H flags
-  """
-  global read_ph_flag_failed
-  if read_ph_flag_failed:
-    return ''
-  sql_str = (
-      'sqlite3 /data/data/com.google.android.gms/databases/phenotype.db'
-      ' "select name, quote(coalesce(intVal, boolVal, floatVal, stringVal,'
-      ' extensionVal)) from FlagOverrides where committed=1 AND'
-      f" packageName='{pname}';\""
-  )
-  try:
-    return ad.adb.shell(sql_str).decode('utf-8').strip()
-  except adb.AdbError:
-    read_ph_flag_failed = True
-    ad.log.exception('Failed to get committed P/H flags')
-  return ''
-
-
-def write_ph_flag(
-    ad: android_device.AndroidDevice,
-    pname: str,
-    flag_name: str,
-    flag_type: str,
-    flag_value: str,
-) -> None:
-  """Write P/H flag."""
-  ad.adb.shell(
-      'am broadcast -a "com.google.android.gms.phenotype.FLAG_OVERRIDE" '
-      f'--es package "{pname}" --es user "*" '
-      f'--esa flags "{flag_name}" '
-      f'--esa types "{flag_type}" --esa values "{flag_value}" '
-      'com.google.android.gms'
-  )
-  time.sleep(PH_FLAG_WRITE_WAIT_TIME_SEC)
-
-
-def check_and_try_to_write_ph_flag(
-    ad: android_device.AndroidDevice,
-    pname: str,
-    flag_name: str,
-    flag_type: str,
-    flag_value: str,
-) -> None:
-  """Check and try to enable the given flag on the given device."""
-  if(not ad.is_adb_root):
-    ad.log.info(
-        "Can't read or write P/H flag value in non-rooted device. Use Mobile"
-        ' Utility app to config instead.'
-    )
-    return
-
-  if check_if_ph_flag_committed(ad, pname, flag_name):
-    ad.log.info(f'{flag_name} is already committed.')
-    return
-  ad.log.info(f'write {flag_name}.')
-  write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-  if check_if_ph_flag_committed(ad, pname, flag_name):
-    ad.log.info(f'{flag_name} is configured successfully.')
-  else:
-    ad.log.info(f'failed to configure {flag_name}.')
-
-
-def enable_wifi_aware(ad: android_device.AndroidDevice) -> None:
-  """Enable wifi aware on the given device."""
-  pname = 'com.google.android.gms.nearby'
-  flag_name = 'mediums_supports_wifi_aware'
-  flag_type = 'boolean'
-  flag_value = 'true'
-
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
-def enable_instant_connection(
-    ad: android_device.AndroidDevice, enable: bool = False
-) -> None:
-  """Enable instant connection on the given device."""
-  pname = 'com.google.android.gms.nearby'
-  flag_name = 'connections_support_instant_connection'
-  flag_type = 'boolean'
-  if enable:
-    flag_value = 'true'
-  else:
-    flag_value = 'false'
-
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
-def disable_wlan_deny_list(ad: android_device.AndroidDevice) -> None:
-  """Disable wlan deny list on the given device."""
-  pname = 'com.google.android.gms.nearby'
-  flag_name = 'wifi_lan_blacklist_verify_bssid_interval_hours'
-  flag_type = 'long'
-  flag_value = '0'
-
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-  flag_name = 'mediums_wifi_lan_temporary_blacklist_verify_bssid_interval_hours'
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
-def disable_usb_medium(ad: android_device.AndroidDevice) -> None:
-  """Disable USB medium on the given device as it interferes ADB connection."""
-  pname = 'com.google.android.gms.nearby'
-  flag_name = 'mediums_supports_usb'
-  flag_type = 'boolean'
-  flag_value = 'false'
-
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
-def enable_ble_scan_throttling_during_2g_transfer(
-    ad: android_device.AndroidDevice, enable_ble_scan_throttling: bool = False
-) -> None:
-  """Enable BLE scan throttling during 2G transfer.
-  """
-
-  # The default values for the following parameters are 3 mins which are long
-  # enough for the performance test.
-  # mediums_ble_client_wifi_24_ghz_warming_up_duration
-  # fast_pair_wifi_24_ghz_warming_up_duration
-  # sharing_wifi_24_ghz_warming_up_duration
-
-  pname = 'com.google.android.gms.nearby'
-  flag_name = 'fast_pair_enable_connection_state_changed_listener'
-  flag_type = 'boolean'
-  flag_value = 'true' if enable_ble_scan_throttling else 'false'
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-  flag_name = 'sharing_enable_connection_state_changed_listener'
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-  flag_name = 'mediums_ble_client_enable_connection_state_changed_listener'
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
-def disable_redaction(ad: android_device.AndroidDevice) -> None:
-  """Disable info log redaction on the given device."""
-  pname = 'com.google.android.gms'
-  flag_name = 'ClientLogging__enable_info_log_redaction'
-  flag_type = 'boolean'
-  flag_value = 'false'
-
-  check_and_try_to_write_ph_flag(ad, pname, flag_name, flag_type, flag_value)
-
-
-def force_flag_sync(ad: android_device.AndroidDevice) -> None:
-  """Force flag sync on the given device."""
-  ad.log.info('Force flag sync.')
-  ad.adb.shell(
-      'am broadcast -a "com.google.android.gms.gcm.ACTION_TRIGGER_TASK" -e'
-      ' component'
-      ' "com.google.android.gms/.phenotype.service.sync.PhenotypeConfigurator"'
-      ' -e tag "oneoff"'
-  )
 
 
 def restart_gms(ad: android_device.AndroidDevice) -> None:
@@ -510,17 +340,13 @@ def restart_gms(ad: android_device.AndroidDevice) -> None:
   ad.adb.shell('am force-stop com.google.android.gms')
 
 
-def install_apk(ad: android_device.AndroidDevice, apk_path: str) -> None:
-  """Installs the apk on the given device."""
-  ad.adb.install(['-r', '-g', '-t', apk_path])
-
-
 def disable_gms_auto_updates(ad: android_device.AndroidDevice) -> None:
   """Disable GMS auto updates on the given device."""
   if not ad.is_adb_root:
     ad.log.warning(
         'You should disable the play store auto updates manually on a'
-        'unrooted device, otherwise the test may be broken unexpected')
+        'unrooted device, otherwise the test may be broken unexpected'
+    )
   ad.log.info('try to disable GMS Auto Updates.')
   gms_auto_updates_util.GmsAutoUpdatesUtil(ad).disable_gms_auto_updates()
   time.sleep(_DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC)
@@ -531,7 +357,8 @@ def enable_gms_auto_updates(ad: android_device.AndroidDevice) -> None:
   if not ad.is_adb_root:
     ad.log.warning(
         'You may enable the play store auto updates manually on a'
-        'unrooted device after test.')
+        'unrooted device after test.'
+    )
   ad.log.info('try to enable GMS Auto Updates.')
   gms_auto_updates_util.GmsAutoUpdatesUtil(ad).enable_gms_auto_updates()
   time.sleep(_DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC)
@@ -579,7 +406,7 @@ def get_int_between_prefix_postfix(
     right_index = string.find(postfix)
   if left_index >= 0 and right_index > left_index:
     try:
-      return int(string[left_index + len(prefix): right_index].strip())
+      return int(string[left_index + len(prefix) : right_index].strip())
     except ValueError:
       return nc_constants.INVALID_INT
   return nc_constants.INVALID_INT
@@ -598,9 +425,7 @@ def dump_wifi_sta_status(ad: android_device.AndroidDevice) -> str:
 def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
   """Dumps wifi p2p status on the given device."""
   try:
-    return (
-        ad.adb.shell('dumpsys wifip2p').decode('utf-8').strip()
-    )
+    return ad.adb.shell('dumpsys wifip2p').decode('utf-8').strip()
   except adb.AdbError:
     return ''
 
@@ -608,9 +433,7 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware is supported on the given device."""
   try:
-    return (
-        ad.nearby.wifiAwareIsAvailable()
-    )
+    return ad.nearby.wifiAwareIsAvailable()
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('Aware is not supported due to %s', e)
     return False
@@ -634,3 +457,52 @@ def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
     return nc_constants.INVALID_RSSI
   except adb.AdbError:
     return nc_constants.INVALID_RSSI
+
+
+def _overrides_file_for_target(target: str) -> str:
+  """Returns the resource path for the given target."""
+  key = target.replace('//', 'google3/').replace(':', '/') + '_generated.txt'
+  return resources.GetResourceFilename(key)
+
+
+def _get_resource_contents(name: str) -> str:
+  """Returns the contents of the given resource."""
+  file_path = resources.GetResourceFilename(name)
+  with open(file_path, 'r') as f:
+    return f.read()
+
+
+def set_flags(
+    ad: android_device.AndroidDevice,
+    output_path: str,
+    enable_instant_connection: bool = False,
+    enable_2g_ble_scan_throttling: bool = False,
+):
+  """Sets flags on the given device."""
+  template_content = _get_resource_contents(_FLAG_SETUP_TEMPLATE_KEY)
+
+  def _install_overrides(target: str, merge_with_existing_overrides: bool):
+    ad.log.info('Installing hermetic overrides from %s', target)
+    hermetic_overrides_partner.install_hermetic_overrides(
+        ad,
+        _overrides_file_for_target(target),
+        output_path,
+        _GMS_PACKAGE,
+        template_content,
+        merge_with_existing_overrides=merge_with_existing_overrides,
+    )
+    restart_gms(ad)
+
+  _install_overrides(_DEFAULT_OVERRIDES, False)
+  _install_overrides(
+      _INSTANT_CONNECTION_ON_OVERRIDES
+      if enable_instant_connection
+      else _INSTANT_CONNECTION_OFF_OVERRIDES,
+      True,
+  )
+  _install_overrides(
+      _BLE_SCAN_THROTTLING_ON_OVERRIDES
+      if enable_2g_ble_scan_throttling
+      else _BLE_SCAN_THROTTLING_OFF_OVERRIDES,
+      True,
+  )

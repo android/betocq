@@ -69,7 +69,7 @@ class FixedWifiMediumFunctionTestActor(
       self._test_result.file_transfer_throughput_kbps = (
           nearby_snippet.transfer_file(
               nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-              nc_constants.TRANSFER_TIMEOUT_FUNC_TEST_SEC,
+              nc_constants.TRANSFER_TIMEOUT_FUNC_TEST,
               payload_type,
               nc_constants.TRANSFER_FILE_NUM_FUNC_TEST))
     finally:
