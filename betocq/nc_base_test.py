@@ -297,12 +297,13 @@ class NCBaseTestClass(base_test.BaseTestClass):
 
     setup_utils.remove_disconnect_wifi_network(ad)
     setup_utils.enable_logs(ad)
-    setup_utils.set_flags(
-        ad,
-        self.current_test_info.output_path,
-        self.test_parameters.enable_instant_connection,
-        self.test_parameters.enable_2g_ble_scan_throttling,
-    )
+    if not self.test_parameters.skip_flag_override_in_base_test:
+      setup_utils.set_flags(
+          ad,
+          self.current_test_info.output_path,
+          self.test_parameters.enable_instant_connection,
+          self.test_parameters.enable_2g_ble_scan_throttling,
+      )
 
     setup_utils.set_country_code(
         ad, self._get_country_code(), self.test_parameters.force_telephony_cc
