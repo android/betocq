@@ -48,11 +48,23 @@ def _resolve_output_files(config: resource_utils.SharedData) -> Sequence[str]:
   return [line for line in trimmed_lines if line.startswith('blaze-bin/')]
 
 
-def _copy_output(output_file: str, root: str) -> None:
+def _copy_output(
+    output_file: str, root: str, data_config: resource_utils.SharedData
+) -> None:
   """Copies the given output file to the specified root directory."""
   print(f'Copying {output_file} to outputs')
   src_dirname = os.path.dirname(output_file)
-  dest_dirname = os.path.join(root, src_dirname)
+  if data_config.data_type == 'output':
+    # Output files have blaze-bin as a prefix, which needs to be removed for
+    # the final destination path.
+    if not output_file.startswith('blaze-bin/'):
+      raise AssertionError(
+          f'Unexpected output file: {output_file} does not start with'
+          ' blaze-bin/'
+      )
+    dest_dirname = os.path.join(root, src_dirname.replace('blaze-bin/', '', 1))
+  else:
+    dest_dirname = os.path.join(root, src_dirname)
   os.makedirs(dest_dirname, exist_ok=True)
   shutil.copy(output_file, dest_dirname)
 
@@ -63,7 +75,7 @@ def _generate_data_files(dest_dir: str) -> None:
   for data_config in resource_utils.shared_data_configs():
     output_files = _resolve_output_files(data_config)
     for output_file in output_files:
-      _copy_output(output_file, dest_dir)
+      _copy_output(output_file, dest_dir, data_config)
 
 
 def _get_sync_cl() -> int:
