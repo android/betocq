@@ -46,6 +46,7 @@ NEARBY_SNIPPET_3P_PACKAGE_NAME = (
 
 # TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
+_CUTTLEFISH_VIRTUALIZATION_TYPE = 6
 
 
 class NCBaseTestClass(base_test.BaseTestClass):
@@ -241,8 +242,24 @@ class NCBaseTestClass(base_test.BaseTestClass):
   def _get_country_code(self) -> str:
     return 'US'
 
+  def _disable_play_protect(self, ad: android_device.AndroidDevice) -> None:
+    """Disables play protect."""
+    ad.adb.shell('settings put global verifier_engprod 1')
+
+  def _is_cuttlefish_device(self, ad: android_device.AndroidDevice) -> bool:
+    lease_info = getattr(ad, 'lease_info', None)
+    if lease_info is None:
+      return False
+    virtualization_type = lease_info.leased_device_spec.virtualization_type
+    return virtualization_type == _CUTTLEFISH_VIRTUALIZATION_TYPE
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     ad.debug_tag = ad.serial + '(' + ad.adb.getprop('ro.product.model') + ')'
+    if self._is_cuttlefish_device(ad):
+      ad.adb.shell(
+          ['settings', 'put', 'global', 'verifier_verify_adb_installs', '0']
+      )
+      self._disable_play_protect(ad)
     if not ad.is_adb_root:
       if self.test_parameters.allow_unrooted_device:
         ad.log.info('Unrooted device is detected. Test coverage is limited')
