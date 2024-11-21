@@ -198,7 +198,7 @@ the following list of test cases:
   </tr>
 </table>
 
-As explained later,
+As explained in [Configure Wi-Fi AP and test](#Configure-Wi-Fi-AP-and-test), 
 if `wifi_dfs_5g_ssid` is empty or commented out,
 all DFS test cases with STA channel = 5260 are skipped.
 
