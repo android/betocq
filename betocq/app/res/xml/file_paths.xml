@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths>
+    <!--
+      app-specific external storage directories of files
+      This is scoped storage path, can't access by adb shell on Android 11 release key devices
+      /sdcard/Android/data/com.google.android.nearby.mobly.snippet/files/
+    -->
+    <external-files-path
+        name="external_files"
+        path="."/>
+    <!--
+      Nearby test files: the folder to save test files for NS tests.
+      Please adb push the test files to
+      /sdcard/Download/test_files/
+    -->
+    <external-path
+        name="nearby_test_files"
+        path="Download/test_files/"/>
+</paths>

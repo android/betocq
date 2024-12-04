@@ -174,6 +174,7 @@ class TestParameters:
   keep_alive_interval_ms: int = KEEP_ALIVE_INTERVAL_WIFI_MS
   enable_2g_ble_scan_throttling: bool = True
   enable_instant_connection: bool = False
+  skip_flag_override_in_base_test: bool = False
   target_post_wifi_connection_idle_time_sec: int = (
       TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC
   )

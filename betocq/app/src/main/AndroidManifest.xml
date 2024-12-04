@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.google.android.nearby.mobly.snippet">
+
+  <!-- targetSdkVersion='28' is to work around wifi connection limitation. -->
+  <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="28" />
+
+  <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.ACCESS_WIFI_STATE"/>
+  <uses-permission android:name="android.permission.BLUETOOTH"/>
+  <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+  <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE"/>
+  <uses-permission android:name="android.permission.CHANGE_WIFI_STATE"/>
+  <uses-permission android:name="android.permission.INTERNET"/>
+  <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+  <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+  <application android:requestLegacyExternalStorage="true">
+    <meta-data
+        android:name="mobly-snippets"
+        android:value="com.google.android.mobly.snippet.bundled.WifiAwareManagerSnippet,
+                       com.google.android.mobly.snippet.bundled.WifiManagerSnippet,
+                       com.google.android.nearby.mobly.snippet.connection.ConnectionsClientSnippet" />
+
+    <provider
+        android:name="androidx.core.content.FileProvider"
+        android:authorities="com.google.android.nearby.mobly.snippet.fileprovider"
+        android:exported="false"
+        android:grantUriPermissions="true">
+      <meta-data
+          android:name="android.support.FILE_PROVIDER_PATHS"
+          android:resource="@xml/file_paths" />
+    </provider>
+
+    <activity
+        android:name="com.google.android.nearby.mobly.snippet.connection.MainActivity"
+        android:exported="true">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+
+  <instrumentation
+      android:name="com.google.android.mobly.snippet.SnippetRunner"
+      android:targetPackage="com.google.android.nearby.mobly.snippet" />
+
+</manifest>
