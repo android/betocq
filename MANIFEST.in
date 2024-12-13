@@ -1,1 +1,2 @@
-include betocq/snippets/*
+recursive-include betocq/snippets *
+recursive-include betocq/synced_resource_data *
