@@ -15,6 +15,7 @@
 """Wrapper API for accessing `data` resources."""
 
 from importlib.resources import files
+import os
 
 
 def GetResourceFilename(name: str) -> str:
