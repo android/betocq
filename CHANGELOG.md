@@ -1,5 +1,16 @@
 # BetoCQ test suite release history
 
+## 2.4.0 (12/20/2024)
+
+## New
+* Update Triage tips for the WLAN upgrade failure.
+* Add multi-payload test parameters and optimize multi-payload transfer tests.
+* Open source Mobly snippet APK codes.
+
+## Bug fixes
+* Lower MCC Hotspot speed target as the speed is further degraded due to out-of-sync between source and target devices.
+* Move to use hermetic override for P/H flag configuration.
+
 ## 2.3.3 (08/27/2024)
 
 ## New
