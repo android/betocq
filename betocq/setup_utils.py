@@ -439,6 +439,15 @@ def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
     return False
 
 
+def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if WiFi Direct is supported on the given device."""
+  try:
+    return ad.nearby.wifiIsP2pSupported()
+  except Exception as e:  # pylint: disable=broad-except
+    ad.log.info('WiFi Direct is not supported due to %s', e)
+    return False
+
+
 def get_hardware(ad: android_device.AndroidDevice) -> str:
   """Gets hardware information on the given device."""
   return ad.adb.getprop('ro.hardware')

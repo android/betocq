@@ -67,7 +67,7 @@ class Bt2gWifiCoexTest(d2d_performance_test_base.D2dPerformanceTestBase):
 
   def _get_file_transfer_failure_tip(self) -> str:
     return (
-        'The Wifi Direct connection might be broken, check related log.'
+        'The Wifi medium connection might be broken, check related log.'
     )
 
   # @typing.override

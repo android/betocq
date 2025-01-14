@@ -31,6 +31,7 @@ from mobly import test_runner
 
 from betocq import d2d_performance_test_base
 from betocq import nc_constants
+from betocq import setup_utils
 
 
 class Scc2gWfdStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
@@ -84,6 +85,11 @@ class Scc2gWfdStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
   def _is_wifi_ap_ready(self) -> bool:
     return True if self.test_parameters.wifi_2g_ssid else False
 
+  # @typing.override
+  def _is_upgrade_medium_supported(self) -> bool:
+    return setup_utils.is_wifi_direct_supported(
+        self.advertiser
+    ) and setup_utils.is_wifi_direct_supported(self.discoverer)
 
 if __name__ == '__main__':
   test_runner.main()
