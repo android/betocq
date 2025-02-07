@@ -149,6 +149,7 @@ class TestParameters:
   abort_all_tests_on_function_tests_fail: bool = True
   fast_fail_on_any_error: bool = False
   use_auto_controlled_wifi_ap: bool = False
+  use_local_sniffer: bool = False
   wifi_2g_ssid: str = ''
   wifi_2g_password: str = ''
   wifi_5g_ssid: str = ''
