@@ -11,10 +11,12 @@ requires-python = ">=3.11"
 dependencies = [
   "mobly",
   "mobly-wifi",
+  "pyyaml",
 ]
 
 [project.scripts]
 betocq_test_suite = "betocq.betocq_test_suite:main"
+local_mobly_runner = "betocq.tools.local_mobly_runner:main"
 
 [project.urls]
 Homepage = "https://github.com/android/betocq"
