@@ -45,8 +45,8 @@ def _run_setup_script(
 ) -> str:
   """Runs the overrides script on the device and returns the output."""
   host_file = os.path.join(output_path, 'setup_flags.sh')
-  with open(host_file, 'w') as f:
-    f.write(script)
+  with open(host_file, 'wb') as f:
+    f.write(script.encode())
   device.adb.push([host_file, SCRIPT_PATH], timeout=120)
   device.adb.shell(f'chmod +x {SCRIPT_PATH}', shell=True)
   # For backwards compatibility on very old devices, the overrides script writes
