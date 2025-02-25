@@ -57,8 +57,8 @@ class Mcc2gWfdIndoor5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
     )
 
   @base_test.repeat(
-      count=nc_constants.SCC_PERFORMANCE_TEST_COUNT,
-      max_consecutive_error=nc_constants.SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
+      count=nc_constants.MCC_PERFORMANCE_TEST_COUNT,
+      max_consecutive_error=nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
   )
   def test_mcc_2g_wfd_indoor_5g_sta(self):
     """Test the performance for wifi MCC with 2G WFD and indoor 5G STA."""
