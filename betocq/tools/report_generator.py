@@ -13,6 +13,7 @@
 #  limitations under the License.
 
 """Generates a BeToCQ test report for upload to APA."""
+import collections
 import os
 import sys
 from pathlib import Path
@@ -26,6 +27,7 @@ import yaml
 
 _RECORD_RESULT = records.TestResultEnums.RECORD_RESULT
 _RECORD_DETAILS = records.TestResultEnums.RECORD_DETAILS
+_RECORD_STACKTRACE = records.TestResultEnums.RECORD_STACKTRACE
 
 _TEST_RESULT_XML = 'test_result.xml'
 
@@ -40,6 +42,34 @@ _MOBLY_TO_APA_STATUS = {
     'fail': _APA_STATUS_WARNING,
     'skip': _APA_STATUS_PASS,
     'error': _APA_STATUS_WARNING,
+}
+
+# Placeholder values for APA-required fields, so the report can be accepted.
+# TODO: Replace with actual test-derived values.
+_PLACEHOLDER_RESULT_FIELDS = {
+    'suite_name': 'GTS',
+    'start': '100',
+    'end': '200',
+    'report_version': '5.0',
+    'suite_build_number': '13035552',
+    'devices': '4A281FDAQ00123',
+    'host_name': 'xianyuanjia',
+    'os_name': 'Linux',
+    'os_version': '6.10.11-1rodete2-amd64',
+    'os_arch': 'amd64',
+}
+_PLACEHOLDER_BUILD_FIELDS = {
+    'build_abi': 'arm64-v8a',
+    'build_brand': 'google',
+    'build_device': 'tokay',
+    'build_manufacturer': 'Google',
+    'build_model': 'Pixel 9',
+    'build_product': 'tokay',
+    'build_type': 'user',
+    'build_version_incremental': '13035552',
+    'build_version_release': '16',
+    'build_version_sdk': '36',
+    'build_tags': 'release-keys',
 }
 
 
@@ -85,7 +115,9 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
                 if test_name == 'teardown_class':
                     test_name = list(results[test_class].keys())[0]
                 results[test_class][test_name] = {
-                    key: entry[key] for key in (_RECORD_RESULT, _RECORD_DETAILS)
+                    key: entry[key] for key in (
+                        _RECORD_RESULT, _RECORD_DETAILS, _RECORD_STACKTRACE
+                    )
                 }
                 if test_class in setup_failure_classes:
                     results[test_class][test_name][_RECORD_RESULT] = 'alert'
@@ -98,12 +130,15 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
     xml_root = ElementTree.Element(
         'Result',
         {
-            'suite_name': nc_constants.BETOCQ_SUITE_NAME,
+            'suite_plan': nc_constants.BETOCQ_SUITE_NAME,
             'suite_version': version.TEST_SCRIPT_VERSION,
-        }
+        } | _PLACEHOLDER_RESULT_FIELDS
     )
     _ = ElementTree.SubElement(
-        xml_root, 'Build', {'build_fingerprint': build_fingerprint}
+        xml_root, 'Build',
+        {
+            'build_fingerprint': build_fingerprint,
+        } | _PLACEHOLDER_BUILD_FIELDS
     )
     xml_summary = ElementTree.SubElement(xml_root, 'Summary')
     xml_module = ElementTree.SubElement(
@@ -112,8 +147,8 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
             'name': 'betocq_test_suite',
         }
     )
-    pass_count = 0
-    fail_count = 0
+
+    status_counts = collections.Counter()
     done = True
     for test_class in results:
         xml_test_case = ElementTree.SubElement(
@@ -123,6 +158,7 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
             test_case_entry = results[test_class][test_name]
             result = test_case_entry[_RECORD_RESULT]
             details = test_case_entry[_RECORD_DETAILS]
+            stacktrace = test_case_entry[_RECORD_STACKTRACE]
             apa_status = _MOBLY_TO_APA_STATUS.get(
                 result.lower(), _APA_STATUS_ALERT
             )
@@ -133,27 +169,37 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
                     'result': apa_status}
             )
             if apa_status == _APA_STATUS_PASS:
-                pass_count += 1
+                status_counts[_APA_STATUS_PASS] += 1
             elif apa_status == _APA_STATUS_WARNING:
-                _ = ElementTree.SubElement(
+                status_counts[_APA_STATUS_WARNING] += 1
+                xml_failure = ElementTree.SubElement(
                     xml_test, 'Failure',
                     {'message': f'[WARNING] {details}'}
                 )
+                xml_stacktrace = ElementTree.SubElement(
+                    xml_failure, 'StackTrace'
+                )
+                xml_stacktrace.text = stacktrace
             else:
                 done = False
-                fail_count += 1
-                _ = ElementTree.SubElement(
+                status_counts[_APA_STATUS_ALERT] += 1
+                xml_failure = ElementTree.SubElement(
                     xml_test, 'Failure',
                     {'message': f'[SETUP ERROR] {details}'}
                 )
-    xml_summary.set('pass', str(pass_count))
-    xml_summary.set('failed', str(fail_count))
+                xml_stacktrace = ElementTree.SubElement(
+                    xml_failure, 'StackTrace'
+                )
+                xml_stacktrace.text = stacktrace
+    xml_summary.set('pass', str(status_counts[_APA_STATUS_PASS]))
+    xml_summary.set('warning', str(status_counts[_APA_STATUS_WARNING]))
+    xml_summary.set('failed', str(status_counts[_APA_STATUS_ALERT]))
     # TODO: support execution of more than one module (BeToCQ suite)
     xml_summary.set('modules_done', '1' if done else '0')
     xml_summary.set('modules_total', '1')
 
     xml_module.set('done', str(done).lower())
-    xml_module.set('pass', str(pass_count))
+    xml_module.set('pass', str(status_counts[_APA_STATUS_PASS]))
 
     test_result_xml = ElementTree.ElementTree(xml_root)
     ElementTree.indent(test_result_xml)
