@@ -82,15 +82,22 @@ def _get_test_case_name_without_iteration_number(test_case_name: str) -> str:
     return test_case_name
 
 
-def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
-    """Generates a test_result.xml from the Mobly results."""
+def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
+    """Generates a test_result.xml from the Mobly results.
+
+    Args:
+        mobly_logs: The base Mobly log directory (containing test_summary.yaml)
+        report_dir: The target directory to save the test_result.xml
+
+    Returns: True if the operation succeeds.
+    """
     mobly_summary = mobly_logs.joinpath(records.OUTPUT_FILE_SUMMARY)
     if not mobly_summary.is_file():
         print(
-            '[WARNING] No BeToCQ summary found. Aborting test_result.xml'
+            f'[WARNING] No BeToCQ summary found. Aborting {_TEST_RESULT_XML}'
             ' generation.'
         )
-        return
+        return False
     results = {}
     build_info = {}
     setup_failure_classes = set()
@@ -217,6 +224,7 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
     test_result_xml.write(
         report_file, encoding='utf-8', xml_declaration=True
     )
+    return True
 
 
 def generate_report(mobly_logs: Path) -> None:
@@ -228,7 +236,8 @@ def generate_report(mobly_logs: Path) -> None:
     report_dir = Path(tempfile.mkdtemp())
     report_base_files = report_dir.joinpath('base_files')
 
-    _generate_test_result_xml(mobly_logs, report_base_files)
+    if not _generate_test_result_xml(mobly_logs, report_base_files):
+        return
 
     zip_path = report_dir.joinpath('report.zip')
     with zipfile.ZipFile(zip_path, 'w') as zip_file:
