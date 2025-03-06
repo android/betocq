@@ -40,6 +40,9 @@ from typing import List, Optional
 
 import yaml
 
+from betocq.tools import report_generator
+
+
 _DEFAULT_MOBLY_LOGPATH = Path('/tmp/logs/mobly')
 _DEFAULT_TESTBED = 'LocalTestBed'
 
@@ -103,6 +106,15 @@ def _parse_args() -> argparse.Namespace:
             'would run all of test class TestClassA, but only test_b in '
             'TestClassB.'
         ),
+    )
+
+    parser.add_argument(
+        '-g',
+        '--generate_report',
+        action='store_true',
+        help=(
+            'Generate an Android Partner Approval report from the test results.'
+        )
     )
 
     return parser.parse_args()
@@ -228,11 +240,17 @@ def main() -> None:
     config = args.config or _generate_mobly_config(serials)
 
     # Run the tests
-    _run_mobly_tests(args.mobly_bin, args.tests, config,
-                     args.test_bed, args.log_path)
+    latest_logs = _run_mobly_tests(
+        args.mobly_bin, args.tests, config, args.test_bed, args.log_path
+    )
 
     # Clean up temporary dirs/files
     _clean_up()
+
+    # Generate test report for submission to Android partner portal
+    if args.generate_report:
+        _padded_print('Generating test report.')
+        report_generator.generate_report(latest_logs)
 
 
 if __name__ == '__main__':

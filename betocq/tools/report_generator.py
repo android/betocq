@@ -15,7 +15,8 @@
 """Generates a BeToCQ test report for upload to APA."""
 import collections
 import os
-import sys
+import tempfile
+import zipfile
 from pathlib import Path
 from xml.etree import ElementTree
 
@@ -51,6 +52,7 @@ _PLACEHOLDER_RESULT_FIELDS = {
     'start': '100',
     'end': '200',
     'report_version': '5.0',
+    'suite_version': '12.0_r2',
     'suite_build_number': '13035552',
     'devices': '4A281FDAQ00123',
     'host_name': 'xianyuanjia',
@@ -64,16 +66,12 @@ _PLACEHOLDER_BUILD_FIELDS = {
     'build_device': 'tokay',
     'build_manufacturer': 'Google',
     'build_model': 'Pixel 9',
-    'build_product': 'tokay',
-    'build_type': 'user',
-    'build_version_incremental': '13035552',
     'build_version_release': '16',
-    'build_version_sdk': '36',
     'build_tags': 'release-keys',
 }
 
 
-def _get_test_case_name_without_iteration_number(test_case_name: str):
+def _get_test_case_name_without_iteration_number(test_case_name: str) -> str:
     """
     Gets the base test case name of a repeated test case without the
     iteration number.
@@ -88,10 +86,13 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
     """Generates a test_result.xml from the Mobly results."""
     mobly_summary = mobly_logs.joinpath(records.OUTPUT_FILE_SUMMARY)
     if not mobly_summary.is_file():
-        print('[WARNING] No BeToCQ summary found. Aborting report generation.')
+        print(
+            '[WARNING] No BeToCQ summary found. Aborting test_result.xml'
+            ' generation.'
+        )
         return
     results = {}
-    build_fingerprint = ''
+    build_info = {}
     setup_failure_classes = set()
     with open(mobly_summary) as f:
         summary = yaml.safe_load_all(f)
@@ -121,11 +122,14 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
                 }
                 if test_class in setup_failure_classes:
                     results[test_class][test_name][_RECORD_RESULT] = 'alert'
-            # Parse Android controller info
+            # Parse Android controller info only for the target device
             if entry_type == records.TestSummaryEntryType.CONTROLLER_INFO.value:
-                build_fingerprint = entry[
+                for controller in entry[
                     records.ControllerInfoRecord.KEY_CONTROLLER_INFO
-                ][0].get('build_info', {}).get('build_fingerprint')
+                ]:
+                    role = controller.get('user_added_info', {}).get('role')
+                    if role == 'target_device':
+                        build_info = controller.get('build_info', {})
 
     xml_root = ElementTree.Element(
         'Result',
@@ -137,7 +141,12 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
     _ = ElementTree.SubElement(
         xml_root, 'Build',
         {
-            'build_fingerprint': build_fingerprint,
+            'build_fingerprint': build_info.get('build_fingerprint'),
+            'build_product': build_info.get('product_name'),
+            'build_type': build_info.get('build_type'),
+            'build_version_incremental': build_info.get(
+                'build_version_incremental'),
+            'build_version_sdk': build_info.get('build_version_sdk'),
         } | _PLACEHOLDER_BUILD_FIELDS
     )
     xml_summary = ElementTree.SubElement(xml_root, 'Summary')
@@ -209,12 +218,20 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> None:
         report_file, encoding='utf-8', xml_declaration=True
     )
 
-    print(f'Report created in {report_file}')
 
+def generate_report(mobly_logs: Path) -> None:
+    """Generates a zipped report for upload to Android Partner Approvals.
 
-if __name__ == '__main__':
-    mobly_dir = Path(sys.argv[1]).expanduser()
-    _generate_test_result_xml(
-        mobly_dir,
-        Path('/tmp/report_generator/').joinpath(mobly_dir.name)
-    )
+    Args:
+        mobly_logs: The base Mobly log directory (containing test_summary.yaml)
+    """
+    report_dir = Path(tempfile.mkdtemp())
+    report_base_files = report_dir.joinpath('base_files')
+
+    _generate_test_result_xml(mobly_logs, report_base_files)
+
+    zip_path = report_dir.joinpath('report.zip')
+    with zipfile.ZipFile(zip_path, 'w') as zip_file:
+        for path in report_base_files.iterdir():
+            zip_file.write(str(path), arcname=str(path.name))
+    print(f'Report created in {zip_path}')
