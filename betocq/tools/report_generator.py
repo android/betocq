@@ -30,10 +30,10 @@ _RECORD_RESULT = records.TestResultEnums.RECORD_RESULT
 _RECORD_DETAILS = records.TestResultEnums.RECORD_DETAILS
 _RECORD_STACKTRACE = records.TestResultEnums.RECORD_STACKTRACE
 
-_TEST_RESULT_XML = 'test_result.xml'
-
 _MOBLY_SUMMARY_KEY_TYPE = 'Type'
 _MOBLY_SUMMARY_TYPE_RECORD = 'Record'
+
+_APA_TEST_RESULT_XML = 'test_result.xml'
 
 _APA_STATUS_PASS = 'pass'
 _APA_STATUS_WARNING = 'warning'
@@ -94,7 +94,7 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
     mobly_summary = mobly_logs.joinpath(records.OUTPUT_FILE_SUMMARY)
     if not mobly_summary.is_file():
         print(
-            f'[WARNING] No BeToCQ summary found. Aborting {_TEST_RESULT_XML}'
+            f'[WARNING] No BeToCQ summary found. Aborting {_APA_TEST_RESULT_XML}'
             ' generation.'
         )
         return False
@@ -220,7 +220,7 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
     test_result_xml = ElementTree.ElementTree(xml_root)
     ElementTree.indent(test_result_xml)
     os.makedirs(report_dir, exist_ok=True)
-    report_file = report_dir.joinpath(_TEST_RESULT_XML)
+    report_file = report_dir.joinpath(_APA_TEST_RESULT_XML)
     test_result_xml.write(
         report_file, encoding='utf-8', xml_declaration=True
     )

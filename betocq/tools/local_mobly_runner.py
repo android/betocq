@@ -26,6 +26,10 @@ Example:
     - Run a test binary with specific Android devices.
     local_mobly_runner test_suite_a -s DEV00001,DEV00002
 
+    - Run a test binary, and generate a report for Android Partner
+      Approvals.
+    local_mobly_runner test_suite_a --generate_report
+
 Please run `local_mobly_runner -h` for a full list of options.
 """
 
