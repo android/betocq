@@ -36,10 +36,11 @@ Please run `local_mobly_runner -h` for a full list of options.
 import argparse
 import importlib.resources
 import os
+from pathlib import Path
 import shutil
 import subprocess
 import tempfile
-from pathlib import Path
+import time
 from typing import List, Optional
 
 import yaml
@@ -244,9 +245,11 @@ def main() -> None:
     config = args.config or _generate_mobly_config(serials)
 
     # Run the tests
+    start_time = int(time.time())
     latest_logs = _run_mobly_tests(
         args.mobly_bin, args.tests, config, args.test_bed, args.log_path
     )
+    end_time = int(time.time())
 
     # Clean up temporary dirs/files
     _clean_up()
@@ -254,7 +257,7 @@ def main() -> None:
     # Generate test report for submission to Android partner portal
     if args.generate_report:
         _padded_print('Generating test report.')
-        report_generator.generate_report(latest_logs)
+        report_generator.generate_report(latest_logs, start_time, end_time)
 
 
 if __name__ == '__main__':

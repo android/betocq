@@ -15,6 +15,9 @@
 """Generates a BeToCQ test report for upload to APA."""
 import collections
 import os
+import platform
+import socket
+import sys
 import tempfile
 import zipfile
 from pathlib import Path
@@ -45,29 +48,16 @@ _MOBLY_TO_APA_STATUS = {
     'error': _APA_STATUS_WARNING,
 }
 
-# Placeholder values for APA-required fields, so the report can be accepted.
+# Placeholder value for missing fields that APA requires to be non-empty, but
+# otherwise is not essential information.
 # TODO: Replace with actual test-derived values.
+_MISSING_VALUE = 'MISSING'
+
+# Placeholder values for APA-required fields, so the report can be accepted.
 _PLACEHOLDER_RESULT_FIELDS = {
     'suite_name': 'GTS',
-    'start': '100',
-    'end': '200',
     'report_version': '5.0',
     'suite_version': '12.0_r2',
-    'suite_build_number': '13035552',
-    'devices': '4A281FDAQ00123',
-    'host_name': 'xianyuanjia',
-    'os_name': 'Linux',
-    'os_version': '6.10.11-1rodete2-amd64',
-    'os_arch': 'amd64',
-}
-_PLACEHOLDER_BUILD_FIELDS = {
-    'build_abi': 'arm64-v8a',
-    'build_brand': 'google',
-    'build_device': 'tokay',
-    'build_manufacturer': 'Google',
-    'build_model': 'Pixel 9',
-    'build_version_release': '16',
-    'build_tags': 'release-keys',
 }
 
 
@@ -82,12 +72,44 @@ def _get_test_case_name_without_iteration_number(test_case_name: str) -> str:
     return test_case_name
 
 
-def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
+def _map_mobly_build_info_to_test_report_build_fields(
+        build_info: dict[str, str]) -> dict[str, str]:
+    """Maps build info collected from Mobly to APA's Build fields."""
+    return {
+        'build_fingerprint': build_info.get('build_fingerprint'),
+        'build_product': build_info.get('product_name'),
+        'build_type': build_info.get('build_type'),
+        'build_version_incremental': build_info.get(
+            'build_version_incremental'),
+        'build_version_sdk': build_info.get('build_version_sdk'),
+        'build_version_release': build_info.get(
+            'android_version'),
+        'build_model': build_info.get('product_model', _MISSING_VALUE),
+        'build_manufacturer': build_info.get(
+            'product_manufacturer', _MISSING_VALUE),
+    }
+
+
+def _get_host_properties() -> dict[str, str]:
+    """Retrieves required properties of the test host."""
+    return {
+        'host_name': socket.gethostname(),
+        'os_name': platform.system(),
+        'os_version': platform.release(),
+        'os_arch': platform.machine(),
+    }
+
+
+def _generate_test_result_xml(
+        mobly_logs: Path, report_dir: Path, start_time: int, end_time: int
+) -> bool:
     """Generates a test_result.xml from the Mobly results.
 
     Args:
         mobly_logs: The base Mobly log directory (containing test_summary.yaml)
         report_dir: The target directory to save the test_result.xml
+        start_time: Starting epoch time of the Mobly run.
+        end_time: Ending epoch time of the Mobly run.
 
     Returns: True if the operation succeeds.
     """
@@ -100,6 +122,7 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
         return False
     results = {}
     build_info = {}
+    device_serials = []
     setup_failure_classes = set()
     with open(mobly_summary) as f:
         summary = yaml.safe_load_all(f)
@@ -129,32 +152,32 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
                 }
                 if test_class in setup_failure_classes:
                     results[test_class][test_name][_RECORD_RESULT] = 'alert'
-            # Parse Android controller info only for the target device
+            # Parse Android controller info
             if entry_type == records.TestSummaryEntryType.CONTROLLER_INFO.value:
                 for controller in entry[
                     records.ControllerInfoRecord.KEY_CONTROLLER_INFO
                 ]:
-                    role = controller.get('user_added_info', {}).get('role')
+                    device_serials.append(controller.get('serial'))
+                    user_added_info = controller.get('user_added_info', {})
+                    role = user_added_info.get('role')
+                    # Get build properties only from the target device
                     if role == 'target_device':
                         build_info = controller.get('build_info', {})
+                        build_info.update(user_added_info)
 
     xml_root = ElementTree.Element(
         'Result',
         {
             'suite_plan': nc_constants.BETOCQ_SUITE_NAME,
             'suite_version': version.TEST_SCRIPT_VERSION,
-        } | _PLACEHOLDER_RESULT_FIELDS
+            'devices': ','.join(device_serials),
+            'start': str(start_time),
+            'end': str(end_time),
+        } | _get_host_properties() | _PLACEHOLDER_RESULT_FIELDS
     )
     _ = ElementTree.SubElement(
         xml_root, 'Build',
-        {
-            'build_fingerprint': build_info.get('build_fingerprint'),
-            'build_product': build_info.get('product_name'),
-            'build_type': build_info.get('build_type'),
-            'build_version_incremental': build_info.get(
-                'build_version_incremental'),
-            'build_version_sdk': build_info.get('build_version_sdk'),
-        } | _PLACEHOLDER_BUILD_FIELDS
+        _map_mobly_build_info_to_test_report_build_fields(build_info)
     )
     xml_summary = ElementTree.SubElement(xml_root, 'Summary')
     xml_module = ElementTree.SubElement(
@@ -227,16 +250,20 @@ def _generate_test_result_xml(mobly_logs: Path, report_dir: Path) -> bool:
     return True
 
 
-def generate_report(mobly_logs: Path) -> None:
+def generate_report(mobly_logs: Path, start_time: int, end_time: int) -> None:
     """Generates a zipped report for upload to Android Partner Approvals.
 
     Args:
         mobly_logs: The base Mobly log directory (containing test_summary.yaml)
+        start_time: Starting epoch time of the Mobly run.
+        end_time: Ending epoch time of the Mobly run.
     """
     report_dir = Path(tempfile.mkdtemp())
     report_base_files = report_dir.joinpath('base_files')
 
-    if not _generate_test_result_xml(mobly_logs, report_base_files):
+    if not _generate_test_result_xml(
+            mobly_logs, report_base_files, start_time, end_time
+    ):
         return
 
     zip_path = report_dir.joinpath('report.zip')
