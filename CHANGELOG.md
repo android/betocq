@@ -1,5 +1,13 @@
 # BetoCQ test suite release history
 
+## 2.4.1 Beta1 (03/26/2025)
+
+## New
+* Checked in the local mobly runner.
+
+## Bug fixes
+* Fix hermetic overrides on Windows.
+
 ## 2.4.0 (12/20/2024)
 
 ## New

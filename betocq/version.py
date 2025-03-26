@@ -15,7 +15,7 @@
 """Define the Beto CQ test script version."""
 
 
-TEST_SCRIPT_VERSION = '2.4.0'
+TEST_SCRIPT_VERSION = '2.4.1b1'
 
 # VERSION_LOG (only add new description for new version, keep the history log)
 # '2.0.0': 'initial version'
