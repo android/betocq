@@ -52,7 +52,7 @@ def _run_setup_script(
   with open(host_file, 'wb') as f:
     f.write(script.encode())
   device.adb.push([host_file, SCRIPT_PATH], timeout=120)
-  device.adb.shell(f'chmod +x {SCRIPT_PATH}', shell=True)
+  device.adb.shell(f'chmod +x {SCRIPT_PATH}')
   # For backwards compatibility on very old devices, the overrides script writes
   # to stderr rather than stdout (which is always empty), even when there are
   # no errors.
