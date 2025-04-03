@@ -15,7 +15,7 @@ dependencies = [
 
 [project.scripts]
 betocq_test_suite = "betocq.betocq_test_suite:main"
-betocq_test_suite = "betocq.betocq_android_auto_test_suite:main"
+betocq_auto_test_suite = "betocq.betocq_android_auto_test_suite:main"
 
 [project.urls]
 Homepage = "https://github.com/android/betocq"
