@@ -15,7 +15,7 @@
 """Define the Beto CQ test script version."""
 
 
-TEST_SCRIPT_VERSION = '2.3.3'
+TEST_SCRIPT_VERSION = '2.4.1'
 
 # VERSION_LOG (only add new description for new version, keep the history log)
 # '2.0.0': 'initial version'
@@ -24,3 +24,5 @@ TEST_SCRIPT_VERSION = '2.3.3'
 # '2.3.0': 'fix the low NC speed issue.'
 # '2.3.1': 'fix WLAN function test and improve the report format.'
 # '2.3.2': 'add TDLS/Aware device capability check.'
+# '2.4.0': 'add multi-payload test parameters and optimize multi-payload transfer tests.'
+# '2.4.1': 'add android auto test case.'
