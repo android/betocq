@@ -462,6 +462,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
       self._current_test_result.quality_info.medium_frequency = p2p_frequency
       if all([
           p2p_frequency != nc_constants.INVALID_INT,
+          sta_frequency != nc_constants.INVALID_INT,
           p2p_frequency != sta_frequency,
           not self._is_mcc,
           not self._is_dbs_mode,
@@ -478,6 +479,7 @@ class D2dPerformanceTestBase(nc_base_test.NCBaseTestClass, abc.ABC):
 
       if all([
           p2p_frequency != nc_constants.INVALID_INT,
+          sta_frequency != nc_constants.INVALID_INT,
           p2p_frequency == sta_frequency,
           self._is_mcc,
           nc_speed_min_mbps > 0,

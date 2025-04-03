@@ -26,10 +26,7 @@ from betocq import nc_constants
 from betocq import resources
 
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
-_BLE_SCAN_THROTTLING_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:ble_scan_throttling_off_overrides'
-_BLE_SCAN_THROTTLING_ON_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:ble_scan_throttling_on_overrides'
-_INSTANT_CONNECTION_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:instant_connection_off_overrides'
-_INSTANT_CONNECTION_ON_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:instant_connection_on_overrides'
+_WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:wifi_direct_hotspot_off_overrides'
 _FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
 _GMS_PACKAGE = 'com.google.android.gms'
 
@@ -484,34 +481,40 @@ def _get_resource_contents(name: str) -> str:
 def set_flags(
     ad: android_device.AndroidDevice,
     output_path: str,
-    enable_instant_connection: bool = False,
-    enable_2g_ble_scan_throttling: bool = False,
 ):
   """Sets flags on the given device."""
+  ad.log.info('Installing hermetic overrides from %s', _DEFAULT_OVERRIDES)
+  _install_overrides(ad, output_path, _DEFAULT_OVERRIDES, False)
+
+
+def set_flag_wifi_direct_hotspot_off(
+    ad: android_device.AndroidDevice,
+    output_path: str,
+):
+  ad.log.info('turn off wifi direct hotspot')
+  _install_overrides(
+      ad,
+      output_path,
+      _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES,
+      False,
+  )
+
+
+def _install_overrides(
+    ad: android_device.AndroidDevice,
+    output_path: str,
+    target: str,
+    merge_with_existing_overrides: bool,
+):
+  """Installs overrides on the given device."""
   template_content = _get_resource_contents(_FLAG_SETUP_TEMPLATE_KEY)
-
-  def _install_overrides(target: str, merge_with_existing_overrides: bool):
-    ad.log.info('Installing hermetic overrides from %s', target)
-    hermetic_overrides_partner.install_hermetic_overrides(
-        ad,
-        _overrides_file_for_target(target),
-        output_path,
-        _GMS_PACKAGE,
-        template_content,
-        merge_with_existing_overrides=merge_with_existing_overrides,
-    )
-    restart_gms(ad)
-
-  _install_overrides(_DEFAULT_OVERRIDES, False)
-  _install_overrides(
-      _INSTANT_CONNECTION_ON_OVERRIDES
-      if enable_instant_connection
-      else _INSTANT_CONNECTION_OFF_OVERRIDES,
-      True,
+  ad.log.info('Installing hermetic overrides from %s', target)
+  hermetic_overrides_partner.install_hermetic_overrides(
+      ad,
+      _overrides_file_for_target(target),
+      output_path,
+      _GMS_PACKAGE,
+      template_content,
+      merge_with_existing_overrides=merge_with_existing_overrides,
   )
-  _install_overrides(
-      _BLE_SCAN_THROTTLING_ON_OVERRIDES
-      if enable_2g_ble_scan_throttling
-      else _BLE_SCAN_THROTTLING_OFF_OVERRIDES,
-      True,
-  )
+  restart_gms(ad)

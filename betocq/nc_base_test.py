@@ -330,8 +330,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
       setup_utils.set_flags(
           ad,
           self.current_test_info.output_path,
-          self.test_parameters.enable_instant_connection,
-          self.test_parameters.enable_2g_ble_scan_throttling,
       )
 
     setup_utils.set_country_code(
