@@ -36,6 +36,7 @@ from mobly import test_runner
 
 from betocq import d2d_performance_test_base
 from betocq import nc_constants
+from betocq import setup_utils
 
 
 class Mcc2gWfdIndoor5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
@@ -56,8 +57,8 @@ class Mcc2gWfdIndoor5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
     )
 
   @base_test.repeat(
-      count=nc_constants.SCC_PERFORMANCE_TEST_COUNT,
-      max_consecutive_error=nc_constants.SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
+      count=nc_constants.MCC_PERFORMANCE_TEST_COUNT,
+      max_consecutive_error=nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR,
   )
   def test_mcc_2g_wfd_indoor_5g_sta(self):
     """Test the performance for wifi MCC with 2G WFD and indoor 5G STA."""
@@ -90,6 +91,12 @@ class Mcc2gWfdIndoor5gStaTest(d2d_performance_test_base.D2dPerformanceTestBase):
 
   def _is_wifi_ap_ready(self) -> bool:
     return True if self.test_parameters.wifi_5g_ssid else False
+
+  # @typing.override
+  def _is_upgrade_medium_supported(self) -> bool:
+    return setup_utils.is_wifi_direct_supported(
+        self.advertiser
+    ) and setup_utils.is_wifi_direct_supported(self.discoverer)
 
   @property
   def _devices_capabilities_definition(self) -> dict[str, dict[str, bool]]:

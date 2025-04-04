@@ -83,6 +83,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
 
   def setup_class(self) -> None:
     self._setup_openwrt_wifi()
+    self._register_sniffer_controller()
     self.ads = self.register_controller(android_device, min_number=2)
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
@@ -181,17 +182,8 @@ class NCBaseTestClass(base_test.BaseTestClass):
     if not self.user_params.get('use_auto_controlled_wifi_ap', False):
       return
 
-    openwrt_devices = self.register_controller(openwrt_device)
-    if len(openwrt_devices) >= 2:
-      self._openwrt, self._sniffer = openwrt_devices[:2]
-      logging.debug(
-          'Using device %s as AP and %s as sniffer.',
-          self._openwrt,
-          self._sniffer,
-      )
-    else:
-      self._openwrt = openwrt_devices[0]
-      logging.debug('Using device %s as router.', self._openwrt)
+    self._openwrt = self.register_controller(openwrt_device)[0]
+    logging.debug('Using device %s as router.', self._openwrt)
 
     if 'wifi_channel' in self.user_params:
       wifi_channel = self.user_params['wifi_channel']
@@ -220,6 +212,26 @@ class NCBaseTestClass(base_test.BaseTestClass):
       self.test_parameters.wifi_dfs_5g_password = self._wifi_info.password
     else:
       raise ValueError('Unknown Wi-Fi channel: %s' % wifi_channel)
+
+  def _register_sniffer_controller(self):
+    if not self.test_parameters.use_local_sniffer:
+      return
+
+    self._sniffer = self.register_controller(local_sniffer_device)[0]
+    logging.debug('Using device %s as sniffer.', self._sniffer)
+
+    # Set self._openwrt_wifi_config, which will be used to start packet capture
+    # for each test case.
+    if 'wifi_channel' in self.user_params:
+      wifi_channel = self.user_params['wifi_channel']
+      self._openwrt_wifi_config = wifi_configs.WiFiConfig(
+          channel=wifi_channel,
+          country_code=self._get_country_code(),
+      )
+    else:
+      self._openwrt_wifi_config = wifi_configs.WiFiConfig(
+          country_code=self._get_country_code(),
+      )
 
   def _setup_android_hw_capability(
       self, ad: android_device.AndroidDevice
@@ -318,8 +330,6 @@ class NCBaseTestClass(base_test.BaseTestClass):
       setup_utils.set_flags(
           ad,
           self.current_test_info.output_path,
-          self.test_parameters.enable_instant_connection,
-          self.test_parameters.enable_2g_ble_scan_throttling,
       )
 
     setup_utils.set_country_code(

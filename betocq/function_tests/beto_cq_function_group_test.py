@@ -15,6 +15,7 @@
 """Group all function tests."""
 
 import time
+
 from mobly import asserts
 from mobly import test_runner
 
@@ -52,11 +53,17 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
     # Let scan, DHCP and internet validation complete before NC.
     time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
-        nc_constants.NearbyMedium.WIFILAN_ONLY, nc_constants.PayloadType.FILE)
+        nc_constants.NearbyMedium.WIFILAN_ONLY, nc_constants.PayloadType.FILE
+    )
 
   def test_d2d_hotspot_function(self):
-    """Test the NC with upgrading to the HOTSPOT as upgrade medium.
-    """
+    """Test the NC with upgrading to the HOTSPOT as upgrade medium."""
+    asserts.skip_if(
+        not setup_utils.is_wifi_direct_supported(self.advertiser)
+        or not setup_utils.is_wifi_direct_supported(self.discoverer),
+        'Wifi Hotspot is not supported in the device',
+    )
+
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
@@ -68,8 +75,13 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
     )
 
   def test_wifi_direct_function(self):
-    """Test the NC with upgrading to the WiFi Direct as upgrade medium.
-    """
+    """Test the NC with upgrading to the WiFi Direct as upgrade medium."""
+    asserts.skip_if(
+        not setup_utils.is_wifi_direct_supported(self.advertiser)
+        or not setup_utils.is_wifi_direct_supported(self.discoverer),
+        'Wifi Direct is not supported in the device',
+    )
+
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
@@ -81,17 +93,14 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
     )
 
   def test_wifi_aware_function(self):
-    """Test the NC with upgrading to the WiFi Aware as upgrade medium.
-    """
-    if (
+    """Test the NC with upgrading to the WiFi Aware as upgrade medium."""
+    asserts.skip_if(
         not self.test_parameters.run_aware_test
         or not setup_utils.is_wifi_aware_available(self.advertiser)
-        or not setup_utils.is_wifi_aware_available(self.discoverer)
-    ):
-      asserts.skip(
-          'aware test is disabled or aware is not available in the device'
-      )
-      return
+        or not setup_utils.is_wifi_aware_available(self.discoverer),
+        'aware test is disabled or aware is not available in the device',
+    )
+
     self._current_test_actor = self.fixed_wifi_medium_test_actor
     self.fixed_wifi_medium_test_actor.run_fixed_wifi_medium_test(
         nc_constants.NearbyMedium.WIFIAWARE_ONLY,
@@ -141,6 +150,7 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
         },
     })
     super().teardown_test()
+
 
 if __name__ == '__main__':
   test_runner.main()
