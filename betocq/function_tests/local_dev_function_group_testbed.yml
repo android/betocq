@@ -1,0 +1,26 @@
+# Test bed for the function tests only.
+x-test-params: &test-params
+  wifi_ssid: "anyAp"
+  wifi_password: "anyAp"
+  target_cuj_name: "quick_start"
+
+x-controllers: &controllers
+  Controllers:
+    AndroidDevice:
+      - serial: "123456ABCDEF"
+        role: "source_device"
+      - serial: "ABCDEF123456"
+        role: "target_device"
+
+TestBeds:
+- Name: LocalDevTestbed
+  # only for development, DO NOT port to AOSP.
+  Controllers:
+    AndroidDevice: '*'
+  TestParams:
+      <<: *test-params
+
+- Name: LocalFunctionGroupTestbed
+  <<: *controllers
+  TestParams:
+      <<: *test-params

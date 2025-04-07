@@ -66,13 +66,13 @@ class BetoCqAndroidAutoPerformanceTestSuite(base_suite.BaseSuite):
     config.user_params['wifi_channel'] = nc_constants.CHANNEL_2G
 
     if test_parameters.run_bt_performance_test:
-      self.enable_test_class(
+      self.add_test_class(
           clazz=bt_performance_test.BtPerformanceTest,
           config=config,
       )
 
     if test_parameters.run_directed_test:
-      self.enable_test_class(
+      self.add_test_class(
           clazz=local_only_hotspot_test.LocalOnlyHotspotTest,
           config=config,
       )
