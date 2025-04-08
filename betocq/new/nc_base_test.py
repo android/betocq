@@ -76,12 +76,8 @@ def _general_android_device_setup_for_nc(
   setup_utils.disable_gms_auto_updates(ad)
   setup_utils.load_nearby_snippet(ad, snippet_conf)
   setup_utils.enable_logs(ad)
-  setup_utils.set_gms_flags(
-      ad,
-      debug_output_dir,
-      enable_instant_connection=False,
-      enable_2g_ble_scan_throttling=True,
-  )
+  # Set default flags.
+  setup_utils.set_flags(ad, debug_output_dir)
   setup_utils.toggle_airplane_mode(ad)
 
 
