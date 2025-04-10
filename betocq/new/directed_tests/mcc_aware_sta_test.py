@@ -119,8 +119,12 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
     self._assert_test_conditions()
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
-    setup_utils.set_country_code(ad, self.test_runtime.country_code)
-    ad.nearby.wifiEnable()
+    nc_utils.setup_android_device_for_nc_tests(
+        ad,
+        snippet_confs=[self.nearby_snippet_config],
+        country_code=self.test_runtime.country_code,
+        debug_output_dir=self.current_test_info.output_path,
+    )
 
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
