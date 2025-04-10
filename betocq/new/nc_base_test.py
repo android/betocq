@@ -33,7 +33,6 @@ from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
 import yaml
 
-from betocq import android_wifi_utils
 from betocq.new import ap_utils
 from betocq.new import nc_constants
 from betocq.new import setup_utils
@@ -64,21 +63,6 @@ def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
     for key, value in rule.items():
       ad.log.debug('Setting capability %s to %s', repr(key), repr(value))
       setattr(ad, key, value)
-
-
-def _general_android_device_setup_for_nc(
-    ad: android_device.AndroidDevice,
-    snippet_conf: nc_constants.SnippetConfig,
-    debug_output_dir: str,
-) -> None:
-  _load_android_hw_capability(ad)
-  android_wifi_utils.forget_all_wifi(ad)
-  setup_utils.disable_gms_auto_updates(ad)
-  setup_utils.load_nearby_snippet(ad, snippet_conf)
-  setup_utils.enable_logs(ad)
-  # Set default flags.
-  setup_utils.set_flags(ad, debug_output_dir)
-  setup_utils.toggle_airplane_mode(ad)
 
 
 class NCBaseTestClass(base_test.BaseTestClass):
@@ -135,9 +119,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
     self._set_run_identifier()
 
     utils.concurrent_exec(
-        lambda ad: _general_android_device_setup_for_nc(
-            ad, self.nearby_snippet_config, self.current_test_info.output_path
-        ),
+        _load_android_hw_capability,
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=True,
     )

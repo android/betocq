@@ -170,9 +170,12 @@ class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for test cases that need to
     # set up 2 nearby connections.
-    setup_utils.load_nearby_snippet(ad, self.nearby2_snippet_config)
-    setup_utils.set_country_code(ad, _COUNTRY_CODE)
-    ad.nearby.wifiEnable()
+    nc_utils.setup_android_device_for_nc_tests(
+        ad,
+        snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
+        country_code=_COUNTRY_CODE,
+        debug_output_dir=self.current_test_info.output_path,
+    )
 
   def setup_test(self):
     """Setup steps that will be performed before exucuting each test case."""

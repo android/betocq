@@ -97,10 +97,12 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
-    # Load an extra snippet instance nearby2 for the prior BT connection.
-    setup_utils.load_nearby_snippet(ad, self.nearby2_snippet_config)
-    setup_utils.set_country_code(ad, self.test_runtime.country_code)
-    ad.nearby.wifiEnable()
+    nc_utils.setup_android_device_for_nc_tests(
+        ad,
+        snippet_confs=[self.nearby_snippet_config],
+        country_code=self.test_runtime.country_code,
+        debug_output_dir=self.current_test_info.output_path,
+    )
 
   def setup_test(self):
     super().setup_test()

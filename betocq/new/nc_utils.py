@@ -14,16 +14,37 @@
 
 """Utility functions for testing against Nearby Connection."""
 
+from collections.abc import Sequence
 import logging
 import time
 
 from mobly import asserts
 from mobly.controllers import android_device
 
+from betocq import android_wifi_utils
 from betocq.new import nc_constants
 from betocq.new import nearby_connection_wrapper
 from betocq.new import setup_utils
 from betocq.new import test_result_utils
+
+
+def setup_android_device_for_nc_tests(
+    ad: android_device.AndroidDevice,
+    snippet_confs: Sequence[nc_constants.SnippetConfig],
+    country_code: str,
+    debug_output_dir: str,
+) -> None:
+  """Performs general Android device setup steps for NC tests."""
+  android_wifi_utils.forget_all_wifi(ad)
+  setup_utils.disable_gms_auto_updates(ad)
+  for conf in snippet_confs:
+    setup_utils.load_nearby_snippet(ad, conf)
+  setup_utils.remove_disconnect_wifi_network(ad)
+  setup_utils.enable_logs(ad)
+  setup_utils.set_flags(ad, debug_output_dir)
+  setup_utils.set_country_code(ad, country_code)
+  setup_utils.toggle_airplane_mode(ad)
+  ad.nearby.wifiEnable()
 
 
 def connect_ad_to_wifi_sta(
