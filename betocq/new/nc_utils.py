@@ -23,9 +23,9 @@ from mobly.controllers import android_device
 
 from betocq import android_wifi_utils
 from betocq.new import nc_constants
-from betocq.new import nearby_connection_wrapper
 from betocq.new import setup_utils
 from betocq.new import test_result_utils
+from betocq.new.nearby_connection import nearby_connection_wrapper
 
 
 def setup_android_device_for_nc_tests(

@@ -12,11 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Mobly base test class for Neaby Connections.
-
-Override the NCBaseTestClass#_get_country_code method if the test requires
-a special country code, the 'US' is used by default.
-"""
+"""Mobly base test class of all BeToCQ tests."""
 
 import logging
 
@@ -65,8 +61,8 @@ def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
       setattr(ad, key, value)
 
 
-class NCBaseTestClass(base_test.BaseTestClass):
-  """The Base of Nearby Connection E2E tests."""
+class BaseTestClass(base_test.BaseTestClass):
+  """The base test class of all BeToCQ tests."""
 
   _run_identifier_is_set = False
   _ap: openwrt_device.OpenWrtDevice | None = None
@@ -283,7 +279,7 @@ class NCBaseTestClass(base_test.BaseTestClass):
     This property is only set once, even if multiple test classes are run as
     part of a test suite.
     """
-    if NCBaseTestClass._run_identifier_is_set:
+    if BaseTestClass._run_identifier_is_set:
       return
     suite_name_items = [
         nc_constants.BETOCQ_SUITE_NAME,
@@ -301,4 +297,4 @@ class NCBaseTestClass(base_test.BaseTestClass):
             'run_identifier': run_identifier,
         }
     })
-    NCBaseTestClass._run_identifier_is_set = True
+    BaseTestClass._run_identifier_is_set = True
