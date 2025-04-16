@@ -139,6 +139,8 @@ class TestParameters:
   wifi_5g_password: str = ''
   wifi_dfs_5g_ssid: str = ''
   wifi_dfs_5g_password: str = ''
+  wifi_ssid: str = ''  # optional, for tests which can use any wifi
+  wifi_password: str = ''
   # Whether to use a programmable AP. If true, the wifi SSIDs and passwords will
   # be ignored.
   use_programmable_ap: bool = False
@@ -149,10 +151,12 @@ class TestParameters:
       TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC
   )
   skip_bug_report: bool = False
+  skip_default_flag_override: bool = False
 
   # Optional test cases disabled by default.
   run_aware_test: bool = False
   run_ble_performance_test: bool = False
+  requires_bt_multiplex: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
@@ -178,6 +182,9 @@ class TestParameters:
         for key, val in user_params.items()
         if key in test_parameters_names
     })
+
+    if test_parameters.target_cuj_name == TARGET_CUJ_QUICK_START:
+      test_parameters.requires_bt_multiplex = True
 
     return test_parameters
 
@@ -356,6 +363,7 @@ class SingleTestFailureReason(enum.IntEnum):
   WRONG_P2P_FREQUENCY = 13
   DEVICE_CONFIG_ERROR = 14
   SUCCESS = 15
+  SKIPPED = 16
 
 
 COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
@@ -420,6 +428,7 @@ COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
     SingleTestFailureReason.DEVICE_CONFIG_ERROR: (
         'Check if device capabilities are set correctly in the config file.'
     ),
+    SingleTestFailureReason.SKIPPED: 'Skipped.',
 }
 
 COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([

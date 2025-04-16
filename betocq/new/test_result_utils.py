@@ -629,7 +629,7 @@ class SingleTestResult:
       return
     if result_message is None:
       result_message = nc_constants.COMMON_TRIAGE_TIP.get(failure_reason)
-    result_message = f'FAIL: {failure_reason.name} - {result_message}'
+    result_message = f'{failure_reason.name} - {result_message}'
     self.result_message = result_message
 
 
