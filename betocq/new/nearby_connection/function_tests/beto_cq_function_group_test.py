@@ -77,6 +77,11 @@ def _get_wifi_ssid_password(
     test_parameters: nc_constants.TestParameters,
 ) -> Tuple[str, str]:
   """Returns an available wifi SSID and password from test parameters."""
+  if test_parameters.wifi_ssid:
+    return (
+        test_parameters.wifi_ssid,
+        test_parameters.wifi_password,
+    )
   if test_parameters.wifi_5g_ssid:
     return (
         test_parameters.wifi_5g_ssid,
@@ -175,6 +180,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
         country_code=_COUNTRY_CODE,
         debug_output_dir=self.current_test_info.output_path,
+        skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
   def setup_test(self):
@@ -263,9 +269,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          with NC payload type FILE.
       2. Tear down the connection.
     """
-    nc_utils.abort_if_wifi_hotspot_not_supported(
-        [self.advertiser, self.discoverer]
-    )
+    self._skip_if_wifi_hotspot_not_supported()
 
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -289,9 +293,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          with NC payload type STREAM.
       2. Tear down the connection.
     """
-    nc_utils.abort_if_wifi_hotspot_not_supported(
-        [self.advertiser, self.discoverer]
-    )
+    self._skip_if_wifi_hotspot_not_supported()
 
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -315,9 +317,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          payload with NC payload type FILE.
       2. Tear down the connection.
     """
-    nc_utils.abort_if_wifi_direct_not_supported(
-        [self.advertiser, self.discoverer]
-    )
+    self._skip_if_wifi_direct_not_supported()
 
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -341,14 +341,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          payload with NC payload type STREAM.
       2. Tear down the connection.
     """
-    nc_utils.abort_if_wifi_direct_not_supported(
-        [self.advertiser, self.discoverer]
-    )
-    asserts.skip_if(
-        not setup_utils.is_wifi_direct_supported(self.advertiser)
-        or not setup_utils.is_wifi_direct_supported(self.discoverer),
-        'Wifi Direct is not supported in the device',
-    )
+    self._skip_if_wifi_direct_not_supported()
 
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -372,12 +365,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          payload with NC payload type FILE.
       2. Tear down the connection.
     """
-    asserts.skip_if(
-        not self.test_parameters.run_aware_test, 'Aware tests are disabled.'
-    )
-    nc_utils.abort_if_wifi_aware_not_available(
-        [self.advertiser, self.discoverer]
-    )
+    self._skip_if_wifi_aware_not_supported()
 
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -401,12 +389,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          payload with NC payload type STREAM.
       2. Tear down the connection.
     """
-    asserts.skip_if(
-        not self.test_parameters.run_aware_test, 'Aware tests are disabled.'
-    )
-    nc_utils.abort_if_wifi_aware_not_available(
-        [self.advertiser, self.discoverer]
-    )
+    self._skip_if_wifi_aware_not_supported()
 
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -427,6 +410,17 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
          payload with one of them.
       2. Tear down all connections.
     """
+    if not self.test_parameters.requires_bt_multiplex:
+      message = (
+          'BT multiplex is not required for this CUJ -'
+          f' {self.test_parameters.target_cuj_name}'
+      )
+      self.current_test_result.set_active_nc_fail_reason(
+          nc_constants.SingleTestFailureReason.SKIPPED,
+          result_message=message,
+      )
+      asserts.skip(message)
+
     # Test Step: Set up a prior BT connection.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
         self.advertiser, self.discoverer, self.current_test_result
@@ -504,6 +498,42 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     )
 
     super().teardown_class()
+
+  def _skip_if_wifi_hotspot_not_supported(self):
+    # Check Direct capability because Hotspot is implemented using Direct in NC.
+    if not setup_utils.is_wifi_direct_supported(
+        self.advertiser
+    ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
+      message = 'Wifi Hotspot is not supported in the device'
+      self.current_test_result.set_active_nc_fail_reason(
+          nc_constants.SingleTestFailureReason.SKIPPED,
+          result_message=message,
+      )
+      asserts.skip(message)
+
+  def _skip_if_wifi_direct_not_supported(self):
+    if not setup_utils.is_wifi_direct_supported(
+        self.advertiser
+    ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
+      message = 'Wifi Direct is not supported in the device'
+      self.current_test_result.set_active_nc_fail_reason(
+          nc_constants.SingleTestFailureReason.SKIPPED,
+          result_message=message,
+      )
+      asserts.skip(message)
+
+  def _skip_if_wifi_aware_not_supported(self):
+    if (
+        not self.test_parameters.run_aware_test
+        or not setup_utils.is_wifi_aware_available(self.advertiser)
+        or not setup_utils.is_wifi_aware_available(self.discoverer)
+    ):
+      message = 'Aware test is disabled or aware is not available in the device'
+      self.current_test_result.set_active_nc_fail_reason(
+          nc_constants.SingleTestFailureReason.SKIPPED,
+          result_message=message,
+      )
+      asserts.skip(message)
 
 
 if __name__ == '__main__':
