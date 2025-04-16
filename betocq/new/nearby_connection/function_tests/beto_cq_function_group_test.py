@@ -37,7 +37,7 @@ from mobly import records
 from mobly import utils
 from mobly.controllers import android_device
 
-from betocq.new import nc_base_test
+from betocq.new import base_test
 from betocq.new import nc_constants
 from betocq.new import nc_utils
 from betocq.new import setup_utils
@@ -138,7 +138,7 @@ def _start_nearby_connection_and_transfer_file(
     nearby_snippet.disconnect_endpoint()
 
 
-class BetoCqFunctionGroupTest(nc_base_test.NCBaseTestClass):
+class BetoCqFunctionGroupTest(base_test.BaseTestClass):
   """The test class to group all function tests in one mobly test."""
 
   # Result information on the test currently being executed.

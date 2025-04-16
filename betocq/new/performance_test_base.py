@@ -19,12 +19,12 @@ import logging
 from mobly import asserts
 from mobly import records
 
-from betocq.new import nc_base_test
+from betocq.new import base_test
 from betocq.new import nc_constants
 from betocq.new import test_result_utils
 
 
-class PerformanceTestBase(nc_base_test.NCBaseTestClass):
+class PerformanceTestBase(base_test.BaseTestClass):
   """Base test class for nearby connection E2E performance tests."""
 
   _test_results: test_result_utils.PerformanceTestResults
