@@ -25,6 +25,7 @@ from mobly.controllers import android_device
 
 BETOCQ_SUITE_NAME = 'BeToCQ'
 
+DCT_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.dct'
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
@@ -58,6 +59,7 @@ FIRST_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=35)
 BT_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 BLE_20K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
+BLE_100K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 SECOND_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=35)
 SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
@@ -86,6 +88,7 @@ WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
 
 CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
 BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
+DCT_BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.01
 
 KEEP_ALIVE_TIMEOUT_BT_MS = 30000
 KEEP_ALIVE_INTERVAL_BT_MS = 5000
@@ -112,6 +115,7 @@ TRANSFER_FILE_SIZE_500KB = 512  # kB
 TRANSFER_FILE_SIZE_1KB = 1  # kB
 TRANSFER_FILE_SIZE_20KB = 20  # kB
 TRANSFER_FILE_SIZE_10KB = 10  # kB
+TRANSFER_FILE_SIZE_100KB = 100  # kB
 
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
@@ -191,6 +195,7 @@ class TestParameters:
 
 @enum.unique
 class PayloadType(enum.IntEnum):
+  BYTES = 1
   FILE = 2
   STREAM = 3
 

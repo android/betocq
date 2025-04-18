@@ -17,14 +17,17 @@
 from collections.abc import Sequence
 import logging
 import time
+from typing import Union
 
 from mobly import asserts
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import snippet_client_v2
 
 from betocq import android_wifi_utils
 from betocq.new import nc_constants
 from betocq.new import setup_utils
 from betocq.new import test_result_utils
+from betocq.new.dct import nearby_connection_dct_wrapper
 from betocq.new.nearby_connection import nearby_connection_wrapper
 
 
@@ -111,10 +114,14 @@ def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
-) -> nearby_connection_wrapper.NearbyConnectionWrapper:
+    is_dct: bool = False,
+) -> Union[
+    nearby_connection_wrapper.NearbyConnectionWrapper,
+    nearby_connection_dct_wrapper.NearbyConnectionDctWrapper,
+]:
   """Starts a prior BT Nearby Connection."""
   logging.info('set up a prior BT connection.')
-  prior_bt_snippet = nearby_connection_wrapper.NearbyConnectionWrapper(
+  prior_bt_snippet = _get_snippet(
       advertiser,
       discoverer,
       advertiser.nearby2,
@@ -122,6 +129,7 @@ def start_prior_bt_nearby_connection(
       advertising_discovery_medium=nc_constants.NearbyMedium.BLE_ONLY,
       connection_medium=nc_constants.NearbyMedium.BT_ONLY,
       upgrade_medium=nc_constants.NearbyMedium.BT_ONLY,
+      is_dct=is_dct,
   )
   try:
     prior_bt_snippet.start_nearby_connection(
@@ -144,10 +152,15 @@ def start_main_nearby_connection(
     medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DISRUPTIVE,
     keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
     keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
-) -> nearby_connection_wrapper.NearbyConnectionWrapper:
+    is_dct: bool = False,
+) -> Union[
+    nearby_connection_wrapper.NearbyConnectionWrapper,
+    nearby_connection_dct_wrapper.NearbyConnectionDctWrapper,
+]:
   """Starts a main Nearby Connection which is used for file transfer."""
   logging.info('set up a nearby connection for file transfer.')
-  active_snippet = nearby_connection_wrapper.NearbyConnectionWrapper(
+
+  active_snippet = _get_snippet(
       advertiser,
       discoverer,
       advertiser.nearby,
@@ -155,6 +168,7 @@ def start_main_nearby_connection(
       advertising_discovery_medium=nc_constants.NearbyMedium.BLE_ONLY,
       connection_medium=connection_medium,
       upgrade_medium=upgrade_medium_under_test,
+      is_dct=is_dct,
   )
   try:
     active_snippet.start_nearby_connection(
@@ -297,4 +311,40 @@ def abort_if_device_cap_not_match(
             f' {"enabled" if actual_value else "disabled"}, which does not'
             ' match test case requirement.'
         ),
+    )
+
+
+def _get_snippet(
+    advertiser: android_device.AndroidDevice,
+    discoverer: android_device.AndroidDevice,
+    advertiser_nearby: snippet_client_v2.SnippetClientV2,
+    discoverer_nearby: snippet_client_v2.SnippetClientV2,
+    advertising_discovery_medium: nc_constants.NearbyMedium,
+    connection_medium: nc_constants.NearbyMedium,
+    upgrade_medium: nc_constants.NearbyMedium,
+    is_dct: bool = False,
+)-> Union[
+    nearby_connection_wrapper.NearbyConnectionWrapper,
+    nearby_connection_dct_wrapper.NearbyConnectionDctWrapper,
+]:
+  """Gets the snippet for Nearby or DCT Connection."""
+  if is_dct:
+    return nearby_connection_dct_wrapper.NearbyConnectionDctWrapper(
+        advertiser,
+        discoverer,
+        advertiser_nearby,
+        discoverer_nearby,
+        advertising_discovery_medium,
+        connection_medium,
+        upgrade_medium,
+    )
+  else:
+    return nearby_connection_wrapper.NearbyConnectionWrapper(
+        advertiser,
+        discoverer,
+        advertiser_nearby,
+        discoverer_nearby,
+        advertising_discovery_medium,
+        connection_medium,
+        upgrade_medium,
     )

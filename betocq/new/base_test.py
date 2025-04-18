@@ -156,6 +156,17 @@ class BaseTestClass(base_test.BaseTestClass):
         apk_path=apk_path,
     )
 
+  @property
+  def dct_snippet_config(self) -> nc_constants.SnippetConfig:
+    """Snippet config for loading the first DCT snippet instance."""
+    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
+    apk_path = self.user_params.get(file_tag, {}).get('dct_snippet', [''])[0]
+    return nc_constants.SnippetConfig(
+        snippet_name='nearby',
+        package_name=nc_constants.DCT_SNIPPET_PACKAGE_NAME,
+        apk_path=apk_path,
+    )
+
   def setup_wifi_env(
       self, d2d_type: nc_constants.WifiD2DType, country_code: str
   ):
