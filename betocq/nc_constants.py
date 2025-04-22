@@ -21,7 +21,13 @@ import enum
 import logging
 from typing import Any
 
+from mobly.controllers import android_device
+
 BETOCQ_SUITE_NAME = 'BeToCQ'
+
+DCT_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.dct'
+NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
+NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
@@ -45,6 +51,7 @@ CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
 WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=1)
+WIFI_AWARE_AVAILABLE_WAIT_TIME = datetime.timedelta(seconds=10)
 
 FIRST_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=30)
@@ -52,6 +59,7 @@ FIRST_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=35)
 BT_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 BLE_20K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
+BLE_100K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 SECOND_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=35)
 SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
@@ -80,6 +88,7 @@ WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
 
 CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
 BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
+DCT_BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.01
 
 KEEP_ALIVE_TIMEOUT_BT_MS = 30000
 KEEP_ALIVE_INTERVAL_BT_MS = 5000
@@ -106,6 +115,7 @@ TRANSFER_FILE_SIZE_500KB = 512  # kB
 TRANSFER_FILE_SIZE_1KB = 1  # kB
 TRANSFER_FILE_SIZE_20KB = 20  # kB
 TRANSFER_FILE_SIZE_10KB = 10  # kB
+TRANSFER_FILE_SIZE_100KB = 100  # kB
 
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
@@ -117,28 +127,9 @@ TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
 TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
 TARGET_CUJ_QUICK_SHARE = 'quick_share'
 
-
-@enum.unique
-class PayloadType(enum.IntEnum):
-  FILE = 2
-  STREAM = 3
-
-
-@enum.unique
-class NearbyMedium(enum.IntEnum):
-  """Medium options for discovery, advertising, connection and upgrade."""
-  # need to align with MediumSettingsFactory.java in snippet
-  AUTO = 0
-  BT_ONLY = 1
-  BLE_ONLY = 2
-  WIFILAN_ONLY = 3
-  WIFIAWARE_ONLY = 4  # connect or upgrade to aware medium
-  UPGRADE_TO_WEBRTC = 5
-  UPGRADE_TO_WIFIHOTSPOT = 6  # connect or upgrade to hotspot medium
-  UPGRADE_TO_WIFIDIRECT = 7  # connect or upgrade to wifi direct medium
-  BLE_L2CAP_ONLY = 8
-  # including WIFI_LAN, WIFI_HOTSPOT, WIFI_DIRECT or WIFI_AWARE
-  UPGRADE_TO_ALL_WIFI = 9  # connect or upgrade to any wifi medium
+MAX_FREQ_2G_MHZ = 2500
+MIN_FREQ_5G_DFS_MHZ = 5260
+MAX_FREQ_5G_DFS_MHZ = 5720
 
 
 @dataclasses.dataclass(frozen=False)
@@ -146,12 +137,6 @@ class TestParameters:
   """Test parameters to be customized for Nearby Connection."""
 
   target_cuj_name: str = 'unspecified'
-  requires_bt_multiplex: bool = False
-  requires_3p_api_test: bool = False
-  abort_all_tests_on_function_tests_fail: bool = True
-  fast_fail_on_any_error: bool = False
-  use_auto_controlled_wifi_ap: bool = False
-  use_local_sniffer: bool = False
   wifi_2g_ssid: str = ''
   wifi_2g_password: str = ''
   wifi_5g_ssid: str = ''
@@ -160,50 +145,25 @@ class TestParameters:
   wifi_dfs_5g_password: str = ''
   wifi_ssid: str = ''  # optional, for tests which can use any wifi
   wifi_password: str = ''
-  advertising_discovery_medium: NearbyMedium = NearbyMedium.BLE_ONLY
-  connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
-  toggle_airplane_mode_target_side: bool = False
-  reset_wifi_connection: bool = True
-  disconnect_bt_after_test: bool = False
-  disconnect_wifi_after_test: bool = False
-  payload_type: PayloadType = PayloadType.FILE
-  payload_file_num: int = 1
-  payload_file_size_kbyte: int = TRANSFER_FILE_SIZE_500MB
-  payload_transfer_timeout_sec: int = int(
-      WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT.total_seconds()
-  )
-  allow_unrooted_device: bool = False
-  keep_alive_timeout_ms: int = KEEP_ALIVE_TIMEOUT_WIFI_MS
-  keep_alive_interval_ms: int = KEEP_ALIVE_INTERVAL_WIFI_MS
-  enable_2g_ble_scan_throttling: bool = True
-  enable_instant_connection: bool = False
-  skip_flag_override_in_base_test: bool = False
+  # Whether to use a programmable AP. If true, the wifi SSIDs and passwords will
+  # be ignored.
+  use_programmable_ap: bool = False
+  # Whether to use a sniffer to capture WiFi packets for failed tests.
+  use_sniffer: bool = False
+
   target_post_wifi_connection_idle_time_sec: int = (
       TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC
   )
-
-  run_function_tests_with_performance_tests: bool = True
-  run_bt_performance_test: bool = True
-  run_ble_performance_test: bool = False
-  run_bt_coex_test: bool = True
-  run_directed_test: bool = True
-  run_compound_test: bool = True
-  run_aware_test: bool = False
-  run_iperf_test: bool = False  # run iperf test for possible mediums
-  run_iperf_test_if_nc_speed_is_low: bool = True
-  run_iperf_test_wlan: bool = True  # run iperf test for WLAN medium
-  check_iperf_speed: bool = True  # check iperf speed if it is available
-  run_nearby_connections_function_tests: bool = False
-  skip_test_if_wifi_chipset_is_empty: bool = True
   skip_bug_report: bool = False
-  force_telephony_cc: bool = False
-  bypass_airplane_mode_toggling: bool = False
-  run_mcc_hotspot_test: bool = True
+  skip_default_flag_override: bool = False
+
+  # Optional test cases disabled by default.
+  run_aware_test: bool = False
+  run_ble_performance_test: bool = False
+  requires_bt_multiplex: bool = False
 
   @classmethod
-  def from_user_params(
-      cls,
-      user_params: dict[str, Any]) -> 'TestParameters':
+  def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
     """convert the parameters from the testbed to the test parameter."""
 
     # Convert G3 user int parameter in str format to int.
@@ -220,16 +180,12 @@ class TestParameters:
       elif isinstance(value, str) and value.isdigit():
         user_params[key] = ast.literal_eval(value)
 
-    test_parameters_names = {
-        field.name for field in dataclasses.fields(cls)
-    }
-    test_parameters = cls(
-        **{
-            key: val
-            for key, val in user_params.items()
-            if key in test_parameters_names
-        }
-    )
+    test_parameters_names = {field.name for field in dataclasses.fields(cls)}
+    test_parameters = cls(**{
+        key: val
+        for key, val in user_params.items()
+        if key in test_parameters_names
+    })
 
     if test_parameters.target_cuj_name == TARGET_CUJ_QUICK_START:
       test_parameters.requires_bt_multiplex = True
@@ -238,8 +194,34 @@ class TestParameters:
 
 
 @enum.unique
+class PayloadType(enum.IntEnum):
+  BYTES = 1
+  FILE = 2
+  STREAM = 3
+
+
+@enum.unique
+class NearbyMedium(enum.IntEnum):
+  """Medium options for discovery, advertising, connection and upgrade."""
+
+  # need to align with MediumSettingsFactory.java in snippet
+  AUTO = 0
+  BT_ONLY = 1
+  BLE_ONLY = 2
+  WIFILAN_ONLY = 3
+  WIFIAWARE_ONLY = 4  # connect or upgrade to aware medium
+  UPGRADE_TO_WEBRTC = 5
+  UPGRADE_TO_WIFIHOTSPOT = 6  # connect or upgrade to hotspot medium
+  UPGRADE_TO_WIFIDIRECT = 7  # connect or upgrade to wifi direct medium
+  BLE_L2CAP_ONLY = 8
+  # including WIFI_LAN, WIFI_HOTSPOT, WIFI_DIRECT or WIFI_AWARE
+  UPGRADE_TO_ALL_WIFI = 9  # connect or upgrade to any wifi medium
+
+
+@enum.unique
 class NearbyConnectionMedium(enum.IntEnum):
   """Copied from com.google.android.gms.nearby.connection."""
+
   UNKNOWN = 0
   # reserved 1, it's Medium.MDNS, not used now
   BLUETOOTH = 2
@@ -274,17 +256,102 @@ class MediumUpgradeType(enum.IntEnum):
 
 @enum.unique
 class WifiD2DType(enum.IntEnum):
+  """The enum for both Wifi Direct and STA types."""
+
   SCC_2G = 0
   SCC_5G = 1
-  MCC_2G_WFD_5G_STA = 2
-  MCC_2G_WFD_5G_INDOOR_STA = 3
-  MCC_5G_WFD_5G_DFS_STA = 4
-  MCC_5G_HS_5G_DFS_STA = 5
+  SCC_5G_DFS = 2
+  SCC_5G_WFD_DBS_2G_STA = 3
+  MCC_2G_WFD_5G_STA = 4
+  MCC_2G_WFD_5G_INDOOR_STA = 5
+  MCC_5G_WFD_2G_STA = 6
+  MCC_5G_WFD_5G_DFS_STA = 7
+  MCC_5G_HS_5G_DFS_STA = 8
+  # 2 Android devices connected to different APs.
+  MCC_5G_AND_5G_DFS_STA = 9
+  # Connect to 2G STA and allows upgrading to all WiFi mediums.
+  ANY_WFD_2G_STA = 10
+  LOCAL_ONLY_HOTSPOT = 11
+
+
+def is_upgrading_to_wifi_of_any_freq(d2d_type: WifiD2DType) -> bool:
+  """Returns True if this could upgrade to either 2G or 5G WiFi mediums."""
+  return d2d_type in {
+      WifiD2DType.ANY_WFD_2G_STA,
+  }
+
+
+_WIFI_D2D_TYPES_MCC = (
+    WifiD2DType.MCC_2G_WFD_5G_STA,
+    WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
+    WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
+    WifiD2DType.MCC_5G_HS_5G_DFS_STA,
+    WifiD2DType.MCC_5G_WFD_2G_STA,
+    WifiD2DType.MCC_5G_AND_5G_DFS_STA,
+)
+
+
+_WIFI_D2D_TYPES_2G_D2D = (
+    WifiD2DType.SCC_2G,
+    WifiD2DType.MCC_2G_WFD_5G_STA,
+    WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
+)
+
+
+_WIFI_D2D_TYPES_2G_STA = (
+    WifiD2DType.SCC_2G,
+    WifiD2DType.SCC_5G_WFD_DBS_2G_STA,
+    WifiD2DType.MCC_5G_WFD_2G_STA,
+    WifiD2DType.ANY_WFD_2G_STA,
+)
+
+
+_WIFI_D2D_TYPES_5G_STA = (
+    WifiD2DType.SCC_5G,
+    WifiD2DType.MCC_2G_WFD_5G_STA,
+    WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
+)
+
+
+_WIFI_D2D_TYPES_DFS_5G_STA = (
+    WifiD2DType.SCC_5G_DFS,
+    WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
+    WifiD2DType.MCC_5G_HS_5G_DFS_STA,
+)
+
+
+def get_wifi_channel(d2d_type: WifiD2DType) -> int:
+  """Gets the WiFi channel for the given D2D type."""
+  if d2d_type in _WIFI_D2D_TYPES_2G_STA:
+    return CHANNEL_2G
+  elif d2d_type in _WIFI_D2D_TYPES_5G_STA:
+    return CHANNEL_5G
+  elif d2d_type in _WIFI_D2D_TYPES_DFS_5G_STA:
+    return CHANNEL_5G_DFS
+  else:
+    raise ValueError(f'Unsupported WifiD2DType: {d2d_type}')
+
+
+@enum.unique
+class WifiType(enum.StrEnum):
+  FREQ_2G = '2G AP'
+  FREQ_5G = '5G AP'
+  FREQ_5G_DFS = '5G DFS AP'
+
+
+@enum.unique
+class TestResultStatus(enum.IntEnum):
+  """The status of the test result."""
+
+  UNINITIALIZED = 0
+  SUCCESS = 1
+  FAILURE = 2
 
 
 @enum.unique
 class SingleTestFailureReason(enum.IntEnum):
   """The failure reasons for a nearby connect connection test."""
+
   UNINITIALIZED = 0
   SOURCE_START_DISCOVERY = 1
   TARGET_START_ADVERTISING = 2
@@ -301,13 +368,15 @@ class SingleTestFailureReason(enum.IntEnum):
   WRONG_P2P_FREQUENCY = 13
   DEVICE_CONFIG_ERROR = 14
   SUCCESS = 15
+  SKIPPED = 16
+
 
 COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
-    ' 1) Check if the wifi ssid or password is correct;\n',
-    ' 2) Try to remove any saved wifi network from wifi settings;\n',
-    ' 3) Check if other device can connect to the same AP\n',
-    ' 4) Check the wifi connection related log on the device.\n',
-    ' 5) Check if RSSI is too high and device is too close to the AP.\n',
+    ' 1) Check if the wifi ssid or password is correct;\n'
+    ' 2) Try to remove any saved wifi network from wifi settings;\n'
+    ' 3) Check if other device can connect to the same AP\n'
+    ' 4) Check the wifi connection related log on the device.\n'
+    ' 5) Check if RSSI is too high and device is too close to the AP.\n'
 )
 
 COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
@@ -364,6 +433,7 @@ COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
     SingleTestFailureReason.DEVICE_CONFIG_ERROR: (
         'Check if device capabilities are set correctly in the config file.'
     ),
+    SingleTestFailureReason.SKIPPED: 'Skipped.',
 }
 
 COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
@@ -427,14 +497,29 @@ MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS: dict[NearbyMedium, str] = {
 @dataclasses.dataclass(frozen=True)
 class ConnectionSetupTimeouts:
   """The timeouts of the nearby connection setup."""
+
   discovery_timeout: datetime.timedelta | None = None
   connection_init_timeout: datetime.timedelta | None = None
   connection_result_timeout: datetime.timedelta | None = None
 
 
+DEFAULT_FIRST_CONNECTION_TIMEOUTS = ConnectionSetupTimeouts(
+    FIRST_DISCOVERY_TIMEOUT,
+    FIRST_CONNECTION_INIT_TIMEOUT,
+    FIRST_CONNECTION_RESULT_TIMEOUT,
+)
+
+DEFAULT_SECOND_CONNECTION_TIMEOUTS = ConnectionSetupTimeouts(
+    SECOND_DISCOVERY_TIMEOUT,
+    SECOND_CONNECTION_INIT_TIMEOUT,
+    SECOND_CONNECTION_RESULT_TIMEOUT,
+)
+
+
 @dataclasses.dataclass(frozen=False)
 class ConnectionSetupQualityInfo:
   """The quality information of the nearby connection setup."""
+
   discovery_latency: datetime.timedelta = UNSET_LATENCY
   connection_latency: datetime.timedelta = UNSET_LATENCY
   medium_upgrade_latency: datetime.timedelta = UNSET_LATENCY
@@ -448,7 +533,7 @@ class ConnectionSetupQualityInfo:
 
     dict_repr = {
         'discovery': f'{round(self.discovery_latency.total_seconds(), 1)}s',
-        'connection': f'{round(self.connection_latency.total_seconds(), 1)}s'
+        'connection': f'{round(self.connection_latency.total_seconds(), 1)}s',
     }
     if self.medium_upgrade_expected:
       dict_repr['upgrade'] = (
@@ -471,31 +556,12 @@ class ConnectionSetupQualityInfo:
     return 'na'
 
 
-@dataclasses.dataclass(frozen=False)
-class SingleTestResult:
-  """The test result of a single iteration."""
+@dataclasses.dataclass(frozen=True)
+class SpeedTarget:
+  """The speed target in MB/s."""
 
-  test_iteration: int = 0
-  is_failed_with_prior_bt: bool = False
-  failure_reason: SingleTestFailureReason = (
-      SingleTestFailureReason.UNINITIALIZED
-  )
-  result_message: str = ''
-  prior_nc_quality_info: ConnectionSetupQualityInfo = dataclasses.field(
-      default_factory=ConnectionSetupQualityInfo
-  )
-  discoverer_sta_latency: datetime.timedelta = UNSET_LATENCY
-  quality_info: ConnectionSetupQualityInfo = (
-      dataclasses.field(default_factory=ConnectionSetupQualityInfo)
-  )
-  file_transfer_throughput_kbps: float = UNSET_THROUGHPUT_KBPS
-  iperf_throughput_kbps: float = UNSET_THROUGHPUT_KBPS
-  advertiser_sta_latency: datetime.timedelta = UNSET_LATENCY
-  discoverer_sta_expected: bool = False
-  advertiser_wifi_expected: bool = False
-  sta_frequency: int = INVALID_INT
-  max_sta_link_speed_mbps: int = INVALID_INT
-  start_time: datetime.datetime = datetime.datetime.now()
+  iperf_speed_mbtye_per_sec: float
+  nc_speed_mbtye_per_sec: float
 
 
 @dataclasses.dataclass(frozen=False)
@@ -518,20 +584,26 @@ class NcPerformanceTestMetrics:
       dataclasses.field(default_factory=list[datetime.timedelta])
   )
   medium_upgrade_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta])
+      default_factory=list[datetime.timedelta]
+  )
   advertiser_wifi_sta_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta])
+      default_factory=list[datetime.timedelta]
+  )
   file_transfer_throughputs_kbps: list[float] = dataclasses.field(
-      default_factory=list[float])
+      default_factory=list[float]
+  )
   iperf_throughputs_kbps: list[float] = dataclasses.field(
-      default_factory=list[float])
+      default_factory=list[float]
+  )
   upgraded_wifi_transfer_mediums: list[NearbyConnectionMedium] = (
-      dataclasses.field(default_factory=list[NearbyConnectionMedium]))
+      dataclasses.field(default_factory=list[NearbyConnectionMedium])
+  )
 
 
 @dataclasses.dataclass(frozen=True)
 class TestResultStats:
   """The test result stats."""
+
   success_count: int | None = None
   zero_count: int | None = None
   min_val: float | None = None
@@ -540,7 +612,99 @@ class TestResultStats:
 
 
 @dataclasses.dataclass(frozen=True)
-class SpeedTarget:
-  """The speed target in MB/s."""
-  iperf_speed_mbtye_per_sec: float
-  nc_speed_mbtye_per_sec: float
+class WifiInfo:
+  """The data class for all Wi-Fi information in one NC based test.
+
+  Attributes:
+    d2d_type: The combination of Wi-Fi Direct type and STA type.
+    advertiser_wifi_ssid: The Wi-Fi SSID of the advertiser.
+    advertiser_wifi_password: The Wi-Fi password of the advertiser.
+    discoverer_wifi_ssid: The Wi-Fi SSID of the discoverer.
+    discoverer_wifi_password: The Wi-Fi password of the discoverer.
+    is_mcc: Whether the test is a MCC test.
+    is_2g_d2d_wifi_medium: Whether the test is using 2G D2D Wi-Fi medium.
+    sta_type: The Wi-Fi STA type.
+  """
+
+  d2d_type: WifiD2DType
+  advertiser_wifi_ssid: str
+  advertiser_wifi_password: str
+  discoverer_wifi_ssid: str
+  discoverer_wifi_password: str
+
+  @property
+  def is_mcc(self) -> bool:
+    """Whether the test is a MCC test."""
+    return self.d2d_type in _WIFI_D2D_TYPES_MCC
+
+  @property
+  def is_2g_d2d_wifi_medium(self) -> bool:
+    """Whether the test is using 2G D2D Wi-Fi medium."""
+    return self.d2d_type in _WIFI_D2D_TYPES_2G_D2D
+
+  @property
+  def sta_type(self) -> WifiType:
+    """The Wi-Fi STA type."""
+    if self.d2d_type in _WIFI_D2D_TYPES_2G_STA:
+      return WifiType.FREQ_2G
+    elif self.d2d_type in _WIFI_D2D_TYPES_5G_STA:
+      return WifiType.FREQ_5G
+    elif self.d2d_type in _WIFI_D2D_TYPES_DFS_5G_STA:
+      return WifiType.FREQ_5G_DFS
+    else:
+      raise ValueError(f'Unsupported WifiD2DType: {self.d2d_type}')
+
+  @classmethod
+  def from_test_parameters(
+      cls, d2d_type: WifiD2DType, params: TestParameters
+  ) -> 'WifiInfo':
+    """Creates a WifiInfo object from the user params."""
+    if d2d_type in _WIFI_D2D_TYPES_2G_STA:
+      advertiser_ssid = params.wifi_2g_ssid
+      advertiser_password = params.wifi_2g_password
+      discoverer_ssid = params.wifi_2g_ssid
+      discoverer_password = params.wifi_2g_password
+    elif d2d_type in _WIFI_D2D_TYPES_5G_STA:
+      advertiser_ssid = params.wifi_5g_ssid
+      advertiser_password = params.wifi_5g_password
+      discoverer_ssid = params.wifi_5g_ssid
+      discoverer_password = params.wifi_5g_password
+    elif d2d_type in _WIFI_D2D_TYPES_DFS_5G_STA:
+      advertiser_ssid = params.wifi_dfs_5g_ssid
+      advertiser_password = params.wifi_dfs_5g_password
+      discoverer_ssid = params.wifi_dfs_5g_ssid
+      discoverer_password = params.wifi_dfs_5g_password
+    else:
+      raise ValueError(f'Unsupported WifiD2DType: {d2d_type}')
+
+    return cls(
+        d2d_type=d2d_type,
+        advertiser_wifi_ssid=advertiser_ssid,
+        advertiser_wifi_password=advertiser_password,
+        discoverer_wifi_ssid=discoverer_ssid,
+        discoverer_wifi_password=discoverer_password,
+    )
+
+
+@dataclasses.dataclass
+class NcTestRuntime:
+  """Records the runtime information of a nearby connection test."""
+
+  advertiser: android_device.AndroidDevice
+  discoverer: android_device.AndroidDevice
+  upgrade_medium_under_test: NearbyMedium
+  connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
+  country_code: str = 'US'
+  is_dbs_mode: bool = False
+  advertising_discovery_medium: NearbyMedium = NearbyMedium.BLE_ONLY
+  connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
+  wifi_info: WifiInfo | None = None
+
+
+@dataclasses.dataclass(frozen=True)
+class SnippetConfig:
+  """The configuration for loading snippet."""
+
+  snippet_name: str
+  package_name: str
+  apk_path: str | None = None
