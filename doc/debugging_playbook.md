@@ -11,7 +11,7 @@ For users who have access to BTX Result Viewer, find the Python failure signatur
 1.  Review test results in BTX Result Viewer.
 1.  Find the name of failed test cases, as shown in Figure 1.
 
-    ![BTX Result viewer](./images/betocq-result-viewer.png)
+    ![BTX Result Viewer](./images/betocq-result-viewer.png)
 
     **Figure 1.** BTX Result viewer.
 
@@ -34,7 +34,7 @@ For users who have access to BTX Result Viewer, find the Python failure signatur
     </tr>
     <tr>
     <td>4</td>
-    <td>Red test case means all iterations failed. Red teardown\_class means the flakiness rate was not in an acceptable range.</td>
+    <td>Red test case means all iterations failed. Red teardown_class means the flakiness rate was not in an acceptable range.</td>
     </tr>
     <tr>
     <td>5</td>
