@@ -1,4 +1,4 @@
-# Better Together Connectivity Quality (BeToCQ) test suite debugging playbook
+# BeToCQ test suite debugging playbook
 
 This page explains how to debug Better Together Connectivity Quality (BeToCQ) test suite errors.
 
@@ -6,14 +6,14 @@ The section [Python failure signatures](#python-failure-signatures) lists typica
 
 ## Python failure signatures
 
-For users who have access to Result Viewer, find the Python failure signature by following these steps:
+For users who have access to BTX Result Viewer, find the Python failure signature by following these steps:
 
-1.  Review test results in Result Viewer.
+1.  Review test results in BTX Result Viewer.
 1.  Find the name of failed test cases, as shown in Figure 1.
 
-    ![Results viewer](./images/betocq-result-viewer.png)
+    ![BTX Results viewer](./images/betocq-result-viewer.png)
 
-    **Figure 1.** Results viewer.
+    **Figure 1.** BTX Result viewer.
 
     <table>
     <tr>
@@ -22,7 +22,7 @@ For users who have access to Result Viewer, find the Python failure signature by
     </tr>
     <tr>
     <td>1</td>
-    <td>This test was flaky, but the flakiness rate was within the acceptable range.</td>
+    <td>This test case was flaky, but the flakiness rate was within the acceptable range.</td>
     </tr>
     <tr>
     <td>2</td>
@@ -34,7 +34,7 @@ For users who have access to Result Viewer, find the Python failure signature by
     </tr>
     <tr>
     <td>4</td>
-    <td>This test case failed.</td>
+    <td>Red test case means all iterations failed. Red `teardown_class` means the flakiness rate was not in an acceptable range.</td>
     </tr>
     <tr>
     <td>5</td>
@@ -221,7 +221,7 @@ Review the following bug report logs:
 
     **Figure 5.** Mobly report test stats.
 
--   `test_info.log`:
+-   `test_log.INFO`:
 
     ```none
     09-20 04:42:49.304 INFO [AndroidDevice|33141FDJH0002A(Pixel 8)] Start advertising BLE_ONLY
