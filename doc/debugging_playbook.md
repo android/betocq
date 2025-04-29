@@ -13,7 +13,7 @@ For users who have access to BTX Result Viewer, find the Python failure signatur
 
     ![BTX Result Viewer](./images/betocq-result-viewer.png)
 
-    **Figure 1.** BTX Result viewer.
+    **Figure 1.** BTX Result Viewer.
 
     <table>
     <tr>
