@@ -23,7 +23,7 @@ from typing import Any
 
 from mobly.controllers import android_device
 
-BETOCQ_SUITE_NAME = 'BeToCQ'
+BETOCQ_NAME = 'BeToCQ'
 
 DCT_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.dct'
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
