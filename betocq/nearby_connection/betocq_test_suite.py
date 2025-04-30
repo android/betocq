@@ -48,11 +48,16 @@ from betocq.nearby_connection.directed_tests import scc_indoor_5g_wfd_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
 
 
+_SUITE_NAME = 'NC'
+
+
 class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
   """Add all BetoCQ tests to run in sequence."""
 
   def setup_suite(self, config):
     """Add all BetoCQ tests to the suite."""
+    self.user_params['suite_name'] = _SUITE_NAME
+
     test_parameters = nc_constants.TestParameters.from_user_params(
         config.user_params
     )

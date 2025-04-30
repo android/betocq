@@ -293,9 +293,11 @@ class BaseTestClass(base_test.BaseTestClass):
     if BaseTestClass._run_identifier_is_set:
       return
     suite_name_items = [
-        nc_constants.BETOCQ_SUITE_NAME,
-        self.test_parameters.target_cuj_name,
+        nc_constants.BETOCQ_NAME,
     ]
+    if 'suite_name' in self.user_params:
+      suite_name_items.append(self.user_params['suite_name'])
+    suite_name_items.append(self.test_parameters.target_cuj_name)
     suite_name = '-'.join(suite_name_items)
     run_identifier_items = [
         self.advertiser.adb.getprop('ro.product.manufacturer'),

@@ -21,11 +21,16 @@ from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import local_only_hotspot_test
 
 
+_SUITE_NAME = 'AndroidAuto'
+
+
 class BetoCqAndroidAutoPerformanceTestSuite(base_suite.BaseSuite):
   """Add all BetoCQ tests to run in sequence."""
 
   def setup_suite(self, config):
     """Add all BetoCQ tests to the suite."""
+    self.user_params['suite_name'] = _SUITE_NAME
+
     self.add_test_class(bt_performance_test.BtPerformanceTest)
     self.add_test_class(local_only_hotspot_test.LocalOnlyHotspotTest)
 
