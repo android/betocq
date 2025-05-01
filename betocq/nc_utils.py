@@ -37,13 +37,14 @@ def setup_android_device_for_nc_tests(
     country_code: str,
     debug_output_dir: str,
     skip_flag_override: bool = False,
+    skip_forget_wifi_network: bool = False,
 ) -> None:
   """Performs general Android device setup steps for NC tests."""
-  android_wifi_utils.forget_all_wifi(ad)
+  if not skip_forget_wifi_network:
+    android_wifi_utils.forget_all_wifi(ad)
   setup_utils.disable_gms_auto_updates(ad)
   for conf in snippet_confs:
     setup_utils.load_nearby_snippet(ad, conf)
-  setup_utils.remove_disconnect_wifi_network(ad)
   setup_utils.enable_logs(ad)
   if not skip_flag_override:
     setup_utils.set_flags(ad, debug_output_dir)
