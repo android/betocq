@@ -1,5 +1,15 @@
 # BetoCQ test suite release history
 
+## 2.4.1 (05/07/2025)
+
+## New
+* Add Android Auto test suite and test cases.
+* Increase SCC test iterations from 10 to 20 and reduce MCC test iterations from 100 to 50.
+* Add WiFi Direct capability check.
+
+## Bug fixes
+* Fix GMS flag overrides on Windows.
+
 ## 2.4.0 (12/20/2024)
 
 ## New
