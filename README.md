@@ -401,3 +401,9 @@ To run the test, run the following commands from the local directory
 
 Note that `Quickstart` is the CUJ test name and there are
 a few other supported CUJ tests listed in `cuj_and_test_config.yml`.
+
+
+### Debugging test failures
+
+If you encounter test failures, you could reference the
+[debugging playbook](./doc/debugging_playbook.md) to help analyze them.
