@@ -84,7 +84,9 @@ _THROUGHPUT_LOW_TIP = (
     'This is a MCC test case where hotspot uses a 5G non-DFS channel and STA'
     ' uses a 5G DFS channel. Note that in hotspot mode, the target acts as a'
     ' WFD GO while the source device acts as the legacy STA. Check with the'
-    ' wifi chip vendor about the possible firmware Tx/Rx issues in MCC mode.'
+    ' wifi chip vendor about the possible firmware Tx/Rx issues in MCC mode. FW'
+    ' may set a suboptimal duty cycle on source or target sides. Tuning the'
+    ' duty cycle parameters may improve the throughput.'
 )
 
 
