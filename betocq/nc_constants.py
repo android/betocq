@@ -442,11 +442,11 @@ COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
         ' that'
     ),
     (
-        ' 1) includes the wpa_supplicant patch to avoid scan before starting GO'
+        ' 1) Includes the wpa_supplicant patch to avoid scan before starting GO'
         ' https://w1.fi/cgit/hostap/commit/?id=b18d95759375834b6ca6f864c898f27d161b14ca.'
     ),
     (
-        ' 2) includes WiFi mainline module 34.11.10.06.0 or later version which'
+        ' 2) Includes WiFi mainline module 34.11.10.06.0 or later version which'
         ' fixes the out-of-order message issue between P2P and tethering'
         ' modules'
     ),
@@ -458,13 +458,19 @@ COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
         ' https://en.wikipedia.org/wiki/List_of_WLAN_channels.'
     ),
     (
-        'Also check if BT socket is still connected and read/write is normal'
+        ' 4) Check if BT socket is still connected and read/write is normal'
         ' when the upgrade failure happens.'
     ),
     (
-        ' If WFD group client fails to connect, check if the devices are too'
-        ' close to each other. The recommended minimum device is 10cm (4'
-        ' inches).'
+        ' 5) If WFD group client fails to connect, check if the devices are too'
+        ' close to each other. The recommended minimum device is 10cm and '
+        ' sometimes 10cm might be too close and causes the RF signal saturation'
+        ' In addition, check if the excessive scanning causes the connection'
+        ' failure.'
+    ),
+    (
+        ' 6) If the MCC test case and WFD group fail to start, check if'
+        ' the device enables MCC operation mode).'
     ),
 ])
 
