@@ -28,7 +28,6 @@ from betocq import nc_constants
 from betocq import resources
 
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
-_DCT_ON_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:dct_on_overrides'
 _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:wifi_direct_hotspot_off_overrides'
 _FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
 _GMS_PACKAGE = 'com.google.android.gms'
@@ -514,20 +513,6 @@ def set_flag_wifi_direct_hotspot_off(
       ad,
       output_path,
       _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES,
-      False,
-  )
-
-
-def set_flag_dct_on(
-    ad: android_device.AndroidDevice,
-    output_path: str,
-):
-  """Turn on the flag connections_enable_dct on the given device."""
-  ad.log.info('Turn on dct')
-  _install_overrides(
-      ad,
-      output_path,
-      _DCT_ON_OVERRIDES,
       False,
   )
 
