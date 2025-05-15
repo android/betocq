@@ -25,7 +25,6 @@ from mobly.controllers import android_device
 
 BETOCQ_NAME = 'BeToCQ'
 
-DCT_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.dct'
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
@@ -88,7 +87,6 @@ WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
 
 CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
 BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
-DCT_BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.01
 
 KEEP_ALIVE_TIMEOUT_BT_MS = 30000
 KEEP_ALIVE_INTERVAL_BT_MS = 5000
