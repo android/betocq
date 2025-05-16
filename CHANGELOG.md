@@ -1,5 +1,10 @@
 # BetoCQ test suite release history
 
+## 2.4.2 (05/16/2025)
+
+## Bug fixes
+* update snippet apk to fix the WiFi direct capability check issue.
+
 ## 2.4.1 (05/07/2025)
 
 ## New
