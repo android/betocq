@@ -319,7 +319,7 @@ def _get_snippet(
 )-> Union[
     nearby_connection_wrapper.NearbyConnectionWrapper,
 ]:
-  """Gets the snippet for Nearby Connection."""
+    """Gets the snippet for Nearby Connection."""
     return nearby_connection_wrapper.NearbyConnectionWrapper(
         advertiser,
         discoverer,

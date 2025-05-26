@@ -35,5 +35,10 @@ class BetoCqAndroidAutoPerformanceTestSuite(base_suite.BaseSuite):
     self.add_test_class(local_only_hotspot_test.LocalOnlyHotspotTest)
 
 
-if __name__ == '__main__':
+def main() -> None:
+  """Entry point for execution as pip installed script."""
   suite_runner.run_suite_class()
+
+
+if __name__ == '__main__':
+  main()

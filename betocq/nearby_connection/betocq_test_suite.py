@@ -100,5 +100,10 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     self.add_test_class(scc_5g_all_wifi_sta_test.Scc5gAllWifiStaTest)
 
 
-if __name__ == '__main__':
+def main() -> None:
+  """Entry point for execution as pip installed script."""
   suite_runner.run_suite_class()
+
+
+if __name__ == '__main__':
+  main()
