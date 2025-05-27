@@ -9,14 +9,15 @@ description = "Better Together Connectivity Quality test suite."
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-  "mobly",
+  "mobly==1.13",
   "mobly-android-partner-tools",
-  "mobly-wifi",
+  "mobly-wifi==1.2.0",
 ]
 
 [project.scripts]
-betocq_test_suite = "betocq.betocq_test_suite:main"
-betocq_auto_test_suite = "betocq.betocq_android_auto_test_suite:main"
+betocq_test_suite = "betocq.nearby_connection.betocq_test_suite:main"
+betocq_auto_test_suite = "betocq.nearby_connection.betocq_android_auto_test_suite:main"
+
 
 [project.urls]
 Homepage = "https://github.com/android/betocq"
