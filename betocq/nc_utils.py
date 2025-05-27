@@ -17,7 +17,6 @@
 from collections.abc import Sequence
 import logging
 import time
-from typing import Union
 
 from mobly import asserts
 from mobly.controllers import android_device
@@ -114,9 +113,8 @@ def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
-) -> Union[
-    nearby_connection_wrapper.NearbyConnectionWrapper,
-]:
+) -> nearby_connection_wrapper.NearbyConnectionWrapper:
+
   """Starts a prior BT Nearby Connection."""
   logging.info('set up a prior BT connection.')
   prior_bt_snippet = _get_snippet(
@@ -149,9 +147,7 @@ def start_main_nearby_connection(
     medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DISRUPTIVE,
     keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
     keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
-) -> Union[
-    nearby_connection_wrapper.NearbyConnectionWrapper,
-]:
+) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a main Nearby Connection which is used for file transfer."""
   logging.info('set up a nearby connection for file transfer.')
 
@@ -316,16 +312,14 @@ def _get_snippet(
     advertising_discovery_medium: nc_constants.NearbyMedium,
     connection_medium: nc_constants.NearbyMedium,
     upgrade_medium: nc_constants.NearbyMedium,
-)-> Union[
-    nearby_connection_wrapper.NearbyConnectionWrapper,
-]:
-    """Gets the snippet for Nearby Connection."""
-    return nearby_connection_wrapper.NearbyConnectionWrapper(
-        advertiser,
-        discoverer,
-        advertiser_nearby,
-        discoverer_nearby,
-        advertising_discovery_medium,
-        connection_medium,
-        upgrade_medium,
-    )
+) -> nearby_connection_wrapper.NearbyConnectionWrapper:
+  """Gets the snippet for Nearby Connection."""
+  return nearby_connection_wrapper.NearbyConnectionWrapper(
+      advertiser,
+      discoverer,
+      advertiser_nearby,
+      discoverer_nearby,
+      advertising_discovery_medium,
+      connection_medium,
+      upgrade_medium,
+  )
