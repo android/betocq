@@ -173,8 +173,11 @@ def start_main_nearby_connection(
     fail_reason = active_snippet.test_failure_reason
     result_message = None
     if fail_reason == nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
-      result_message = (
+      default_message = (
           f'unexpected upgrade medium - {upgrade_medium_under_test.name}'
+      )
+      result_message = nc_constants.MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS.get(
+          upgrade_medium_under_test, default_message
       )
 
     if fail_reason != nc_constants.SingleTestFailureReason.SUCCESS:
