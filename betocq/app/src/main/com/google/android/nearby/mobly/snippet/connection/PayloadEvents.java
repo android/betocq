@@ -71,16 +71,12 @@ public class PayloadEvents extends PayloadCallback {
   }
 
   private String getPayloadType(Payload payload) {
-    switch (payload.getType()) {
-      case Payload.Type.BYTES:
-        return "BYTES";
-      case Payload.Type.FILE:
-        return "FILE";
-      case Payload.Type.STREAM:
-        return "STREAM";
-      default:
-        return "UNKNOWN";
-    }
+    return switch (payload.getType()) {
+      case Payload.Type.BYTES -> "BYTES";
+      case Payload.Type.FILE -> "FILE";
+      case Payload.Type.STREAM -> "STREAM";
+      default -> "UNKNOWN";
+    };
   }
 
   @Override

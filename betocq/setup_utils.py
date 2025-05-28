@@ -14,11 +14,13 @@
 
 """Android Nearby device setup."""
 
+from collections.abc import Callable
 import datetime
 import time
 
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
+from mobly.controllers.android_device_lib import apk_utils
 
 from betocq.gms import hermetic_overrides_partner
 from betocq import gms_auto_updates_util
@@ -286,6 +288,7 @@ def enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
 
 
 def _do_enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+  """Enables airplane mode on the given device."""
   if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '1'])
     ad.adb.shell([
@@ -315,6 +318,7 @@ def disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
 
 
 def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+  """Disables airplane mode on the given device."""
   if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '0'])
     ad.adb.shell([
@@ -427,6 +431,15 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
     return ''
 
 
+def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if WiFi Direct is supported on the given device."""
+  try:
+    return ad.nearby.wifiIsP2pSupported()
+  except Exception as e:  # pylint: disable=broad-except
+    ad.log.info('WiFi Direct is not supported due to %s', e)
+    return False
+
+
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware is supported on the given device."""
   try:
@@ -436,13 +449,16 @@ def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
     return False
 
 
-def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
-  """Checks if WiFi Direct is supported on the given device."""
-  try:
-    return ad.nearby.wifiIsP2pSupported()
-  except Exception as e:  # pylint: disable=broad-except
-    ad.log.info('WiFi Direct is not supported due to %s', e)
-    return False
+def wait_for_aware_available(
+    ad: android_device.AndroidDevice,
+    timeout: datetime.timedelta = nc_constants.WIFI_AWARE_AVAILABLE_WAIT_TIME,
+) -> bool:
+  """Waits for Wifi Aware to be available on the given device."""
+  return wait_for_predicate(
+      lambda: is_wifi_aware_available(ad),
+      timeout,
+      interval=datetime.timedelta(seconds=1),
+  )
 
 
 def get_hardware(ad: android_device.AndroidDevice) -> str:
@@ -482,7 +498,7 @@ def set_flags(
     ad: android_device.AndroidDevice,
     output_path: str,
 ):
-  """Sets flags on the given device."""
+  """Sets default flags on the given device."""
   ad.log.info('Installing hermetic overrides from %s', _DEFAULT_OVERRIDES)
   _install_overrides(ad, output_path, _DEFAULT_OVERRIDES, False)
 
@@ -491,6 +507,7 @@ def set_flag_wifi_direct_hotspot_off(
     ad: android_device.AndroidDevice,
     output_path: str,
 ):
+  """Turn off the flag use_wifi_direct_hotspot on the given device."""
   ad.log.info('turn off wifi direct hotspot')
   _install_overrides(
       ad,
@@ -518,3 +535,67 @@ def _install_overrides(
       merge_with_existing_overrides=merge_with_existing_overrides,
   )
   restart_gms(ad)
+
+
+def get_target_sta_frequency_and_max_link_speed(
+    ad: android_device.AndroidDevice,
+) -> tuple[int, int]:
+  """Gets the STA frequency and max link speed."""
+  connection_info = ad.nearby.wifiGetConnectionInfo()
+  sta_frequency = int(
+      connection_info.get('mFrequency', nc_constants.INVALID_INT)
+  )
+  sta_max_link_speed_mbps = int(
+      connection_info.get('mMaxSupportedTxLinkSpeed', nc_constants.INVALID_INT)
+  )
+
+  # If the info is not available, try getting them by adb wifi status command.
+  if sta_frequency == nc_constants.INVALID_INT:
+    sta_frequency = get_wifi_sta_frequency(ad)
+    sta_max_link_speed_mbps = get_wifi_sta_max_link_speed(ad)
+  return (sta_frequency, sta_max_link_speed_mbps)
+
+
+def load_nearby_snippet(
+    ad: android_device.AndroidDevice,
+    config: nc_constants.SnippetConfig,
+):
+  """Loads a nearby snippet with the given snippet config."""
+  if config.apk_path:
+    ad.log.info('try to install nearby_snippet_apk')
+    apk_utils.install(ad, config.apk_path)
+  else:
+    ad.log.warning(
+        'nearby_snippet apk is not specified, '
+        'make sure it is installed in the device'
+    )
+  ad.log.info('grant manage external storage permission')
+  grant_manage_external_storage_permission(ad, config.package_name)
+  ad.load_snippet(config.snippet_name, config.package_name)
+
+
+def wait_for_predicate(
+    predicate: Callable[[], bool],
+    timeout: datetime.timedelta,
+    interval: datetime.timedelta | None = None,
+) -> bool:
+  """Returns True if the predicate returns True within the given timeout.
+
+  Any exception raised in the predicate will terminate the wait immediately.
+
+  Args:
+    predicate: A predicate function.
+    timeout: The timeout to wait.
+    interval: The interval time between each check of the predicate.
+
+  Returns:
+    Whether the predicate returned True within the given timeout.
+  """
+  start_time = time.monotonic()
+  deadline = start_time + timeout.total_seconds()
+  while time.monotonic() < deadline:
+    if predicate():
+      return True
+    if interval is not None:
+      time.sleep(interval.total_seconds())
+  return False
