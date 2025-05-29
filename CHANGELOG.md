@@ -16,6 +16,9 @@ Minor changes:
 * Adds some triaging tips for MCC test cases.
 * Remove the p2p frequency check in test case `Scc5gWfdDbs2gStaTest`.
 
+**NOTE:** This release comes with a built-in test runner, which replaces the separate `local_mobly_runner.py`.
+Please read the updated instructions in the README for the installation and execution steps.
+
 ## 2.4.2 (05/16/2025)
 
 ## Bug fixes

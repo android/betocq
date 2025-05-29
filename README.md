@@ -302,6 +302,36 @@ https://github.com/android/betocq/releases and save them in a local directory:
    - `cuj_and_test_config.yml`
    where `x.y.z` stands for the latest release version.
 
+#### Set up Python virtual environment and install test runner
+
+Create a new local Python virtual environment as follows.
+
+On Linux:
+```
+python3 -m venv venv
+source venv/bin/activate
+```
+
+On Windows:
+```
+python -m venv venv                                                                                                                                                                                               
+venv\Scripts\activate
+```
+
+If successful, you will see a `(venv)` at the beginning of your command prompt.
+
+Then, install the BeToCQ test runner, substituting in the correct `.whl` file.
+
+On Linux:
+```
+python3 -m pip install <betocq_x.y.z-py3-none-any.whl>
+```
+
+On Windows:
+```
+python -m pip install <betocq_x.y.z-py3-none-any.whl>
+```
+
 #### Configure Wi-Fi AP and test
 
 1. Modify the test config file `cuj_and_test_config.yml` as follows:
@@ -391,23 +421,7 @@ https://github.com/android/betocq/releases and save them in a local directory:
 
 ### Run the test
 
-To run the test, first the following installation commands from a local directory.
-
-On Linux:
-```
-python3 -m venv venv
-source venv/bin/activate
-python3 -m pip install <betocq_x.y.z-py3-none-any.whl>
-```
-
-On Windows:
-```
-python -m venv venv
-venv\Scripts\activate
-python -m pip install <betocq_x.y.z-py3-none-any.whl>
-```
-
-Once the test runner has been installed, execute BeToCQ with the following command:
+From the local `(venv)` with the BeToCQ installation, run the test with the following command:
 
 ```
 mobly_runner betocq_test_suite -tb Quickstart -i -c cuj_and_test_config.yml
