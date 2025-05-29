@@ -14,8 +14,8 @@
 
 """Define the Beto CQ test script version."""
 
-
-TEST_SCRIPT_VERSION = '2.4.1'
+import importlib.metadata
+TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 
 # VERSION_LOG (only add new description for new version, keep the history log)
 # '2.0.0': 'initial version'
@@ -26,3 +26,5 @@ TEST_SCRIPT_VERSION = '2.4.1'
 # '2.3.2': 'add TDLS/Aware device capability check.'
 # '2.4.0': 'add multi-payload test parameters and optimize multi-payload transfer tests.'
 # '2.4.1': 'add android auto test case.'
+# '2.4.2': 'fix wifi direct capability check issue.'
+# '2.5.0': 'refactor tests for improved readability; split 3 functional cases into 6.'
