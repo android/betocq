@@ -1,5 +1,21 @@
 # BetoCQ test suite release history
 
+## 2.5.0 (05/29/2025)
+
+## New
+* Refactor the test code structure to improve readability and maintainability, while keeping the test logic unchanged.
+* Split 3 functional test cases into 6 to make each test case more focused.
+
+Minor changes:
+* Move all device setup steps out from `NCBaseTestClass`.
+* For each BeToCQ suite, define a unique `suite_name` string
+* Set result message when a function test case is skipped.
+* Use `skip_if` instead of `abort_class_if` in function test class when device capability does not meet.
+* Add a flag `skip_default_flag_override`.
+* Migrate legacy Java statement switches to equivalent expression switches in Snippets
+* Adds some triaging tips for MCC test cases.
+* Remove the p2p frequency check in test case `Scc5gWfdDbs2gStaTest`.
+
 ## 2.4.2 (05/16/2025)
 
 ## Bug fixes
