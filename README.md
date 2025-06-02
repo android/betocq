@@ -298,9 +298,8 @@ Prepare the following materials to be used for the tests.
 
 Download the latest release test binary files from
 https://github.com/android/betocq/releases and save them in a local directory:
-   - `betocq_x.y.z-py3-none-any.whl`
+   - `betocq_x.y.z-py3-none-any.whl` where `x.y.z` stands for the latest release version
    - `cuj_and_test_config.yml`
-   where `x.y.z` stands for the latest release version.
 
 #### Set up Python virtual environment and install test runner
 
