@@ -1,6 +1,6 @@
 # BetoCQ test suite release history
 
-## 2.5.0 (05/29/2025)
+## 2.5.0 (06/24/2025)
 
 ## New
 * Refactor the test code structure to improve readability and maintainability, while keeping the test logic unchanged.
