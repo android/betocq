@@ -298,10 +298,38 @@ Prepare the following materials to be used for the tests.
 
 Download the latest release test binary files from
 https://github.com/android/betocq/releases and save them in a local directory:
-   - `betocq_x.y.z-py3-none-any.whl`
-   - `local_mobly_runner.py`
+   - `betocq_x.y.z-py3-none-any.whl` where `x.y.z` stands for the latest release version
    - `cuj_and_test_config.yml`
-   where `x.y.z` stands for the latest release version.
+
+#### Set up Python virtual environment and install test runner
+
+Create a new local Python virtual environment as follows.
+
+On Linux:
+```
+python3 -m venv venv
+source venv/bin/activate
+```
+
+On Windows:
+```
+python -m venv venv                                                                                                                                                                                               
+venv\Scripts\activate
+```
+
+If successful, you will see a `(venv)` at the beginning of your command prompt.
+
+Then, install the BeToCQ test runner, substituting in the correct `.whl` file.
+
+On Linux:
+```
+python3 -m pip install <betocq_x.y.z-py3-none-any.whl>
+```
+
+On Windows:
+```
+python -m pip install <betocq_x.y.z-py3-none-any.whl>
+```
 
 #### Configure Wi-Fi AP and test
 
@@ -392,16 +420,18 @@ https://github.com/android/betocq/releases and save them in a local directory:
 
 ### Run the test
 
-To run the test, run the following commands from the local directory 
-(substituting in the actual downloaded `.whl` test package for `--wheel`):
+From the local `(venv)` with the BeToCQ installation, run the test with the following command:
 
-  ```
-  python3 local_mobly_runner.py --wheel <betocq_x.y.z-py3-none-any.whl> --bin betocq_test_suite -tb Quickstart -i -c cuj_and_test_config.yml
-  ```
+```
+mobly_runner betocq_test_suite -tb Quickstart -i -c cuj_and_test_config.yml
+```
 
 Note that `Quickstart` is the CUJ test name and there are
 a few other supported CUJ tests listed in `cuj_and_test_config.yml`.
 
+**For users of [`results_uploader`](https://github.com/android/mobly-android-partner-tools)
+to share test results with Google, you may directly run the upload command in this same
+`(venv)`, without any extra installation required.
 
 ### Debugging test failures
 
