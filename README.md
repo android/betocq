@@ -430,8 +430,13 @@ Note that `Quickstart` is the CUJ test name and there are
 a few other supported CUJ tests listed in `cuj_and_test_config.yml`.
 
 **For users of [`results_uploader`](https://github.com/android/mobly-android-partner-tools)
-to share test results with Google, you may directly run the upload command in this same
-`(venv)`, without any extra installation required.
+to share test results with Google, you may configure the runner to automatically upload upon
+test completion.
+
+```
+# Upload test results upon run completion [optionally attach label if all tests pass]
+mobly_runner betocq_test_suite -tb Quickstart -i -c cuj_and_test_config.yml -u [--label_on_pass some-label]
+```
 
 ### Debugging test failures
 
