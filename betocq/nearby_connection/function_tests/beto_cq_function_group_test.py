@@ -29,7 +29,6 @@ import collections
 import datetime
 import logging
 import time
-from typing import Tuple
 
 from mobly import asserts
 from mobly import test_runner
@@ -75,7 +74,7 @@ _WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP = (
 
 def _get_wifi_ssid_password(
     test_parameters: nc_constants.TestParameters,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
   """Returns an available wifi SSID and password from test parameters."""
   if test_parameters.wifi_ssid:
     return (
