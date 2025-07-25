@@ -67,8 +67,12 @@ _COUNTRY_CODE = 'US'
 
 _THROUGHPUT_LOW_TIP = (
     'This is 5G WLAN test case. Check with the wifi chip vendor if TDLS is'
-    ' supported correctly. Also check if the AP has the firewall which could'
-    ' block the mDNS traffic.'
+    ' supported correctly.'
+    ' Check if CPU temperature is too high around the test time which results'
+    ' in low CPU performance and transfer speed as this test case requires CPU'
+    ' level encryption. Check if the standalone WLAN test case can pass when'
+    ' CPU temperature is not high. If it does pass, check CPU thermal'
+    ' performance with the CPU thermal engineer team.'
 )
 
 

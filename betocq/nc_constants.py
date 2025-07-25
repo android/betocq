@@ -375,6 +375,11 @@ COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
     ' 3) Check if other device can connect to the same AP\n'
     ' 4) Check the wifi connection related log on the device.\n'
     ' 5) Check if RSSI is too high and device is too close to the AP.\n'
+    ' 6) Check dumpsys > wifi > StaEventList in the bug report to confirm \n'
+    ' if L2 connection completes, if the STA is initially connected to AP and\n'
+    ' immediately disconnected from AP, check the firmware logs and sniffer\n'
+    ' logs with your engineering team. Check if L3 activities, for example,\n'
+    ' IP address allocation and internet validation, fail to complete.'
 )
 
 COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
