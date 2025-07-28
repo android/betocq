@@ -49,7 +49,7 @@ CHANNEL_5G = 36
 CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
-WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=1)
+WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=6)
 WIFI_AWARE_AVAILABLE_WAIT_TIME = datetime.timedelta(seconds=10)
 
 FIRST_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=30)

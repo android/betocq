@@ -241,9 +241,11 @@ def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
     # with other tasks. Wifi thread is optimized in V but not in old releases.
     # Therefore let's disable wifi so that these calls can be completed on time.
     ad.nearby.wifiDisable()
+  ad.log.info('Clear wifi configured networks')
   ad.nearby.wifiClearConfiguredNetworks()
   if was_wifi_enabled:
     ad.nearby.wifiEnable()
+  time.sleep(nc_constants.WIFI_DISCONNECTION_DELAY.total_seconds())
 
 
 def _grant_manage_external_storage_permission(
@@ -535,6 +537,21 @@ def _install_overrides(
       merge_with_existing_overrides=merge_with_existing_overrides,
   )
   restart_gms(ad)
+
+
+def clear_hermetic_overrides(
+    ad: android_device.AndroidDevice,
+) -> None:
+  """Clear hermetic overrides.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+  """
+  ad.adb.shell(
+      'rm -f'
+      ' /data/user_de/0/com.google.android.gms/app_phenotype_hermetic/overrides.txt'
+  )
+  ad.log.info('Clear hermetic flags override.')
 
 
 def get_target_sta_frequency_and_max_link_speed(

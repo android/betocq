@@ -44,6 +44,7 @@ def setup_android_device_for_nc_tests(
   for conf in snippet_confs:
     setup_utils.load_nearby_snippet(ad, conf)
   setup_utils.enable_logs(ad)
+  setup_utils.clear_hermetic_overrides(ad)
   if not skip_flag_override:
     setup_utils.set_flags(ad, debug_output_dir)
   setup_utils.set_country_code(ad, country_code)
