@@ -50,6 +50,7 @@ def setup_android_device_for_nc_tests(
   setup_utils.set_country_code(ad, country_code)
   setup_utils.toggle_airplane_mode(ad)
   ad.nearby.wifiEnable()
+  setup_utils.get_thermal_zone_data(ad)
 
 
 def connect_ad_to_wifi_sta(

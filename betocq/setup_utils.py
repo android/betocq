@@ -28,6 +28,8 @@ from betocq import nc_constants
 from betocq import resources
 
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
+    '//wireless/android/platform/testing/bettertogether/betocq:dct_on_overrides'
+)
 _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:wifi_direct_hotspot_off_overrides'
 _FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
 _GMS_PACKAGE = 'com.google.android.gms'
@@ -616,3 +618,47 @@ def wait_for_predicate(
     if interval is not None:
       time.sleep(interval.total_seconds())
   return False
+
+
+def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
+  """Reads and logs temperature and type from /sys/class/thermal/thermal_zone*.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+  """
+  if not ad.is_adb_root:
+    ad.log.info('Skipped getting thermal zone data on unrooted device.')
+    return
+  thermal_data = []
+  try:
+    thermal_zones = (
+        ad.adb.shell('ls /sys/class/thermal | grep thermal_zone')
+        .decode('utf-8')
+        .splitlines()
+    )
+  except adb.AdbError as e:
+    ad.log.error(f'Failed to list thermal zones: {e}')
+    return
+
+  for zone_name in thermal_zones:
+    zone_name = zone_name.strip()
+    zone_path = f'/sys/class/thermal/{zone_name}'
+    try:
+      zone_type = ad.adb.shell(f'cat {zone_path}/type').decode('utf-8').strip()
+      temp_str = ad.adb.shell(f'cat {zone_path}/temp').decode('utf-8').strip()
+      try:
+        temp = int(temp_str)
+        if temp > 0:
+          thermal_data.append((zone_type, temp_str))
+        else:
+          ad.log.debug(
+              f'Ignoring thermal zone {zone_path} with temp {temp_str} <= 0'
+          )
+      except ValueError:
+        ad.log.debug(
+            f"Failed to parse temperature '{temp_str}' from {zone_path}"
+        )
+    except adb.AdbError as e:
+      ad.log.debug(f'Failed to read thermal zone {zone_path}: {e}')
+      continue
+  ad.log.info(f'Thermal zone data: {thermal_data}')
