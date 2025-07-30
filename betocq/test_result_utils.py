@@ -692,23 +692,38 @@ class PerformanceTestResults:
 
   def is_test_class_passed(self) -> bool:
     """Returns True if test iteration success rate meets the target."""
-    return self._get_success_iteration_count() >= round(
-        self.test_iterations_expected * self.success_rate_target, 2
+    finished_iteration_count = len(self._results)
+    min_success_iterations_required = round(
+        finished_iteration_count * self.success_rate_target, 2
     )
+    actual_success_count = self._get_success_iteration_count()
+    logging.info(
+        'min_success_iterations_required: %s, actual_success_count: %s',
+        min_success_iterations_required,
+        actual_success_count,
+    )
+    return actual_success_count >= min_success_iterations_required
 
   def get_test_class_result_message(self) -> str:
     """Gets the test result message for the test class based on result enum."""
+    finished_iteration_count = len(self._results)
+    if finished_iteration_count == 0:
+      return 'FAIL: Test did not execute any iterations. Zero finished tests.'
     if self.is_test_class_passed():
       return 'PASS'
-
     success_rate = (
-        float(self._get_success_iteration_count())
-        / self.test_iterations_expected
+        float(self._get_success_iteration_count()) / finished_iteration_count
     )
     logging.info('success rate: %.2f', success_rate)
+    str_for_exit_early = ''
+    if finished_iteration_count < self.test_iterations_expected:
+      str_for_exit_early += (
+          'Note: Test exited early, not all iterations are executed.'
+      )
     return (
-        f'FAIL: low successe rate: {success_rate:.2%} is lower than the target'
-        f' {self.success_rate_target:.2%}'
+        f'FAIL: Low success rate: {success_rate:.2%} is'
+        f' lower than the target {self.success_rate_target:.2%}. '
+        f'{str_for_exit_early}'
     )
 
   def gen_test_summary(self) -> dict[str, Any]:
