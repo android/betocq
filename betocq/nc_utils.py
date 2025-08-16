@@ -98,6 +98,7 @@ def connect_ad_to_wifi_sta(
     test_result.set_active_nc_fail_reason(
         fail_reason, result_message=' '.join(result_messages)
     )
+    setup_utils.log_sta_event_list(ad)
     raise
 
   if is_discoverer:

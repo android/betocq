@@ -485,6 +485,54 @@ def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
     return nc_constants.INVALID_RSSI
 
 
+def log_sta_event_list(ad: android_device.AndroidDevice):
+  """Obtain the 'StaEventList' from dumpsys and place them in the logs."""
+  try:
+    # get the dumpsys output
+    dumpsys_output = ad.adb.shell('dumpsys wifi')
+
+    # processing
+    lines = dumpsys_output.splitlines()
+    sta_events = []
+    in_section = False
+
+    # retrieve the 'StaEventList' section from dumpsys output, ending
+    # the retrieval at the next label -'UserActionEvents'.
+    for line in lines:
+      decoded_line = line.decode('utf-8').strip()
+      if 'StaEventList' in decoded_line:
+        in_section = True
+        sta_events.append(decoded_line)
+      elif 'UserActionEvents' in decoded_line and in_section:
+        break
+      elif in_section:
+        sta_events.append(decoded_line)
+
+    line_count = len(sta_events)
+
+    # include in adb log the 'StaEventList' header found at the beginning of
+    # 'sta_events' and add the data lines from 'sta_events'(for longer logs -
+    # the return is 8 lines maximum counting from the end).
+    max_sta_events_to_log = 8
+    if line_count > 0:
+      start_index = 1
+      reminder = ''
+      if line_count > max_sta_events_to_log + 1:
+        start_index = line_count - max_sta_events_to_log  # show last lines
+        reminder = f' (last {max_sta_events_to_log} lines)'
+
+      ad.log.info('%s%s', sta_events[0], reminder)  # log the header
+      # log the data lines
+      for event in sta_events[start_index:line_count]:
+        ad.log.info('%s', event)
+    else:
+      ad.log.warning('Warning: No "StaEventList" was found in dumpsys wifi')
+
+  except adb.AdbError as e:
+    ad.log.info('Error in log_sta_event_list %s', e)
+    return
+
+
 def _overrides_file_for_target(target: str) -> str:
   """Returns the resource path for the given target."""
   key = target.replace('//', 'google3/').replace(':', '/') + '_generated.txt'
