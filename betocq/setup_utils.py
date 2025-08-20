@@ -481,7 +481,8 @@ def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
     if scan_result:
       return int(scan_result.split()[2].strip())
     return nc_constants.INVALID_RSSI
-  except adb.AdbError:
+  except (adb.AdbError, ValueError):
+    ad.log.warning('Failed to get wifi sta rssi')
     return nc_constants.INVALID_RSSI
 
 
