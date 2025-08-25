@@ -214,6 +214,7 @@ class NearbyMedium(enum.IntEnum):
   BLE_L2CAP_ONLY = 8
   # including WIFI_LAN, WIFI_HOTSPOT, WIFI_DIRECT or WIFI_AWARE
   UPGRADE_TO_ALL_WIFI = 9  # connect or upgrade to any wifi medium
+  USB = 10
 
 
 @enum.unique
@@ -242,6 +243,7 @@ def is_high_quality_medium(medium: NearbyMedium) -> bool:
       NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
       NearbyMedium.UPGRADE_TO_WIFIDIRECT,
       NearbyMedium.UPGRADE_TO_ALL_WIFI,
+      NearbyMedium.USB,
   }
 
 
@@ -499,6 +501,10 @@ MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS: dict[NearbyMedium, str] = {
         ' all WiFI mediums, check NearbyConnections logs to see if WFD, WLAN'
         ' and HOTSPOT mediums are tried and if the failure is on the target or'
         ' source side. Check directed test results to see which medium fails.'
+    ),
+    NearbyMedium.USB: (
+        ' USB NCM, check if the USB is connected and working correctly.\n'
+        f' {COMMON_WFD_UPGRADE_FAILURE_REASONS}'
     ),
 }
 

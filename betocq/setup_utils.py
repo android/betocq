@@ -30,6 +30,8 @@ from betocq import resources
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
     '//wireless/android/platform/testing/bettertogether/betocq:dct_on_overrides'
 )
+    '//wireless/android/platform/testing/bettertogether/betocq:dct_usb_on_overrides'
+)
 _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:wifi_direct_hotspot_off_overrides'
 _FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
 _GMS_PACKAGE = 'com.google.android.gms'
