@@ -33,7 +33,6 @@ def setup_android_device_for_nc_tests(
     ad: android_device.AndroidDevice,
     snippet_confs: Sequence[nc_constants.SnippetConfig],
     country_code: str,
-    debug_output_dir: str,
     skip_flag_override: bool = False,
     skip_forget_wifi_network: bool = False,
 ) -> None:
@@ -46,7 +45,7 @@ def setup_android_device_for_nc_tests(
   setup_utils.enable_logs(ad)
   setup_utils.clear_hermetic_overrides(ad)
   if not skip_flag_override:
-    setup_utils.set_flags(ad, debug_output_dir)
+    setup_utils.set_flags(ad, ad.log_path)
   setup_utils.set_country_code(ad, country_code)
   setup_utils.toggle_airplane_mode(ad)
   ad.nearby.wifiEnable()

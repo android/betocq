@@ -178,7 +178,6 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         ad,
         snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
         country_code=_COUNTRY_CODE,
-        debug_output_dir=self.current_test_info.output_path,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
