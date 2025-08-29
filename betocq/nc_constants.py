@@ -25,6 +25,8 @@ from mobly.controllers import android_device
 
 BETOCQ_NAME = 'BeToCQ'
 
+    'com.google.android.nearby.mobly.snippet.dct'
+)
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
@@ -78,8 +80,9 @@ MAX_PHY_RATE_PER_STREAM_N_20_MBPS = 72
 MCC_THROUGHPUT_MULTIPLIER = 0.25
 # MCC hotspot has lower throughput due to synchronization issue with STA.
 MCC_HOTSPOT_THROUGHPUT_MULTIPLIER = 0.2
-MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37
+MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37  # 866/8*0.37 = 40
 IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
+IPERF_TO_NC_THROUGHPUT_RATIO_DCT = 1
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
 WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
     15  # cap for WLAN medium due to encryption overhead

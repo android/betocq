@@ -166,6 +166,24 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
   )
 
 
+def assert_2g_wifi_throughput(
+    test_result: SingleTestResult,
+    nc_test_runtime: nc_constants.NcTestRuntime,
+    low_throughput_tip: str,
+):
+  """Checks the throughput for 2G WiFi medium."""
+  speed_target = _get_2g_wifi_throughput_benchmark(
+      test_result=test_result,
+      nc_test_runtime=nc_test_runtime,
+  )
+  logging.info('speed target: %s', speed_target)
+  assert_throughput(
+      test_result,
+      speed_target,
+      low_throughput_tip,
+  )
+
+
 def _get_2g_wifi_throughput_benchmark(
     test_result: SingleTestResult,
     nc_test_runtime: nc_constants.NcTestRuntime,
@@ -216,7 +234,7 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
     nc_test_runtime: nc_constants.NcTestRuntime,
     low_throughput_tip: str,
 ):
-  """Checks the throughput for 5G WFD medium and runs iperf test if needed."""
+  """Checks the throughput for 5G WiFi medium and runs iperf test if needed."""
   speed_target = _get_5g_wifi_throughput_benchmark(
       test_result=test_result,
       nc_test_runtime=nc_test_runtime,
@@ -230,9 +248,30 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
   )
 
 
+def assert_5g_wifi_throughput(
+    test_result: SingleTestResult,
+    nc_test_runtime: nc_constants.NcTestRuntime,
+    low_throughput_tip: str,
+    is_dct: bool = True,
+):
+  """Checks the throughput for 5G medium."""
+  speed_target = _get_5g_wifi_throughput_benchmark(
+      test_result=test_result,
+      nc_test_runtime=nc_test_runtime,
+      is_dct=is_dct,
+  )
+  logging.info('speed target: %s', speed_target)
+  assert_throughput(
+      test_result,
+      speed_target,
+      low_throughput_tip,
+  )
+
+
 def _get_5g_wifi_throughput_benchmark(
     test_result: SingleTestResult,
     nc_test_runtime: nc_constants.NcTestRuntime,
+    is_dct: bool = False,
 ):
   """Gets the throughput benchmark as MBps."""
   discoverer = nc_test_runtime.discoverer
@@ -299,11 +338,16 @@ def _get_5g_wifi_throughput_benchmark(
     min_throughput_mbyte_per_sec /= 2.0
 
   # Step 4. Calculate nc_min_throughput_mbyte_per_sec.
+  iperf_to_nc_throughput_ratio = (
+      nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO_DCT
+      if is_dct
+      else nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO
+  )
   nc_min_throughput_mbyte_per_sec = (
-      min_throughput_mbyte_per_sec * nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO
+      min_throughput_mbyte_per_sec * iperf_to_nc_throughput_ratio
   )
   # Limit NC min throughput due to encryption overhead
-  if is_wlan_medium:
+  if is_wlan_medium and not is_dct:
     nc_min_throughput_mbyte_per_sec = min(
         nc_min_throughput_mbyte_per_sec,
         nc_constants.WLAN_MEDIUM_THROUGHPUT_CAP_MBPS,
@@ -350,6 +394,29 @@ def _is_5g_ap_bandwidth_less_than_80mhz(
       test_result.max_sta_link_speed_mbps > 0,
       test_result.max_sta_link_speed_mbps < max_phy_rate_ac80,
   ])
+
+
+def assert_throughput(
+    test_result: SingleTestResult,
+    speed_target: nc_constants.SpeedTarget,
+    low_throughput_tip: str,
+):
+  """Checks the file transfer throughput."""
+  nc_speed_min_mbps = speed_target.nc_speed_mbtye_per_sec
+  nc_speed_mbps = round(test_result.file_transfer_throughput_kbps / 1024, 3)
+
+  if nc_speed_mbps >= nc_speed_min_mbps:
+    return
+
+  low_throughput_info = (
+      f'file speed {nc_speed_mbps} < target {nc_speed_min_mbps} MB/s'
+  )
+
+  test_result.set_active_nc_fail_reason(
+      nc_constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
+      result_message=f'{low_throughput_info}. {low_throughput_tip}',
+  )
+  asserts.fail(low_throughput_info)
 
 
 def assert_throughput_and_run_iperf_if_needed(
