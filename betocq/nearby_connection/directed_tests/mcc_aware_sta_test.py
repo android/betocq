@@ -15,7 +15,6 @@
 """Test for Aware MCC when STAs are connected to two 5G channels.
 
 In this case, Wi-Fi STA on 2 devices are connected to different 5G channels.
-should use the same channel.
 
 Test requirements:
   The device requirements:
