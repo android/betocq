@@ -40,10 +40,10 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 THROUGHPUT_TARGET = nc_constants.BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS

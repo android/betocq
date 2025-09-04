@@ -58,10 +58,10 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 TEST_ITERATION_NUM = nc_constants.SCC_PERFORMANCE_TEST_COUNT
@@ -143,15 +143,15 @@ class Scc5gAllWifiDbs2gStaTest(performance_test_base.PerformanceTestBase):
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
-    nc_utils.abort_if_2g_ap_not_ready(self.test_parameters)
+    setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
-    nc_utils.abort_if_device_cap_not_match(
+    setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
     )
-    nc_utils.abort_if_wifi_direct_not_supported(
+    setup_utils.abort_if_wifi_direct_not_supported(
         [self.discoverer, self.advertiser]
     )
-    nc_utils.abort_if_device_cap_not_match(
+    setup_utils.abort_if_device_cap_not_match(
         [self.advertiser], 'supports_dbs_sta_wfd', expected_value=True
     )
 

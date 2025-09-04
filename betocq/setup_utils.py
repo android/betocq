@@ -18,6 +18,7 @@ from collections.abc import Callable
 import datetime
 import time
 
+from mobly import asserts
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import apk_utils
@@ -713,3 +714,86 @@ def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
       ad.log.debug(f'Failed to read thermal zone {zone_path}: {e}')
       continue
   ad.log.info(f'Thermal zone data: {thermal_data}')
+
+
+def abort_if_2g_ap_not_ready(
+    test_parameters: nc_constants.TestParameters,
+) -> None:
+  """Aborts test class if 2G AP is not ready."""
+  asserts.abort_class_if(
+      not test_parameters.wifi_2g_ssid, '2G AP is not ready for this test.'
+  )
+
+
+def abort_if_5g_ap_not_ready(
+    test_parameters: nc_constants.TestParameters,
+) -> None:
+  """Aborts test class if 5G AP is not ready."""
+  asserts.abort_class_if(
+      not test_parameters.wifi_5g_ssid, '5G AP is not ready for this test.'
+  )
+
+
+def abort_if_dfs_5g_ap_not_ready(
+    test_parameters: nc_constants.TestParameters,
+) -> None:
+  """Aborts test class if DFS 5G AP is not ready."""
+  asserts.abort_class_if(
+      not test_parameters.wifi_dfs_5g_ssid,
+      '5G DFS AP is not ready for this test.',
+  )
+
+
+def abort_if_wifi_direct_not_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Aborts test class if any device does not support Wi-Fi Direct."""
+  for ad in ads:
+    asserts.abort_class_if(
+        not is_wifi_direct_supported(ad),
+        f'Wifi Direct is not supported on the device {ad}.',
+    )
+
+
+def abort_if_wifi_hotspot_not_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Aborts test class if any device does not support Wi-Fi Hotspot."""
+  for ad in ads:
+    # We are checking Wi-Fi Direct capability here because Wi-Fi Hotspot is
+    # implemented using Wi-Fi Direct in NC.
+    asserts.abort_class_if(
+        not is_wifi_direct_supported(ad),
+        f'Wifi Hotspot is not supported on the device {ad}.',
+    )
+
+
+def abort_if_wifi_aware_not_available(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Aborts test class if Wi-Fi Aware is not available in any device."""
+  for ad in ads:
+    # The utility function waits a small time. This is because Aware is not
+    # immediately available after enabling WiFi.
+    asserts.abort_class_if(
+        not wait_for_aware_available(ad),
+        f'Wifi Aware is not available in the device {ad}.',
+    )
+
+
+def abort_if_device_cap_not_match(
+    ads: list[android_device.AndroidDevice],
+    attribute_name: str,
+    expected_value: bool,
+) -> None:
+  """Aborts class if the device capability does not match the expected value."""
+  for ad in ads:
+    actual_value = getattr(ad, attribute_name)
+    asserts.abort_class_if(
+        actual_value != expected_value,
+        (
+            f'{ad}, "{attribute_name}" is'
+            f' {"enabled" if actual_value else "disabled"}, which does not'
+            ' match test case requirement.'
+        ),
+    )

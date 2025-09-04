@@ -38,9 +38,9 @@ from mobly.controllers import android_device
 
 from betocq import base_test
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 _COUNTRY_CODE = 'US'
