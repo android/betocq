@@ -344,7 +344,11 @@ def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
 
 def restart_gms(ad: android_device.AndroidDevice) -> None:
   """Restarts GMS on the given device."""
-  ad.log.info('Restart GMS.')
+  ad.log.info(
+      'Restart GMS. Note that the flag sync will NOT complete before Nearby'
+      ' connection. Please ensure the default flags are correct or you override'
+      ' in the test.'
+  )
   ad.adb.shell('am force-stop com.google.android.gms')
 
 
