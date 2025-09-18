@@ -570,6 +570,14 @@ def _summarize_transfer_quality_info(
     result: SingleTestResult,
 ) -> dict[str, str]:
   """Summarizes the transfer quality info during a single test iteration."""
+  upgrade_medium = result.quality_info.upgrade_medium
+  speed_mbps_fraction_bits = 3
+  if upgrade_medium in [
+      nc_constants.NearbyConnectionMedium.BLE,
+      nc_constants.NearbyConnectionMedium.BLE_L2CAP,
+      nc_constants.NearbyConnectionMedium.BLUETOOTH,
+  ]:
+    speed_mbps_fraction_bits = 1
   metrics = {
       'discovery_latency': _float_to_str(
           result.quality_info.discovery_latency.total_seconds(), 1
@@ -584,12 +592,12 @@ def _summarize_transfer_quality_info(
       'upgrade_medium': result.quality_info.get_medium_name(),
       'medium_frequency': str(result.quality_info.medium_frequency),
       'speed_mbps': _float_to_str(
-          result.file_transfer_throughput_kbps / 1024, 1
+          result.file_transfer_throughput_kbps / 1024, speed_mbps_fraction_bits
       ),
   }
   if result.iperf_throughput_kbps > 0:
     metrics['speed_mbps_iperf'] = _float_to_str(
-        result.iperf_throughput_kbps / 1024, 1
+        result.iperf_throughput_kbps / 1024, speed_mbps_fraction_bits
     )
   return metrics
 
