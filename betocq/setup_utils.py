@@ -46,6 +46,10 @@ ADB_RETRY_WAIT_TIME_SEC = 2
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
 
+WIFI_SCAN_WAIT_TIME_SEC = 5
+
+MAX_SSID_THRESHOLD = 10
+
 read_ph_flag_failed = False
 
 NEARBY_LOG_TAGS = [
@@ -251,6 +255,8 @@ def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   if was_wifi_enabled:
     ad.nearby.wifiEnable()
   time.sleep(nc_constants.WIFI_DISCONNECTION_DELAY.total_seconds())
+  # Check if the wifi environment is clean.
+  check_wifi_env(ad)
 
 
 def _grant_manage_external_storage_permission(
@@ -449,6 +455,47 @@ def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('WiFi Direct is not supported due to %s', e)
     return False
+
+
+def check_wifi_env(ad: android_device.AndroidDevice) -> None:
+  """Let WI-FI scan and get scan results. Check if the environment is clean.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+  """
+  # Initialize the number of SSIDs found in the wifi scan.
+  ad.wifi_env_ssid_count = 0
+  # Start wifi scan.
+  try:
+    ad.adb.shell('cmd wifi start-scan')
+    time.sleep(WIFI_SCAN_WAIT_TIME_SEC)
+  except adb.AdbError:
+    ad.log.warning('Failed to start wifi scan.')
+    return
+
+  # List scanned result.
+  try:
+    wifi_scan_results = (
+        ad.adb.shell('cmd wifi list-scan-results').decode('utf-8').strip()
+    )
+  except (adb.AdbError, ValueError):
+    ad.log.warning('Failed to retrieve wifi scan results.')
+    return
+
+  # Subtract 1st line of results(header line) to get actual number of SSIDs.
+  num_of_ssid = len(wifi_scan_results.splitlines()) - 1
+  # Check the number of results against the threshold.
+  if num_of_ssid > MAX_SSID_THRESHOLD:
+    ad.log.warning(
+        'Please clean up the Wi-Fi test environment: more than %d SSIDs found.',
+        MAX_SSID_THRESHOLD,
+    )
+  else:
+    ad.log.info('Wi-Fi test environment is clean.')
+
+  # Update the number of SSIDs found in the wifi scan.
+  ad.wifi_env_ssid_count = num_of_ssid
+  return
 
 
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:

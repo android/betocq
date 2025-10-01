@@ -663,6 +663,7 @@ class SingleTestResult:
   max_sta_link_speed_mbps: int = nc_constants.INVALID_INT
   start_time: datetime.datetime = datetime.datetime.now()
   end_time: datetime.datetime | None = None
+  wifi_env_ssid_count: int = 0
 
   def __post_init__(self):
     self.start_time = datetime.datetime.now()
@@ -830,6 +831,7 @@ class PerformanceTestResults:
         ),
         'wifi_upgrade_stats': self._summary_upgraded_wifi_transfer_mediums(),
         'prior_bt_connection_stats': self._get_prior_bt_connection_stats(),
+        'wifi_ap_number': self._get_wifi_ap_number_results(),
     })
     test_summary_with_index = {}
     for index, (k, v) in enumerate(test_summary.items()):
@@ -1000,6 +1002,18 @@ class PerformanceTestResults:
         f'connection_latency_med: {connection_latency_stats.median_val:.2f}',
         f'connection_latency_max: {connection_latency_stats.max_val:.2f}',
     ])
+
+  def _get_wifi_ap_number_results(self) -> str:
+    """Gets the wifi test environment ap number results for all iterations."""
+    wifi_env_results = []
+    for i, result in enumerate(self._results):
+      if result.wifi_env_ssid_count:
+        wifi_env_results.append(
+            f'Test_iteration_{i}: {result.wifi_env_ssid_count}'
+        )
+      else:
+        wifi_env_results.append(f'Test_iteration_{i}: Not Found')
+    return '\n'.join(wifi_env_results)
 
   def _get_latency_stats(
       self, latency_indicators: list[datetime.timedelta]
