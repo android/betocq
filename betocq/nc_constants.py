@@ -27,6 +27,8 @@ BETOCQ_NAME = 'BeToCQ'
 
     'com.google.android.nearby.mobly.snippet.dct'
 )
+    'com.google.android.nearby.mobly.snippet.dct.second'
+)
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
