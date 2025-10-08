@@ -132,28 +132,41 @@ class BaseTestClass(base_test.BaseTestClass):
         'wifi_chipset is empty in the config file',
     )
 
+  def _get_snippet_apk_path(self, snippet_name: str) -> str:
+    """Gets the APK path for the given snippet name from user params.
+
+    Args:
+      snippet_name: The snippet name used to find the snippet
+      APK in user_params (e.g., 'nearby_snippet').
+
+    Returns:
+      The path to the snippet APK.
+
+    Raises:
+      ValueError: If the snippet APK is not configured correctly.
+    """
+    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
+    apk_paths = self.user_params.get(file_tag, {}).get(snippet_name, [''])
+    if not apk_paths or not apk_paths[0]:
+      raise ValueError(f'{snippet_name} is not configured correctly.')
+    return apk_paths[0]
+
   @property
   def nearby_snippet_config(self) -> nc_constants.SnippetConfig:
     """Snippet config for loading the first nearby snippet instance."""
-    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
-    apk_path = self.user_params.get(file_tag, {}).get('nearby_snippet', [''])[0]
     return nc_constants.SnippetConfig(
         snippet_name='nearby',
         package_name=nc_constants.NEARBY_SNIPPET_PACKAGE_NAME,
-        apk_path=apk_path,
+        apk_path=self._get_snippet_apk_path('nearby_snippet'),
     )
 
   @property
   def nearby2_snippet_config(self) -> nc_constants.SnippetConfig:
     """Snippet config for loading the second nearby snippet instance."""
-    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
-    apk_path = self.user_params.get(file_tag, {}).get('nearby_snippet_2', [''])[
-        0
-    ]
     return nc_constants.SnippetConfig(
         snippet_name='nearby2',
         package_name=nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
-        apk_path=apk_path,
+        apk_path=self._get_snippet_apk_path('nearby_snippet_2'),
     )
 
   def setup_wifi_env(
