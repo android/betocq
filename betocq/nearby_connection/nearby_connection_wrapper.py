@@ -490,9 +490,6 @@ class NearbyConnectionWrapper:
       return event.data['endpointId'] == self._discoverer_endpoint_id
 
     transfer_time_s = 0
-    tx_ids = []
-    rx_ids_payload_received = []
-    rx_ids_transfer_update = []
     for _ in range(num_files):
       # Ensure the order of payload transfer events are the same on both sides.
 
@@ -517,26 +514,13 @@ class NearbyConnectionWrapper:
       tx_id = tx_transfer_event.data['update']['payloadId']
       rx_id_payload_received = rx_received_event.data['payload']['id']
       rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
-      tx_ids.append(tx_id)
-      rx_ids_payload_received.append(rx_id_payload_received)
-      rx_ids_transfer_update.append(rx_id_transfer_update)
-
+      if payload_type == nc_constants.PayloadType.FILE:
+        asserts.assert_equal(tx_id, rx_id_payload_received)
+        asserts.assert_equal(tx_id, rx_id_transfer_update)
       if tx_id == last_payload_id:
         transfer_time_s = datetime.timedelta(
             microseconds=tx_transfer_event.data['transferTimeNs'] / 1_000
         ).total_seconds()
-
-    if payload_type == nc_constants.PayloadType.FILE:
-      asserts.assert_equal(
-          tx_ids,
-          rx_ids_payload_received,
-          'rx_id in payload received event should match tx_id',
-      )
-      asserts.assert_equal(
-          tx_ids,
-          rx_ids_transfer_update,
-          'rx_id in transfer update should match tx_id',
-      )
 
     asserts.assert_true(transfer_time_s > 0, 'Transfer time is 0')
     return round(file_size_kb * num_files / transfer_time_s)
