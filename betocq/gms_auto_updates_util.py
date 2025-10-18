@@ -46,6 +46,58 @@ _ENABLE_GSERVICES_CMD_TEMPLATE = [
     ),
 ]
 
+_ENABLE_GMS_CORE_CHECKINS_AND_UPDATES = [
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags Chimera__config_checkin_enabled --esa values true '
+        '--esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags "Chimera__disable_config_checkin_for_tests" '
+        '--esa values false --esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular --es SelfUpdate__do_not_schedule true'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular '
+        '--es AutoUpdateCodegen__gms_auto_update_enabled true'
+    )
+]
+
+_DISABLE_GMS_CORE_CHECKINS_AND_UPDATES = [
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags Chimera__config_checkin_enabled --esa values false '
+        '--esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags "Chimera__disable_config_checkin_for_tests" '
+        '--esa values true --esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular --es SelfUpdate__do_not_schedule false'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular '
+        '--es AutoUpdateCodegen__gms_auto_update_enabled false'
+    )
+]
+
 
 class GmsAutoUpdatesUtil:
   """class to enable/disable GMS auto updates."""
@@ -75,6 +127,17 @@ class GmsAutoUpdatesUtil:
             _FINSKY_CONFIG_VALUE_DISABLE, _VENDING_CONFIG_VALUE_DISABLE
         )
     self._configure_gservice_updates(enable_updates)
+    self._configure_gms_core_checkins_and_updates(enable_updates)
+
+  def _configure_gms_core_checkins_and_updates(
+      self, enable_updates: bool
+  ) -> None:
+    if enable_updates:
+      for cmd in _ENABLE_GMS_CORE_CHECKINS_AND_UPDATES:
+        self._device.adb.shell(cmd)
+    else:
+      for cmd in _DISABLE_GMS_CORE_CHECKINS_AND_UPDATES:
+        self._device.adb.shell(cmd)
 
   def _configure_gservice_updates(self, enable_updates: bool) -> None:
     """Overwites Gservice to enable/disable updates."""
