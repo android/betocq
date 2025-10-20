@@ -36,6 +36,7 @@ def setup_android_device_for_nc_tests(
     skip_forget_wifi_network: bool = False,
 ) -> None:
   """Performs general Android device setup steps for NC tests."""
+  setup_utils.enable_location_on_device(ad)
   if not skip_forget_wifi_network:
     android_wifi_utils.forget_all_wifi(ad)
   setup_utils.disable_gms_auto_updates(ad)

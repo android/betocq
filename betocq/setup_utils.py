@@ -382,6 +382,17 @@ def enable_gms_auto_updates(ad: android_device.AndroidDevice) -> None:
   time.sleep(_DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC)
 
 
+def enable_location_on_device(ad: android_device.AndroidDevice) -> None:
+  """Enable location on the given device."""
+  try:
+    ad.adb.shell('cmd location set-location-enabled true')
+  except adb.AdbError:
+    ad.log.exception(
+        'Failed to enable location on the device. Make sure'
+        ' location is enabled in the settings.'
+    )
+
+
 def get_wifi_sta_frequency(ad: android_device.AndroidDevice) -> int:
   """Get wifi STA frequency on the given device."""
   wifi_sta_status = dump_wifi_sta_status(ad)
