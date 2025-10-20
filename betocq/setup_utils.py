@@ -127,6 +127,9 @@ def _do_set_country_code(
 def enable_logs(ad: android_device.AndroidDevice) -> None:
   """Enables Nearby, WiFi and BT detailed logs."""
   ad.log.info('Enable Nearby loggings.')
+  # Increase log buffer size to 8M.
+  ad.adb.shell('setprop persist.logd.size 8388608')
+
   for tag in NEARBY_LOG_TAGS:
     ad.adb.shell(f'setprop log.tag.{tag} VERBOSE')
 
@@ -134,13 +137,13 @@ def enable_logs(ad: android_device.AndroidDevice) -> None:
   ad.adb.shell('cmd wifi set-verbose-logging enabled')
 
   # Enable Bluetooth HCI logs.
-  if not ad.is_adb_root:
+  if ad.is_adb_root:
+    ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
+  else:
     ad.log.info(
         'Skipped setting Bluetooth HCI logs on device,'
         'because we do not set Bluetooth HCI logs on unrooted phone.'
     )
-    return
-  ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
 
   # Enable Bluetooth verbose logs.
   ad.adb.shell('setprop persist.log.tag.bluetooth VERBOSE')
