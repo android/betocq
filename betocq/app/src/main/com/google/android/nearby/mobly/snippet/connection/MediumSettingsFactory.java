@@ -33,7 +33,6 @@ import com.google.android.gms.nearby.connection.Strategy;
 import java.util.stream.IntStream;
 
 /** A factory to create advertising/discovery/connection medium options for Nearby connections. */
-@SuppressWarnings("AndroidJdkLibsChecker")
 public final class MediumSettingsFactory {
   private static final int AUTO = 0;
 
@@ -135,8 +134,6 @@ public final class MediumSettingsFactory {
     return builder.build();
   }
 
-
-
   public static DiscoveryOptions getDiscoveryMediumOptions(int discoveryMedium) {
     boolean forwardUnrecognizedBluetoothDevices = false;
     boolean lowPower = false;
@@ -169,9 +166,11 @@ public final class MediumSettingsFactory {
     return builder.build();
   }
 
-
   public static ConnectionOptions getConnectionMediumOptions(
-      int connectionMedium, int upgradeMedium, int mediumUpgradeType, int keepAliveTimeoutMillis,
+      int connectionMedium,
+      int upgradeMedium,
+      int mediumUpgradeType,
+      int keepAliveTimeoutMillis,
       int keepAliveIntervalMillis) {
     IntStream connectionMediums = IntStream.empty();
     IntStream upgradeMediums = IntStream.empty();
