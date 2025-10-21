@@ -486,37 +486,61 @@ class NearbyConnectionWrapper:
         'No nearby connection is set up, discoverer payload cb is none.',
     )
 
-    def on_receive(event: callback_event.CallbackEvent) -> bool:
+    def on_advertiser_receive(event: callback_event.CallbackEvent) -> bool:
       return event.data['endpointId'] == self._discoverer_endpoint_id
+    def on_discoverer_receive(event: callback_event.CallbackEvent) -> bool:
+      return event.data['endpointId'] == self._advertiser_endpoint_id
 
     transfer_time_s = 0
     for _ in range(num_files):
-      # Ensure the order of payload transfer events are the same on both sides.
-
-      rx_received_event = self._advertiser_payload_callback.waitForEvent(
-          'onPayloadReceived',
-          predicate=on_receive,
+      # NC guarantees the order of payload transfer events are the same on both
+      # sides.
+      # Use this order to wait for events as the tx, rx transfer update event
+      # may got failure and it can terminate early to avoid the timeout.
+      tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
+          'onPayloadTransferUpdate',
+          predicate=on_discoverer_receive,
           timeout=timeout.total_seconds(),
+      )
+      asserts.assert_true(
+          tx_transfer_event.data['update']['isSuccess'],
+          'file transfer failure reported on the source side for payload id:'
+          f' {tx_transfer_event.data["update"]["payloadId"]}',
       )
 
       rx_transfer_event = self._advertiser_payload_callback.waitForEvent(
           'onPayloadTransferUpdate',
-          predicate=lambda event: event.data['update']['isSuccess'],
+          predicate=on_advertiser_receive,
           timeout=timeout.total_seconds(),
       )
+      asserts.assert_true(
+          rx_transfer_event.data['update']['isSuccess'],
+          'file transfer failure reported on the target side for payload id:'
+          f' {rx_transfer_event.data["update"]["payloadId"]}',
+      )
 
-      tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
-          'onPayloadTransferUpdate',
-          predicate=lambda event: event.data['update']['isSuccess'],
-          # and event.data['update']['payloadId'] == last_payload_id,
+      rx_received_event = self._advertiser_payload_callback.waitForEvent(
+          'onPayloadReceived',
+          predicate=on_advertiser_receive,
           timeout=timeout.total_seconds(),
       )
       tx_id = tx_transfer_event.data['update']['payloadId']
       rx_id_payload_received = rx_received_event.data['payload']['id']
       rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
       if payload_type == nc_constants.PayloadType.FILE:
-        asserts.assert_equal(tx_id, rx_id_payload_received)
-        asserts.assert_equal(tx_id, rx_id_transfer_update)
+        asserts.assert_equal(
+            tx_id,
+            rx_id_payload_received,
+            f'payload id mismatch between sent - {tx_id} and '
+            f'received 1st time - {rx_id_payload_received}',
+        )
+        asserts.assert_equal(
+            tx_id,
+            rx_id_transfer_update,
+            f'payload id mismatch between sent - {tx_id} and '
+            f'received completely - {rx_id_transfer_update}',
+            )
+
       if tx_id == last_payload_id:
         transfer_time_s = datetime.timedelta(
             microseconds=tx_transfer_event.data['transferTimeNs'] / 1_000
