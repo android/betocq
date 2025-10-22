@@ -277,6 +277,8 @@ class WifiD2DType(enum.IntEnum):
   # Connect to 2G STA and allows upgrading to all WiFi mediums.
   ANY_WFD_2G_STA = 10
   LOCAL_ONLY_HOTSPOT = 11
+  # Connected to the same 2G STA and upgrading to 5G Aware.
+  SCC_5G_AWARE_DBS_2G_STA = 12
 
 
 def is_upgrading_to_wifi_of_any_freq(d2d_type: WifiD2DType) -> bool:
@@ -308,6 +310,7 @@ _WIFI_D2D_TYPES_2G_STA = (
     WifiD2DType.SCC_5G_WFD_DBS_2G_STA,
     WifiD2DType.MCC_5G_WFD_2G_STA,
     WifiD2DType.ANY_WFD_2G_STA,
+    WifiD2DType.SCC_5G_AWARE_DBS_2G_STA,
 )
 
 
