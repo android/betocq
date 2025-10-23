@@ -164,6 +164,7 @@ class TestParameters:
   run_aware_test: bool = False
   run_ble_performance_test: bool = False
   requires_bt_multiplex: bool = False
+  allow_unrooted_device: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':

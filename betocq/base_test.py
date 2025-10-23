@@ -123,10 +123,12 @@ class BaseTestClass(base_test.BaseTestClass):
     self._assert_general_nc_test_conditions()
 
   def _assert_general_nc_test_conditions(self):
-    asserts.abort_all_if(
-        not self.advertiser.is_adb_root or not self.discoverer.is_adb_root,
-        'The test only can run on rooted device.',
-    )
+    if not self.test_parameters.allow_unrooted_device:
+      logging.info('The test is not allowed to run on unrooted device.')
+      asserts.abort_all_if(
+          not self.advertiser.is_adb_root or not self.discoverer.is_adb_root,
+          'The test only can run on rooted device.',
+      )
     asserts.abort_all_if(
         not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset,
         'wifi_chipset is empty in the config file',

@@ -80,6 +80,12 @@ def set_country_code(
     country_code: WiFi and Telephony Country Code.
     force_telephony_cc: True to force Telephony Country Code.
   """
+  if not ad.is_adb_root:
+    ad.log.info(
+        f'Skipped setting wifi country code on device "{ad.serial}" '
+        'because we do not set country code on unrooted phone.'
+    )
+    return
   try:
     _do_set_country_code(ad, country_code, force_telephony_cc)
   except adb.AdbError:
@@ -96,13 +102,6 @@ def _do_set_country_code(
     force_telephony_cc: bool = False,
 ) -> None:
   """Sets Wi-Fi and Telephony country code."""
-  if not ad.is_adb_root:
-    ad.log.info(
-        f'Skipped setting wifi country code on device "{ad.serial}" '
-        'because we do not set country code on unrooted phone.'
-    )
-    return
-
   ad.log.info(f'Set Wi-Fi country code to {country_code}.')
   ad.adb.shell('cmd wifi set-wifi-enabled disabled')
   time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
@@ -127,8 +126,14 @@ def _do_set_country_code(
 def enable_logs(ad: android_device.AndroidDevice) -> None:
   """Enables Nearby, WiFi and BT detailed logs."""
   ad.log.info('Enable Nearby loggings.')
-  # Increase log buffer size to 8M.
-  ad.adb.shell('setprop persist.logd.size 8388608')
+  if ad.is_adb_root:
+  # Increase log buffer size.
+    ad.adb.shell('setprop persist.logd.size 8388608')  # 8M
+  else:
+    try:
+      ad.adb.shell('logcat -G 5242880')  # 5M
+    except adb.AdbError:
+      ad.log.info('Failed to increase log buffer size on device.')
 
   for tag in NEARBY_LOG_TAGS:
     ad.adb.shell(f'setprop log.tag.{tag} VERBOSE')
@@ -242,9 +247,6 @@ def connect_to_wifi(
 
 def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   """Removes and disconnects all wifi network on the given device."""
-  if not ad.is_adb_root:
-    ad.log.info("Can't clear wifi network in non-rooted device")
-    return
   was_wifi_enabled = ad.nearby.wifiIsEnabled()
   if was_wifi_enabled:
     # wifiClearConfiguredNetworks() calls getConfiguredNetworks() and
@@ -645,6 +647,10 @@ def _install_overrides(
     merge_with_existing_overrides: bool,
 ):
   """Installs overrides on the given device."""
+  if not ad.is_adb_root:
+    ad.log.info('Skipped installing hermetic overrides on unrooted device.')
+    return
+
   template_content = _get_resource_contents(_FLAG_SETUP_TEMPLATE_KEY)
   ad.log.info('Installing hermetic overrides from %s', target)
   hermetic_overrides_partner.install_hermetic_overrides(
@@ -666,6 +672,10 @@ def clear_hermetic_overrides(
   Args:
     ad: AndroidDevice, Mobly Android Device.
   """
+  if not ad.is_adb_root:
+    ad.log.info('Skipped clearing hermetic overrides on unrooted device.')
+    return
+
   ad.adb.shell(
       'rm -f'
       ' /data/user_de/0/com.google.android.gms/app_phenotype_hermetic/overrides.txt'
@@ -779,6 +789,19 @@ def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
       ad.log.debug(f'Failed to read thermal zone {zone_path}: {e}')
       continue
   ad.log.info(f'Thermal zone data: {thermal_data}')
+
+
+def abort_if_on_unrooted_device(
+    ads: list[android_device.AndroidDevice],
+    reason: str,
+) -> None:
+  """Aborts test class if any device is not rooted."""
+  failed_messages = f'skipping the test on unrooted devices. due to {reason}'
+  for ad in ads:
+    asserts.abort_class_if(
+        not ad.is_adb_root,
+        failed_messages,
+    )
 
 
 def abort_if_2g_ap_not_ready(
