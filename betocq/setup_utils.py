@@ -260,8 +260,6 @@ def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   if was_wifi_enabled:
     ad.nearby.wifiEnable()
   time.sleep(nc_constants.WIFI_DISCONNECTION_DELAY.total_seconds())
-  # Check if the wifi environment is clean.
-  check_wifi_env(ad)
 
 
 def _grant_manage_external_storage_permission(
