@@ -126,7 +126,10 @@ class Scc5gWfdDbs2gStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
-    self._assert_test_conditions()
+    # Check device capabilities.
+    setup_utils.abort_if_wifi_direct_not_supported(
+        [self.discoverer, self.advertiser]
+    )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
@@ -144,9 +147,6 @@ class Scc5gWfdDbs2gStaTest(performance_test_base.PerformanceTestBase):
     # Check device capabilities.
     setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
-    setup_utils.abort_if_wifi_direct_not_supported(
-        [self.discoverer, self.advertiser]
     )
     setup_utils.abort_if_device_cap_not_match(
         [self.advertiser], 'supports_dbs_sta_wfd', expected_value=True

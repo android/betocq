@@ -82,9 +82,6 @@ class BaseTestClass(base_test.BaseTestClass):
     # Skip the device clean up steps if the test class is skipped.
     self.__skipped_test_class = True
 
-  def _get_skipped_test_class_reason(self) -> str | None:
-    return None
-
   def setup_class(self) -> None:
     self.ads = self.register_controller(android_device, min_number=2)
     for ad in self.ads:
@@ -121,6 +118,8 @@ class BaseTestClass(base_test.BaseTestClass):
     )
 
     self._assert_general_nc_test_conditions()
+    self._assert_test_conditions()
+    self.__skipped_test_class = False
 
   def _assert_general_nc_test_conditions(self):
     if not self.test_parameters.allow_unrooted_device:
@@ -133,6 +132,9 @@ class BaseTestClass(base_test.BaseTestClass):
         not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset,
         'wifi_chipset is empty in the config file',
     )
+
+  def _assert_test_conditions(self) -> None:
+    """Asserts the test conditions for all devices."""
 
   def _get_snippet_apk_path(self, snippet_name: str) -> str:
     """Gets the APK path for the given snippet name from user params.
@@ -224,7 +226,6 @@ class BaseTestClass(base_test.BaseTestClass):
     )
 
   def setup_test(self):
-    self.__skipped_test_class = False
     self.record_data({
         'Test Name': self.current_test_info.name,
         'properties': {

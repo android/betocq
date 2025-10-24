@@ -806,6 +806,8 @@ def abort_if_2g_ap_not_ready(
     test_parameters: nc_constants.TestParameters,
 ) -> None:
   """Aborts test class if 2G AP is not ready."""
+  if test_parameters.use_programmable_ap:
+    return
   asserts.abort_class_if(
       not test_parameters.wifi_2g_ssid, '2G AP is not ready for this test.'
   )
@@ -815,6 +817,8 @@ def abort_if_5g_ap_not_ready(
     test_parameters: nc_constants.TestParameters,
 ) -> None:
   """Aborts test class if 5G AP is not ready."""
+  if test_parameters.use_programmable_ap:
+    return
   asserts.abort_class_if(
       not test_parameters.wifi_5g_ssid, '5G AP is not ready for this test.'
   )
@@ -824,6 +828,8 @@ def abort_if_dfs_5g_ap_not_ready(
     test_parameters: nc_constants.TestParameters,
 ) -> None:
   """Aborts test class if DFS 5G AP is not ready."""
+  if test_parameters.use_programmable_ap:
+    return
   asserts.abort_class_if(
       not test_parameters.wifi_dfs_5g_ssid,
       '5G DFS AP is not ready for this test.',

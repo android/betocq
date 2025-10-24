@@ -118,7 +118,10 @@ class Scc2gWfdStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
-    self._assert_test_conditions()
+    # Check device capabilities.
+    setup_utils.abort_if_wifi_direct_not_supported(
+        [self.discoverer, self.advertiser]
+    )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
@@ -133,10 +136,6 @@ class Scc2gWfdStaTest(performance_test_base.PerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
-    # Check device capabilities.
-    setup_utils.abort_if_wifi_direct_not_supported(
-        [self.discoverer, self.advertiser]
-    )
 
   def setup_test(self):
     super().setup_test()

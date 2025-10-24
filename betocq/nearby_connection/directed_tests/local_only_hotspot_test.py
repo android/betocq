@@ -110,8 +110,6 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
         self.advertiser, self.current_test_info.output_path
     )
 
-    self._assert_test_conditions()
-
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     nc_utils.setup_android_device_for_nc_tests(
         ad,
