@@ -16,8 +16,6 @@
 
 package com.google.android.nearby.mobly.snippet.connection;
 
-import static java.util.concurrent.TimeUnit.NANOSECONDS;
-
 import android.content.Context;
 import android.os.Bundle;
 import android.util.LongSparseArray;
@@ -107,34 +105,17 @@ public class PayloadEvents extends PayloadCallback {
     Bundle eventData = snippetEvent.getData();
     eventData.putString("endpointId", endpointId);
     long payloadId = update.getPayloadId();
+    IncomingStreamData incomingStreamData = incomingStreamDataByPayloadId.get(payloadId);
 
-    if (receivedPayloadType == Payload.Type.STREAM
-        && incomingStreamDataByPayloadId.get(payloadId) == null) {
+    if (receivedPayloadType == Payload.Type.STREAM && incomingStreamData == null) {
       // Most likely incoming different type payloads or outgoing payloads. Nothing to do.
       return;
     }
 
     int status = update.getStatus();
-    if (status == Status.SUCCESS) {
-      if (transferStopwatch.isRunning()) {
-        eventData.putLong("transferTimeNs", transferStopwatch.elapsed(NANOSECONDS));
-      }
-      // Remove the received file through URI to avoid access limitation due to
-      // scoped storage enforcement on Android 11. File location is /sdcard/Download/.nearby/...
-      // The read/write access to the payload URI already granted by
-      // ClientProxy inside Nearby Connection.
-      if (receivedPayload != null && receivedPayload.asFile() != null) {
-        context
-            .getContentResolver()
-            .delete(
-                Objects.requireNonNull(receivedPayload.asFile()).asUri(),
-                null /* where */,
-                null /* selectionArgs */);
-      }
-    } else if (status == Status.IN_PROGRESS) {
+    if (status == Status.IN_PROGRESS) {
       if (receivedPayloadType == Payload.Type.STREAM) {
         try {
-          IncomingStreamData incomingStreamData = incomingStreamDataByPayloadId.get(payloadId);
           long newBytes = update.getBytesTransferred() - incomingStreamData.receivedBytes;
           byte[] bytes = new byte[(int) newBytes];
           int bytesRead = incomingStreamData.inputStream.read(bytes);
@@ -154,6 +135,33 @@ public class PayloadEvents extends PayloadCallback {
         }
       }
       return;
+    }
+
+    // Terminal state: SUCCESS, FAILURE, or CANCELLED.
+    if (transferStopwatch.isRunning()) {
+      eventData.putLong("transferTimeNs", transferStopwatch.elapsed().toNanos());
+    }
+    // Remove the received file through URI to avoid access limitation due to
+    // scoped storage enforcement on Android 11. File location is /sdcard/Download/.nearby/...
+    // The read/write access to the payload URI already granted by
+    // ClientProxy inside Nearby Connection.
+    if (receivedPayload != null && receivedPayload.asFile() != null) {
+      context
+          .getContentResolver()
+          .delete(
+              Objects.requireNonNull(receivedPayload.asFile()).asUri(),
+              null /* where */,
+              null /* selectionArgs */);
+    }
+
+    if (receivedPayloadType == Payload.Type.STREAM && incomingStreamData != null) {
+      try {
+        incomingStreamData.inputStream.close();
+      } catch (IOException e) {
+        Log.e("Failed to close input stream for payload " + payloadId, e);
+      } finally {
+        incomingStreamDataByPayloadId.remove(payloadId);
+      }
     }
 
     Log.d("PayloadTransferUpdate ID:" + payloadId);
