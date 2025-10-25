@@ -37,7 +37,9 @@ public class PayloadEvents extends PayloadCallback {
   private final Context context;
   private final String callbackId;
   private final Stopwatch transferStopwatch;
-  private final LongSparseArray<Payload> incomingPayloadsById = new LongSparseArray<>();
+  private Payload receivedPayload;
+  private int receivedPayloadType;
+  private long lastTxPayloadId = -1;
   private final LongSparseArray<IncomingStreamData> incomingStreamDataByPayloadId =
       new LongSparseArray<>();
 
@@ -62,6 +64,10 @@ public class PayloadEvents extends PayloadCallback {
     }
   }
 
+  public void setLastTxPayloadId(long lastPayloadId) {
+    lastTxPayloadId = lastPayloadId;
+  }
+
   private String getPayloadType(Payload payload) {
     return switch (payload.getType()) {
       case Payload.Type.BYTES -> "BYTES";
@@ -73,13 +79,14 @@ public class PayloadEvents extends PayloadCallback {
 
   @Override
   public void onPayloadReceived(String endpointId, Payload payload) {
-    incomingPayloadsById.put(payload.getId(), payload);
+    receivedPayload = payload;
+    receivedPayloadType = payload.getType();
     SnippetEvent snippetEvent = new SnippetEvent(callbackId, "onPayloadReceived");
     Bundle eventData = snippetEvent.getData();
     eventData.putString("endpointId", endpointId);
 
     Log.d("PayloadReceived type:" + getPayloadType(payload) + " id:" + payload.getId());
-    if (payload.getType() == Payload.Type.STREAM) {
+    if (receivedPayloadType == Payload.Type.STREAM) {
       incomingStreamDataByPayloadId.put(
           payload.getId(), new IncomingStreamData(payload.asStream().asInputStream()));
     }
@@ -98,74 +105,63 @@ public class PayloadEvents extends PayloadCallback {
     Bundle eventData = snippetEvent.getData();
     eventData.putString("endpointId", endpointId);
     long payloadId = update.getPayloadId();
+    IncomingStreamData incomingStreamData = incomingStreamDataByPayloadId.get(payloadId);
 
-    Payload incomingPayload = incomingPayloadsById.get(payloadId);
-    if (incomingPayload != null) {
-      IncomingStreamData incomingStreamData = incomingStreamDataByPayloadId.get(payloadId);
-      if (incomingPayload.getType() == Payload.Type.STREAM && incomingStreamData == null) {
-        // Most likely incoming different type payloads or outgoing payloads. Nothing to do.
-        return;
-      }
-
-      if (update.getStatus() == Status.IN_PROGRESS) {
-        if (incomingPayload.getType() == Payload.Type.STREAM) {
-          try {
-            long newBytes = update.getBytesTransferred() - incomingStreamData.receivedBytes;
-            byte[] bytes = new byte[(int) newBytes];
-            int bytesRead = incomingStreamData.inputStream.read(bytes);
-            if (bytesRead != newBytes) {
-              // TODO: Fix the stream consumption logic to ensure that we read the expected
-              // number of bytes, either once we reach the end of the stream or by using a loop on a
-              // consumer thread. For now, we just log the issue for debugging purposes.
-              Log.d(
-                  "PayloadTransferUpdate expected "
-                      + newBytes
-                      + " bytes from incoming stream but got "
-                      + bytesRead
-                      + " bytes!");
-            }
-            incomingStreamData.receivedBytes += newBytes;
-          } catch (IOException e) {
-            Log.d(
-                "PayloadTransferUpdate failed to copy received bytes from stream payload id="
-                    + payloadId);
-          }
-        }
-        return;
-      }
-
-      // Terminal state: SUCCESS, FAILURE, or CANCELLED.
-      try {
-        // Remove the received file through URI to avoid access limitation due to
-        // scoped storage enforcement on Android 11. File location is /sdcard/Download/.nearby/...
-        // The read/write access to the payload URI already granted by
-        // ClientProxy inside Nearby Connection.
-        if (incomingPayload.asFile() != null) {
-          context
-              .getContentResolver()
-              .delete(
-                  Objects.requireNonNull(incomingPayload.asFile()).asUri(),
-                  null /* where */,
-                  null /* selectionArgs */);
-        }
-
-        if (incomingPayload.getType() == Payload.Type.STREAM && incomingStreamData != null) {
-          try {
-            incomingStreamData.inputStream.close();
-          } catch (IOException e) {
-            Log.e("Failed to close input stream for payload " + payloadId, e);
-          } finally {
-            incomingStreamDataByPayloadId.remove(payloadId);
-          }
-        }
-      } finally {
-        incomingPayloadsById.remove(payloadId);
-        incomingPayload.close();
-      }
+    if (receivedPayloadType == Payload.Type.STREAM && incomingStreamData == null) {
+      // Most likely incoming different type payloads or outgoing payloads. Nothing to do.
+      return;
     }
 
+    int status = update.getStatus();
+    if (status == Status.IN_PROGRESS) {
+      if (receivedPayloadType == Payload.Type.STREAM) {
+        try {
+          long newBytes = update.getBytesTransferred() - incomingStreamData.receivedBytes;
+          byte[] bytes = new byte[(int) newBytes];
+          int bytesRead = incomingStreamData.inputStream.read(bytes);
+          if (bytesRead != newBytes) {
+            Log.d(
+                "PayloadTransferUpdate expected "
+                    + newBytes
+                    + " bytes from incoming stream but got "
+                    + bytesRead
+                    + " bytes!");
+          }
+          incomingStreamData.receivedBytes += newBytes;
+        } catch (IOException e) {
+          Log.d(
+              "PayloadTransferUpdate failed to copy received bytes from stream payload id="
+                  + payloadId);
+        }
+      }
+      return;
+    }
+
+    // Terminal state: SUCCESS, FAILURE, or CANCELLED.
     if (transferStopwatch.isRunning()) {
       eventData.putLong("transferTimeNs", transferStopwatch.elapsed().toNanos());
+    }
+    // Remove the received file through URI to avoid access limitation due to
+    // scoped storage enforcement on Android 11. File location is /sdcard/Download/.nearby/...
+    // The read/write access to the payload URI already granted by
+    // ClientProxy inside Nearby Connection.
+    if (receivedPayload != null && receivedPayload.asFile() != null) {
+      context
+          .getContentResolver()
+          .delete(
+              Objects.requireNonNull(receivedPayload.asFile()).asUri(),
+              null /* where */,
+              null /* selectionArgs */);
+    }
+
+    if (receivedPayloadType == Payload.Type.STREAM && incomingStreamData != null) {
+      try {
+        incomingStreamData.inputStream.close();
+      } catch (IOException e) {
+        Log.e("Failed to close input stream for payload " + payloadId, e);
+      } finally {
+        incomingStreamDataByPayloadId.remove(payloadId);
+      }
     }
 
     Log.d("PayloadTransferUpdate ID:" + payloadId);
@@ -174,7 +170,7 @@ public class PayloadEvents extends PayloadCallback {
     updateData.putLong("totalBytes", update.getTotalBytes());
     updateData.putLong("payloadId", update.getPayloadId());
     updateData.putInt("statusCode", update.getStatus());
-    updateData.putBoolean("isSuccess", update.getStatus() == Status.SUCCESS);
+    updateData.putBoolean("isSuccess", status == Status.SUCCESS);
     eventData.putParcelable("update", updateData);
     EventCache.getInstance().postEvent(snippetEvent);
   }

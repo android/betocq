@@ -180,6 +180,7 @@ public class ConnectionsClientSnippet implements Snippet {
     }
     verifyApiConnection();
     payloadEvents.startTransferStopwatch();
+    payloadEvents.setLastTxPayloadId(payload[numFiles - 1].getId());
     for (int i = 0; i < numFiles; i++) {
       Tasks.await(
           Nearby.getConnectionsClient(context).sendPayload(Arrays.asList(endpointId), payload[i]));
