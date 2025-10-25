@@ -143,6 +143,11 @@ class Mcc5gWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
 
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
+    # Check rooted devices.
+    setup_utils.abort_if_on_unrooted_device(
+        [self.discoverer, self.advertiser],
+        'the country code can not be set.'
+    )
     # Check WiFi AP.
     setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
