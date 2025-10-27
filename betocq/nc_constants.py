@@ -222,6 +222,32 @@ class NearbyMedium(enum.IntEnum):
   UPGRADE_TO_ALL_WIFI = 9  # connect or upgrade to any wifi medium
   USB = 10
 
+  def to_connection_medium(self) -> 'NearbyConnectionMedium':
+    """Converts to NearbyConnectionMedium."""
+    match self:
+      case NearbyMedium.BT_ONLY:
+        return NearbyConnectionMedium.BLUETOOTH
+      case NearbyMedium.BLE_ONLY:
+        return NearbyConnectionMedium.BLE
+      case NearbyMedium.WIFILAN_ONLY:
+        return NearbyConnectionMedium.WIFI_LAN
+      case NearbyMedium.WIFIAWARE_ONLY:
+        return NearbyConnectionMedium.WIFI_AWARE
+      case NearbyMedium.UPGRADE_TO_WEBRTC:
+        return NearbyConnectionMedium.WEB_RTC
+      case NearbyMedium.UPGRADE_TO_WIFIHOTSPOT:
+        return NearbyConnectionMedium.WIFI_HOTSPOT
+      case NearbyMedium.UPGRADE_TO_WIFIDIRECT:
+        return NearbyConnectionMedium.WIFI_DIRECT
+      case NearbyMedium.BLE_L2CAP_ONLY:
+        return NearbyConnectionMedium.BLE_L2CAP
+      case NearbyMedium.USB:
+        return NearbyConnectionMedium.USB
+      case NearbyMedium.UPGRADE_TO_ALL_WIFI | NearbyMedium.AUTO:
+        return NearbyConnectionMedium.UNKNOWN
+      case _:
+        return NearbyConnectionMedium.UNKNOWN
+
 
 @enum.unique
 class NearbyConnectionMedium(enum.IntEnum):

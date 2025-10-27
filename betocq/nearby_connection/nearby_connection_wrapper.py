@@ -282,6 +282,17 @@ class NearbyConnectionWrapper:
               discoverer_medium_connection_event.data['medium']
           )
       )
+      if self.connection_quality_info.connection_medium == (
+          nc_constants.NearbyConnectionMedium.UNKNOWN
+      ):
+        self.discoverer.log.info(
+            'connection medium from onBandwidthChanged is unknown, set to the'
+            ' requested medium:'
+            f' {self.connection_medium.to_connection_medium().name} instead'
+        )
+        self.connection_quality_info.connection_medium = (
+            self.connection_medium.to_connection_medium()
+        )
       if discoverer_medium_connection_event.data['isHighBwQuality']:
         is_connection_medium_high_quality = True
       self.discoverer.log.info(
@@ -335,6 +346,17 @@ class NearbyConnectionWrapper:
                   discoverer_medium_upgrade_event.data['medium']
               )
           )
+          if self.connection_quality_info.upgrade_medium == (
+              nc_constants.NearbyConnectionMedium.UNKNOWN
+          ):
+            self.discoverer.log.info(
+                'medium upgrade from onBandwidthChanged is unknown, set to the'
+                ' upgrade medium:'
+                f' {self.upgrade_medium.to_connection_medium().name} instead'
+            )
+            self.connection_quality_info.upgrade_medium = (
+                self.upgrade_medium.to_connection_medium()
+            )
           self.connection_quality_info.medium_upgrade_expected = True
           self.discoverer.log.info(
               'upgraded to high quality medium: '
