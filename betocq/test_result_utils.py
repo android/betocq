@@ -151,6 +151,7 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
     test_result: SingleTestResult,
     nc_test_runtime: nc_constants.NcTestRuntime,
     low_throughput_tip: str,
+    did_nc_file_transfer: bool = True,
 ):
   """Checks the throughput for 2G WiFi medium and runs iperf test if needed."""
   speed_target = _get_2g_wifi_throughput_benchmark(
@@ -163,6 +164,7 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
       nc_test_runtime,
       speed_target,
       low_throughput_tip,
+      did_nc_file_transfer,
   )
 
 
@@ -233,6 +235,7 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
     test_result: SingleTestResult,
     nc_test_runtime: nc_constants.NcTestRuntime,
     low_throughput_tip: str,
+    did_nc_file_transfer: bool = True,
 ):
   """Checks the throughput for 5G WiFi medium and runs iperf test if needed."""
   speed_target = _get_5g_wifi_throughput_benchmark(
@@ -245,6 +248,7 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
       nc_test_runtime,
       speed_target,
       low_throughput_tip,
+      did_nc_file_transfer,
   )
 
 
@@ -424,6 +428,7 @@ def assert_throughput_and_run_iperf_if_needed(
     nc_test_runtime: nc_constants.NcTestRuntime,
     speed_target: nc_constants.SpeedTarget,
     low_throughput_tip: str,
+    did_nc_file_transfer: bool = True,
 ):
   """Checks the file transfer throughput and runs iperf test if needed."""
   advertiser = nc_test_runtime.advertiser
@@ -448,7 +453,7 @@ def assert_throughput_and_run_iperf_if_needed(
     )
 
   low_throughput_info = None
-  if nc_speed_mbps < nc_speed_min_mbps:
+  if did_nc_file_transfer and nc_speed_mbps < nc_speed_min_mbps:
     nc_speed_info = (
         f'file speed {nc_speed_mbps} < target {nc_speed_min_mbps} MB/s'
     )

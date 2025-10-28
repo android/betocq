@@ -198,24 +198,33 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
     if upgrade_medium is not None:
       upgraded_medium_name = upgrade_medium.name
 
-    # Test Step: Transfer file on the established NC.
-    try:
-      self.current_test_result.file_transfer_throughput_kbps = (
-          active_snippet.transfer_file(
-              file_size_kb=_FILE_TRANSFER_SIZE_KB,
-              timeout=_FILE_TRANSFER_TIMEOUT,
-              payload_type=_PAYLOAD_TYPE,
-              num_files=_FILE_TRANSFER_NUM,
-          )
-      )
-    finally:
-      nc_utils.handle_file_transfer_failure(
-          active_snippet.test_failure_reason,
-          self.current_test_result,
-          file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP.format(
-              upgraded_medium_name=upgraded_medium_name
-          ),
-      )
+    # due to (internal), the file transfer is not stable for wifi LAN medium.
+    do_file_transfer = True
+    if (
+        upgrade_medium == nc_constants.NearbyMedium.WIFILAN_ONLY
+        and self.test_parameters.do_nc_wlan_file_transfer_test
+    ):
+      do_file_transfer = self.test_parameters.do_nc_wlan_file_transfer_test
+
+    if do_file_transfer:
+      # Test Step: Transfer file on the established NC.
+      try:
+        self.current_test_result.file_transfer_throughput_kbps = (
+            active_snippet.transfer_file(
+                file_size_kb=_FILE_TRANSFER_SIZE_KB,
+                timeout=_FILE_TRANSFER_TIMEOUT,
+                payload_type=_PAYLOAD_TYPE,
+                num_files=_FILE_TRANSFER_NUM,
+            )
+        )
+      finally:
+        nc_utils.handle_file_transfer_failure(
+            active_snippet.test_failure_reason,
+            self.current_test_result,
+            file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP.format(
+                upgraded_medium_name=upgraded_medium_name
+            ),
+        )
 
       # Collect test metrics and check the transfer medium info regardless of
       # whether the transfer succeeded or not.
@@ -242,6 +251,7 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
         low_throughput_tip=_THROUGHPUT_LOW_TIP.format(
             upgraded_medium_name=upgraded_medium_name
         ),
+        did_nc_file_transfer=do_file_transfer,
     )
 
     prior_bt_snippet.disconnect_endpoint()

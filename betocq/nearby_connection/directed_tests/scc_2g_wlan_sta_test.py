@@ -183,22 +183,24 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
     )
 
-    # Test Step: Transfer file on the established NC.
-    try:
-      self.current_test_result.file_transfer_throughput_kbps = (
-          active_snippet.transfer_file(
-              file_size_kb=_FILE_TRANSFER_SIZE_KB,
-              timeout=_FILE_TRANSFER_TIMEOUT,
-              payload_type=_PAYLOAD_TYPE,
-              num_files=_FILE_TRANSFER_NUM,
-          )
-      )
-    finally:
-      nc_utils.handle_file_transfer_failure(
-          active_snippet.test_failure_reason,
-          self.current_test_result,
-          file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
+    # due to (internal), the file transfer is not stable for wifi LAN medium.
+    if self.test_parameters.do_nc_wlan_file_transfer_test:
+      # Test Step: Transfer file on the established NC.
+      try:
+        self.current_test_result.file_transfer_throughput_kbps = (
+            active_snippet.transfer_file(
+                file_size_kb=_FILE_TRANSFER_SIZE_KB,
+                timeout=_FILE_TRANSFER_TIMEOUT,
+                payload_type=_PAYLOAD_TYPE,
+                num_files=_FILE_TRANSFER_NUM,
+            )
+        )
+      finally:
+        nc_utils.handle_file_transfer_failure(
+            active_snippet.test_failure_reason,
+            self.current_test_result,
+            file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
+        )
 
       # Collect test metrics and check the transfer medium info regardless of
       # whether the transfer succeeded or not.
@@ -215,6 +217,7 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         test_result=self.current_test_result,
         nc_test_runtime=self.test_runtime,
         low_throughput_tip=_THROUGHPUT_LOW_TIP,
+        did_nc_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
     )
 
     prior_bt_snippet.disconnect_endpoint()

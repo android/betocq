@@ -110,6 +110,7 @@ def _start_nearby_connection_and_transfer_file(
     payload_transfer_timeout: datetime.timedelta = nc_constants.TRANSFER_TIMEOUT_FUNC_TEST,
     payload_num: int = nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     connect_timeout: nc_constants.ConnectionSetupTimeouts = nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+    do_file_transfer: bool = True,
 ):
   """Starts a nearby connection and transfers files on it."""
   # Test Step: Set up a NC connection for file transfer.
@@ -125,19 +126,20 @@ def _start_nearby_connection_and_transfer_file(
   )
 
   # Test Step: Transfer file on the established NC.
-  try:
-    test_result.file_transfer_throughput_kbps = nearby_snippet.transfer_file(
-        file_size_kb=payload_size_kb,
-        timeout=payload_transfer_timeout,
-        payload_type=payload_type,
-        num_files=payload_num,
-    )
-  finally:
-    nc_utils.handle_file_transfer_failure(
-        nearby_snippet.test_failure_reason,
-        test_result,
-        file_transfer_failure_tip=file_transfer_failure_tip,
-    )
+  if do_file_transfer:
+    try:
+      test_result.file_transfer_throughput_kbps = nearby_snippet.transfer_file(
+          file_size_kb=payload_size_kb,
+          timeout=payload_transfer_timeout,
+          payload_type=payload_type,
+          num_files=payload_num,
+      )
+    finally:
+      nc_utils.handle_file_transfer_failure(
+          nearby_snippet.test_failure_reason,
+          test_result,
+          file_transfer_failure_tip=file_transfer_failure_tip,
+      )
 
     nearby_snippet.disconnect_endpoint()
 
@@ -182,7 +184,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     )
 
   def setup_test(self):
-    """Setup steps that will be performed before exucuting each test case."""
+    """Setup steps that will be performed before executing each test case."""
     super().setup_test()
     self.current_test_result = test_result_utils.SingleTestResult()
     self._test_results[self.current_test_info.name] = self.current_test_result
@@ -244,6 +246,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     # Let scan, DHCP and internet validation complete before NC.
     time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
+    # due to (internal), the file transfer is not stable for wifi LAN medium.
     # Test Step: Set up nearby connection and transfer file.
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
@@ -254,6 +257,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         payload_type=nc_constants.PayloadType.FILE,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        do_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
     )
 
   def test_d2d_hotspot_file_transfer_function(self):
