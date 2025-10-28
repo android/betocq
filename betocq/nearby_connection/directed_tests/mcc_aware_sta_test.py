@@ -181,6 +181,7 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Transfer file on the established NC.

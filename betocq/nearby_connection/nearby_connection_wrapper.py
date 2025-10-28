@@ -15,6 +15,7 @@
 """Utils for handling Nearby Connection rpc."""
 
 import datetime
+import logging
 import random
 import time
 
@@ -377,7 +378,7 @@ class NearbyConnectionWrapper:
           f'Start disconnecting from endpoint: {self._advertiser_endpoint_id}'
       )
     else:
-      self.discoverer.log.info('no nearby connecty setup yet')
+      logging.warning('no nearby connection setup yet')
       return nc_constants.OpResult(nc_constants.Result.SUCCESS)
 
     if self._discoverer_connection_lifecycle_callback is not None:
@@ -399,10 +400,13 @@ class NearbyConnectionWrapper:
   def start_nearby_connection(
       self,
       timeouts: nc_constants.ConnectionSetupTimeouts,
-      medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DEFAULT,
+      medium_upgrade_type: nc_constants.MediumUpgradeType = (
+          nc_constants.MediumUpgradeType.DEFAULT
+      ),
       keep_alive_timeout_ms: int = 0,
       keep_alive_interval_ms: int = 0,
       enable_target_discovery: bool = False,
+      test_parameters: nc_constants.TestParameters | None = None,
   ) -> None:
     """Starts Nearby Connection between two Android devices."""
     self.test_failure_reason = (
@@ -410,13 +414,14 @@ class NearbyConnectionWrapper:
     )
     # Start advertising.
     self.start_advertising()
-    # Add a random delay between adversting and discovery
-    # to mimic the random delay between two devices' user action
-    time.sleep(
-        ADV_TO_DISCOVERY_MIN_DELAY_SEC
-        + (ADV_TO_DISCOVERY_MAX_DELAY_SEC - ADV_TO_DISCOVERY_MIN_DELAY_SEC)
-        * random.random()
-    )
+    if test_parameters and test_parameters.delay_nc_discovery_request:
+      # Add a random delay between adversting and discovery
+      # to mimic the random delay between two devices' user action
+      time.sleep(
+          ADV_TO_DISCOVERY_MIN_DELAY_SEC
+          + (ADV_TO_DISCOVERY_MAX_DELAY_SEC - ADV_TO_DISCOVERY_MIN_DELAY_SEC)
+          * random.random()
+      )
 
     self.test_failure_reason = (
         nc_constants.SingleTestFailureReason.SOURCE_START_DISCOVERY

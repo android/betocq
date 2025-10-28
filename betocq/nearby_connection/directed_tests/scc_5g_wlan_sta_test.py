@@ -160,7 +160,10 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
 
     # Test Step: Set up a prior BT connection.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
-        self.advertiser, self.discoverer, self.current_test_result
+        self.advertiser,
+        self.discoverer,
+        self.current_test_result,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Connect advertiser to wifi sta.
@@ -182,6 +185,7 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        test_parameters=self.test_parameters,
     )
     # due to (internal), the file transfer is not stable for wifi LAN medium.
     if self.test_parameters.do_nc_wlan_file_transfer_test:

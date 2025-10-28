@@ -129,6 +129,7 @@ class BlePerformanceTest(performance_test_base.PerformanceTestBase):
         connect_timeout=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
         keep_alive_timeout_ms=nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
         keep_alive_interval_ms=nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Transfer file on the established NC.

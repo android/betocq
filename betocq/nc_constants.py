@@ -167,6 +167,7 @@ class TestParameters:
   allow_unrooted_device: bool = False
   # TODO: Enable this test when the bug is fixed.
   do_nc_wlan_file_transfer_test: bool = False
+  delay_nc_discovery_request: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
