@@ -836,17 +836,21 @@ def abort_if_dfs_5g_ap_not_ready(
   )
 
 
-def abort_if_both_5g_and_dfs_aps_not_ready(
+def abort_if_any_5g_or_dfs_aps_not_ready(
     test_parameters: nc_constants.TestParameters,
 ) -> None:
-  """Aborts test class if both 5G and DFS 5G APs are not ready."""
+  """Aborts test class if any 5G or DFS 5G APs is not ready."""
   asserts.abort_class_if(
-      not test_parameters.use_programmable_ap,
+      test_parameters.use_programmable_ap,
       'Programmable AP does not support 5G and DFS 5G at the same time yet.',
   )
   asserts.abort_class_if(
-      not test_parameters.wifi_5g_ssid and not test_parameters.wifi_dfs_5g_ssid,
-      'Both 5G and DFS 5G APs are not ready for this test.',
+      not test_parameters.wifi_5g_ssid,
+      '5G AP is not ready. This test requires both 5G and 5G DFS APs.',
+  )
+  asserts.abort_class_if(
+      not test_parameters.wifi_dfs_5g_ssid,
+      '5G DFS AP is not ready. This test requires both 5G and 5G DFS APs.',
   )
 
 
