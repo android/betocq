@@ -14,6 +14,8 @@
 
 """This test is to test the bluetooth and wifi 2G coex.
 
+The goal is to test the bluetooth reliability when the 2.4Gwifi is connected.
+
 Test requirements:
   The device requirements:
     2 Android devices.
@@ -58,8 +60,8 @@ _MAX_CONSECUTIVE_ERROR = (
     nc_constants.BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 )
 _FILE_TRANSFER_NUM = 1
-_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_20MB
-_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT
+_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_1KB
+_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
@@ -89,7 +91,9 @@ class Bt2gWifiCoexTest(performance_test_base.PerformanceTestBase):
     self.test_runtime = nc_constants.NcTestRuntime(
         advertiser=self.advertiser,
         discoverer=self.discoverer,
-        upgrade_medium_under_test=nc_constants.NearbyMedium.UPGRADE_TO_ALL_WIFI,
+        upgrade_medium_under_test=(
+            nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT
+        ),
         country_code=_COUNTRY_CODE,
         wifi_info=self.wifi_info,
     )

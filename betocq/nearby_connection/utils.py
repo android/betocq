@@ -115,7 +115,7 @@ def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: nc_constants.TestParameters | None = None,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a prior BT Nearby Connection."""
   logging.info('set up a prior BT connection.')
@@ -145,7 +145,7 @@ def start_main_nearby_connection(
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
     upgrade_medium_under_test: nc_constants.NearbyMedium,
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: nc_constants.TestParameters | None = None,
     connection_medium: nc_constants.NearbyMedium = nc_constants.NearbyMedium.BT_ONLY,
     connect_timeout: nc_constants.ConnectionSetupTimeouts = nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
     medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DISRUPTIVE,
