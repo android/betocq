@@ -836,6 +836,20 @@ def abort_if_dfs_5g_ap_not_ready(
   )
 
 
+def abort_if_both_5g_and_dfs_aps_not_ready(
+    test_parameters: nc_constants.TestParameters,
+) -> None:
+  """Aborts test class if both 5G and DFS 5G APs are not ready."""
+  asserts.abort_class_if(
+      not test_parameters.use_programmable_ap,
+      'Programmable AP does not support 5G and DFS 5G at the same time yet.',
+  )
+  asserts.abort_class_if(
+      not test_parameters.wifi_5g_ssid and not test_parameters.wifi_dfs_5g_ssid,
+      'Both 5G and DFS 5G APs are not ready for this test.',
+  )
+
+
 def abort_if_wifi_direct_not_supported(
     ads: list[android_device.AndroidDevice],
 ) -> None:

@@ -131,8 +131,7 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
-    setup_utils.abort_if_5g_ap_not_ready(self.test_parameters)
-    setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
+    setup_utils.abort_if_both_5g_and_dfs_aps_not_ready(self.test_parameters)
     # Check device capabilities.
     setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
