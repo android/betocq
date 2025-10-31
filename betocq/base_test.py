@@ -238,11 +238,10 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
+    setup_utils.clear_hermetic_overrides(ad)
     setup_utils.enable_gms_auto_updates(ad)
 
   def teardown_test(self) -> None:
-    setup_utils.clear_hermetic_overrides(self.advertiser)
-    setup_utils.clear_hermetic_overrides(self.discoverer)
     utils.concurrent_exec(
         lambda d: d.services.create_output_excerpts_all(self.current_test_info),
         param_list=[[ad] for ad in self.ads],
