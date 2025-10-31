@@ -17,6 +17,7 @@
 from collections.abc import Callable
 import datetime
 import time
+from typing import Any
 
 from mobly import asserts
 from mobly.controllers import android_device
@@ -60,6 +61,22 @@ NEARBY_LOG_TAGS = [
     'NearbyMediums',
     'NearbySetup',
 ]
+
+
+def get_betocq_device_specific_info(
+    ad: android_device.AndroidDevice
+) -> dict[str, Any]:
+  """Gets the device specific info from the class attribute."""
+  # Check if the class attribute exists. If not, create it as an empty dict.
+  if not hasattr(android_device.AndroidDevice, 'betocq_customized_device_info'):
+    setattr(android_device.AndroidDevice, 'betocq_customized_device_info', {})
+  info_dict = getattr(
+      android_device.AndroidDevice, 'betocq_customized_device_info'
+  )
+  # Check if the device specific attribute exists. If not, create it as an
+  # empty dict.
+  device_specific_dict = info_dict.setdefault(ad.serial, {})
+  return device_specific_dict
 
 
 def set_country_code(
@@ -705,16 +722,24 @@ def load_nearby_snippet(
     config: nc_constants.SnippetConfig,
 ):
   """Loads a nearby snippet with the given snippet config."""
+  device_specific_dict = get_betocq_device_specific_info(ad)
+
   if config.apk_path:
-    ad.log.info('try to install nearby_snippet_apk')
-    apk_utils.install(ad, config.apk_path)
+    key_apk_installed = config.package_name + '_installed'
+    if not device_specific_dict.get(key_apk_installed, False):
+      ad.log.info('try to install nearby_snippet_apk')
+      apk_utils.install(ad, config.apk_path)
+      device_specific_dict[key_apk_installed] = True
   else:
     ad.log.warning(
         'nearby_snippet apk is not specified, '
         'make sure it is installed in the device'
     )
-  ad.log.info('grant manage external storage permission')
-  grant_manage_external_storage_permission(ad, config.package_name)
+  if not device_specific_dict.get('external_storage_permission_granted', False):
+    ad.log.info('grant manage external storage permission')
+    grant_manage_external_storage_permission(ad, config.package_name)
+    device_specific_dict['external_storage_permission_granted'] = True
+
   ad.load_snippet(config.snippet_name, config.package_name)
 
 

@@ -33,22 +33,40 @@ def setup_android_device_for_nc_tests(
     snippet_confs: Sequence[nc_constants.SnippetConfig],
     country_code: str,
     skip_flag_override: bool = False,
-    skip_forget_wifi_network: bool = False,
 ) -> None:
   """Performs general Android device setup steps for NC tests."""
-  setup_utils.enable_location_on_device(ad)
-  if not skip_forget_wifi_network:
-    android_wifi_utils.forget_all_wifi(ad)
+  # TODO: Double check if the set_flags() may break this as it will
+  # restart GMS.
   setup_utils.disable_gms_auto_updates(ad)
+
   for conf in snippet_confs:
     setup_utils.load_nearby_snippet(ad, conf)
-  setup_utils.enable_logs(ad)
+
   setup_utils.clear_hermetic_overrides(ad)
   if not skip_flag_override:
     setup_utils.set_flags(ad, ad.log_path)
-  setup_utils.set_country_code(ad, country_code)
-  setup_utils.toggle_airplane_mode(ad)
-  ad.nearby.wifiEnable()
+
+  device_specific_dict = setup_utils.get_betocq_device_specific_info(ad)
+  if not device_specific_dict.get('one_time_setup_done', False):
+    setup_utils.enable_location_on_device(ad)
+    setup_utils.enable_logs(ad)
+
+    setup_utils.enable_airplane_mode(ad)
+    if ad.nearby.wifiIsEnabled():
+      ad.nearby.wifiDisable()
+    # Put it here to work around the WifiManager#getConfiguredNetworks() issue
+    # before Android 15.
+    ad.log.info('Forgetting all wifi networks')
+    android_wifi_utils.forget_all_wifi(ad)
+    setup_utils.disable_airplane_mode(ad)
+    if not ad.nearby.wifiIsEnabled():
+      ad.nearby.wifiEnable()
+    device_specific_dict['one_time_setup_done'] = True
+
+  if country_code != device_specific_dict.get('wifi_country_code', ''):
+    setup_utils.set_country_code(ad, country_code)
+    device_specific_dict['wifi_country_code'] = country_code
+  # TODO: Only get the thermal zone data on_fail.
   setup_utils.get_thermal_zone_data(ad)
 
 
@@ -62,7 +80,7 @@ def connect_ad_to_wifi_sta(
   """Connects NC discoverer or advertiser to the given Wi-Fi STA.
 
   Args:
-    ad: The device to connect to wifi sta.
+    ad: The device to connect to Wi-Fi STA.
     wifi_ssid: The Wi-Fi SSID.
     wifi_password: The Wi-Fi password.
     test_result: The object to record test result and metrics.
@@ -118,7 +136,7 @@ def start_prior_bt_nearby_connection(
     test_parameters: nc_constants.TestParameters | None = None,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a prior BT Nearby Connection."""
-  logging.info('set up a prior BT connection.')
+  logging.info('Set up a prior BT connection.')
   prior_bt_snippet = _get_snippet(
       advertiser,
       discoverer,
@@ -153,7 +171,7 @@ def start_main_nearby_connection(
     keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a main Nearby Connection which is used for file transfer."""
-  logging.info('set up a nearby connection for file transfer.')
+  logging.info('Set up a nearby connection for file transfer.')
 
   active_snippet = _get_snippet(
       advertiser,
@@ -179,7 +197,7 @@ def start_main_nearby_connection(
     result_message = None
     if fail_reason == nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
       default_message = (
-          f'unexpected upgrade medium - {upgrade_medium_under_test.name}'
+          f'Unexpected upgrade medium - {upgrade_medium_under_test.name}.'
       )
       result_message = nc_constants.MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS.get(
           upgrade_medium_under_test, default_message
