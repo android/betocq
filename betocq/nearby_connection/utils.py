@@ -61,6 +61,7 @@ def setup_android_device_for_nc_tests(
     setup_utils.disable_airplane_mode(ad)
     if not ad.nearby.wifiIsEnabled():
       ad.nearby.wifiEnable()
+    setup_utils.reset_nearby_connection(ad)
     device_specific_dict['one_time_setup_done'] = True
 
   if country_code != device_specific_dict.get('wifi_country_code', ''):

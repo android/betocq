@@ -165,7 +165,6 @@ class SccDfs5gWfdStaTest(performance_test_base.PerformanceTestBase):
 
   def setup_test(self):
     super().setup_test()
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
     utils.concurrent_exec(
         setup_utils.remove_disconnect_wifi_network,
         param_list=[[ad] for ad in self.ads],

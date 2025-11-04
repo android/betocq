@@ -263,6 +263,14 @@ class BaseTestClass(base_test.BaseTestClass):
     if self.__skipped_test_class:
       logging.info('Skipping on_fail.')
       return
+    # Reset the Nearby Connection state to ensure the testbed is in a good
+    # state for the next test.
+    utils.concurrent_exec(
+        setup_utils.reset_nearby_connection,
+        param_list=[[ad] for ad in self.ads],
+        raise_on_exception=False,
+    )
+
     self._stop_packet_capture(ignore_packets=False)
     if self.test_parameters.skip_bug_report:
       logging.info('Skipping bug report.')

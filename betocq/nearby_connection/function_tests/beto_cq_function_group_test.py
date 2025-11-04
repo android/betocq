@@ -194,7 +194,6 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     super().setup_test()
     self.current_test_result = test_result_utils.SingleTestResult()
     self._test_results[self.current_test_info.name] = self.current_test_result
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
 
   def test_bt_ble_function(self):
     """Test the NC with the BT/BLE medium only.
