@@ -96,20 +96,21 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
+    # try to disconnect the wifi sta if it is connected.
+    # This is to avoid the wifi sta connection interfering the BLE connection
+    # in the middle of the test.
+    utils.concurrent_exec(
+        setup_utils.remove_current_connected_wifi_network,
+        param_list=[[self.discoverer], [self.advertiser]],
+        raise_on_exception=False,
+    )
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     nc_utils.setup_android_device_for_nc_tests(
         ad,
         snippet_confs=[self.nearby_snippet_config],
         country_code=self.test_runtime.country_code,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
-    )
-
-  def setup_test(self):
-    super().setup_test()
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
     )
 
   @base_test.repeat(

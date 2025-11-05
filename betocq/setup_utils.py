@@ -262,6 +262,31 @@ def connect_to_wifi(
   ad.nearby.wifiConnectSimple(ssid, password)
 
 
+def remove_current_connected_wifi_network(
+    ad: android_device.AndroidDevice,
+) -> bool:
+  """Removes and disconnects the current connected wifi network on the given device."""
+  wifi_info = ad.nearby.wifiGetConnectionInfo()
+  if (
+      not wifi_info
+      or wifi_info.get('SupplicantState', '')
+      == nc_constants.WIFI_SUPPLICANT_STATE_DISCONNECTED
+  ):
+    ad.log.info('No current connected wifi network')
+    return False
+
+  network_id = get_sta_network_id_from_wifi_info(wifi_info)
+  if network_id != nc_constants.INVALID_NETWORK_ID:
+    ad.log.info(f'disconnecting from {wifi_info.get("SSID", "")}')
+    ad.nearby.wifiRemoveNetwork(network_id)
+  else:
+    ad.log.warning(f'No valid network id for {wifi_info.get("SSID", "")}, try'
+                   ' to remove all networks.')
+    remove_disconnect_wifi_network(ad)
+
+  return True
+
+
 def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   """Removes and disconnects all wifi network on the given device."""
   was_wifi_enabled = ad.nearby.wifiIsEnabled()
@@ -277,6 +302,24 @@ def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   if was_wifi_enabled:
     ad.nearby.wifiEnable()
   time.sleep(nc_constants.WIFI_DISCONNECTION_DELAY.total_seconds())
+
+
+def wait_for_wifi_auto_join(
+    ad: android_device.AndroidDevice,
+) -> None:
+  """Waits for the wifi connection after disruptive test."""
+  initial_max_wait_time_sec = 6
+  max_wait_time_sec = initial_max_wait_time_sec
+  wifi_is_connected = ad.nearby.isWifiConnected()
+  while not wifi_is_connected and max_wait_time_sec > 0:
+    time.sleep(1)
+    wifi_is_connected = ad.nearby.isWifiConnected()
+    max_wait_time_sec -= 1
+  ad.log.info(
+      f'Waiting {initial_max_wait_time_sec - max_wait_time_sec} seconds for'
+      ' wifi connection after disruptive test, is the wifi sta connected:'
+      f' {wifi_is_connected}'
+  )
 
 
 def _grant_manage_external_storage_permission(
@@ -413,7 +456,50 @@ def enable_location_on_device(ad: android_device.AndroidDevice) -> None:
     )
 
 
-def get_wifi_sta_frequency(ad: android_device.AndroidDevice) -> int:
+def get_sta_network_id_from_wifi_info(wifi_info: dict[str, Any]) -> int:
+  """Get wifi STA network id on the given device."""
+  # introduced for unrooted device.
+  network_id = wifi_info.get('NetworkId', nc_constants.INVALID_NETWORK_ID)
+  # fallback for rooted device if the 'NetworkId' is not available.
+  if network_id == nc_constants.INVALID_NETWORK_ID:
+    network_id = wifi_info.get('mNetworkId', nc_constants.INVALID_NETWORK_ID)
+  return network_id
+
+
+def get_sta_rssi_from_wifi_info(wifi_info: dict[str, Any]) -> int:
+  """Get wifi STA RSSI from the given wifi info."""
+  # introduced for unrooted device.
+  rssi = wifi_info.get('RSSI', nc_constants.INVALID_RSSI)
+  if rssi == nc_constants.INVALID_RSSI:
+    rssi = wifi_info.get('mRssi', nc_constants.INVALID_RSSI)
+  return rssi
+
+
+def get_sta_frequency_from_wifi_info(wifi_info: dict[str, Any]) -> int:
+  """Get wifi STA frequency from the given wifi info."""
+  # introduced for unrooted device.
+  sta_frequency = wifi_info.get('StaFrequency', nc_constants.INVALID_INT)
+  if sta_frequency == nc_constants.INVALID_INT:
+    sta_frequency = wifi_info.get('mFrequency', nc_constants.INVALID_INT)
+  return sta_frequency
+
+
+def get_sta_max_link_speed_from_wifi_info(wifi_info: dict[str, Any]) -> int:
+  """Get wifi STA max supported Tx link speed from the given wifi info."""
+  # introduced for unrooted device.
+  max_link_speed = wifi_info.get(
+      'MaxSupportedTxLinkSpeedMbps', nc_constants.INVALID_INT
+  )
+  if max_link_speed == nc_constants.INVALID_INT:
+    max_link_speed = wifi_info.get(
+        'mMaxSupportedTxLinkSpeedMbps', nc_constants.INVALID_INT
+    )
+  return max_link_speed
+
+
+def _get_wifi_sta_frequency_from_dumpsys(
+    ad: android_device.AndroidDevice,
+) -> int:
   """Get wifi STA frequency on the given device."""
   wifi_sta_status = dump_wifi_sta_status(ad)
   if not wifi_sta_status:
@@ -433,7 +519,9 @@ def get_wifi_p2p_frequency(ad: android_device.AndroidDevice) -> int:
   return get_int_between_prefix_postfix(wifi_p2p_status, prefix, postfix)
 
 
-def get_wifi_sta_max_link_speed(ad: android_device.AndroidDevice) -> int:
+def _get_wifi_sta_max_link_speed_from_dumpsys(
+    ad: android_device.AndroidDevice,
+) -> int:
   """Get wifi STA max supported Tx link speed on the given device."""
   wifi_sta_status = dump_wifi_sta_status(ad)
   if not wifi_sta_status:
@@ -703,17 +791,15 @@ def get_target_sta_frequency_and_max_link_speed(
 ) -> tuple[int, int]:
   """Gets the STA frequency and max link speed."""
   connection_info = ad.nearby.wifiGetConnectionInfo()
-  sta_frequency = int(
-      connection_info.get('mFrequency', nc_constants.INVALID_INT)
-  )
-  sta_max_link_speed_mbps = int(
-      connection_info.get('mMaxSupportedTxLinkSpeed', nc_constants.INVALID_INT)
+  sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
+  sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
+      connection_info
   )
 
   # If the info is not available, try getting them by adb wifi status command.
   if sta_frequency == nc_constants.INVALID_INT:
-    sta_frequency = get_wifi_sta_frequency(ad)
-    sta_max_link_speed_mbps = get_wifi_sta_max_link_speed(ad)
+    sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
+    sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
 
 

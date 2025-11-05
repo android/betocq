@@ -110,6 +110,13 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
         self.advertiser, self.current_test_info.output_path
     )
 
+    # try to disconnect the wifi sta if it is connected.
+    utils.concurrent_exec(
+        setup_utils.remove_current_connected_wifi_network,
+        param_list=[[self.discoverer], [self.advertiser]],
+        raise_on_exception=False,
+    )
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     nc_utils.setup_android_device_for_nc_tests(
         ad,
@@ -123,14 +130,6 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
     # Check device capabilities.
     setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
-
-  def setup_test(self):
-    super().setup_test()
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
     )
 
   @base_test.repeat(

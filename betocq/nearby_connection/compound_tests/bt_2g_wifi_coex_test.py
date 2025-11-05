@@ -123,14 +123,6 @@ class Bt2gWifiCoexTest(performance_test_base.PerformanceTestBase):
     # Check WiFi AP.
     setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
 
-  def setup_test(self):
-    super().setup_test()
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
-
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
@@ -167,6 +159,8 @@ class Bt2gWifiCoexTest(performance_test_base.PerformanceTestBase):
     # case as we don't care speed.
 
     # Test Step: Set up a NC connection for file transfer.
+    # use NON_DISRUPTIVE to avoid wifi disconnection during file transfer as
+    # data throughput is not the goal of this test case.
     active_snippet = nc_utils.start_main_nearby_connection(
         self.advertiser,
         self.discoverer,
@@ -174,6 +168,7 @@ class Bt2gWifiCoexTest(performance_test_base.PerformanceTestBase):
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
+        medium_upgrade_type=nc_constants.MediumUpgradeType.NON_DISRUPTIVE,
     )
 
     # Test Step: Transfer file on the established NC.

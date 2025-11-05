@@ -16,7 +16,6 @@
 
 from collections.abc import Sequence
 import logging
-import time
 
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import snippet_client_v2
@@ -55,7 +54,7 @@ def setup_android_device_for_nc_tests(
     if ad.nearby.wifiIsEnabled():
       ad.nearby.wifiDisable()
     # Put it here to work around the WifiManager#getConfiguredNetworks() issue
-    # before Android 15.
+    # before Android 15
     ad.log.info('Forgetting all wifi networks')
     android_wifi_utils.forget_all_wifi(ad)
     setup_utils.disable_airplane_mode(ad)
@@ -67,7 +66,7 @@ def setup_android_device_for_nc_tests(
   if country_code != device_specific_dict.get('wifi_country_code', ''):
     setup_utils.set_country_code(ad, country_code)
     device_specific_dict['wifi_country_code'] = country_code
-  # TODO: Only get the thermal zone data on_fail.
+  # TODO: Only get the thermal zone data on_fail
   setup_utils.get_thermal_zone_data(ad)
 
 
@@ -77,7 +76,7 @@ def connect_ad_to_wifi_sta(
     wifi_password: str,
     test_result: test_result_utils.SingleTestResult,
     is_discoverer: bool,
-):
+) -> bool:
   """Connects NC discoverer or advertiser to the given Wi-Fi STA.
 
   Args:
@@ -87,8 +86,35 @@ def connect_ad_to_wifi_sta(
     test_result: The object to record test result and metrics.
     is_discoverer: Whether the device is the NC discoverer. This is used for
       generating test failure reason and result summary info.
+
+  Returns:
+    True if the device successfully connected to a new Wi-Fi network, False if
+    the device was already connected to the specified Wi-Fi network.
+
+  Raises:
+    Exception: If an error occurs during the Wi-Fi connection process.
   """
   try:
+    wifi_info = ad.nearby.wifiGetConnectionInfo()
+    ad.log.info(f'network_info: {wifi_info}')
+    current_wifi_ssid = wifi_info.get('SSID', '')
+    if current_wifi_ssid == wifi_ssid:
+      ad.log.info(f'already connected to {wifi_ssid}')
+      return False
+
+    if (
+        current_wifi_ssid
+        and current_wifi_ssid != nc_constants.WIFI_UNKNOWN_SSID
+    ):
+      network_id = setup_utils.get_sta_network_id_from_wifi_info(wifi_info)
+      if network_id != nc_constants.INVALID_NETWORK_ID:
+        ad.log.info(f'disconnecting from {current_wifi_ssid})')
+        ad.nearby.wifiRemoveNetwork(network_id)
+      else:
+        ad.log.warning(f'No valid network id for {current_wifi_ssid}, try'
+                       f' to remove all networks.')
+        setup_utils.remove_disconnect_wifi_network(ad)
+
     latency = setup_utils.connect_to_wifi_sta_till_success(
         ad, wifi_ssid, wifi_password
     )
@@ -124,10 +150,15 @@ def connect_ad_to_wifi_sta(
   else:
     test_result.advertiser_sta_latency = latency
   ad.log.info('connecting to wifi in %d s', round(latency.total_seconds()))
+  new_wifi_info = ad.nearby.wifiGetConnectionInfo()
   ad.log.info(
-      'sta frequency: %s',
-      ad.nearby.wifiGetConnectionInfo().get('mFrequency'),
+      'sta frequency: %s, rssi: %s for new wifi connection',
+      setup_utils.get_sta_frequency_from_wifi_info(
+          new_wifi_info),
+      setup_utils.get_sta_rssi_from_wifi_info(new_wifi_info),
   )
+
+  return True
 
 
 def start_prior_bt_nearby_connection(
@@ -222,30 +253,6 @@ def handle_file_transfer_failure(
   if fail_reason == nc_constants.SingleTestFailureReason.FILE_TRANSFER_FAIL:
     result_message = file_transfer_failure_tip
   test_result.set_active_nc_fail_reason(fail_reason, result_message)
-
-
-def reset_nearby_connection(
-    discoverer: android_device.AndroidDevice,
-    advertiser: android_device.AndroidDevice,
-) -> None:
-  """Resets any nearby connection on the devices."""
-  discoverer.nearby.stopDiscovery()
-  discoverer.nearby.stopAllEndpoints()
-  advertiser.nearby.stopAdvertising()
-  advertiser.nearby.stopAllEndpoints()
-  if getattr(discoverer, 'nearby2', None):
-    discoverer.nearby2.stopDiscovery()
-    discoverer.nearby2.stopAllEndpoints()
-  if getattr(advertiser, 'nearby2', None):
-    advertiser.nearby2.stopAdvertising()
-    advertiser.nearby2.stopAllEndpoints()
-  if getattr(discoverer, 'nearby3', None):
-    discoverer.nearby3p.stopDiscovery()
-    discoverer.nearby3p.stopAllEndpoints()
-  if getattr(advertiser, 'nearby3', None):
-    advertiser.nearby3p.stopAdvertising()
-    advertiser.nearby3p.stopAllEndpoints()
-  time.sleep(nc_constants.NEARBY_RESET_WAIT_TIME.total_seconds())
 
 
 def _get_snippet(

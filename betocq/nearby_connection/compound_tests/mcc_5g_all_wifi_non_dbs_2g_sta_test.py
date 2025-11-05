@@ -68,8 +68,8 @@ TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
 SUCCESS_RATE_TARGET = nc_constants.SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
-_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_500MB
-_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
+_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_100MB
+_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
@@ -144,22 +144,14 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
         [self.advertiser], 'supports_dbs_sta_wfd', expected_value=False
     )
 
-  def setup_test(self):
-    super().setup_test()
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
-
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
   )
   def test_mcc_5g_all_wifi_non_dbs_2g_sta(self):
     """Test the performance for CUJ MCC with 5G D2D medium and 2G STA test."""
-    # Test Step: Connect discoverer to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    # Test Step: Connect discoverer to wifi sta in case WLAN is used.
+    discoverer_sta_op = nc_utils.connect_ad_to_wifi_sta(
         self.discoverer,
         self.wifi_info.discoverer_wifi_ssid,
         self.wifi_info.discoverer_wifi_password,
@@ -176,16 +168,17 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Test Step: Connect advertiser to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    advertiser_sta_op = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
         self.wifi_info.advertiser_wifi_ssid,
         self.wifi_info.advertiser_wifi_password,
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
-    # This is important especially for the transfer speed or WLAN test.
-    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+    if discoverer_sta_op or advertiser_sta_op:
+      # Let scan, DHCP and internet validation complete before NC.
+      # This is important especially for the transfer speed or WLAN test.
+      time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
@@ -259,6 +252,12 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
 
     prior_bt_snippet.disconnect_endpoint()
     active_snippet.disconnect_endpoint()
+
+    # Wait for the STA to be connected as the 'DISRUPPTIVE' upgrade medium
+    # will disconnect the STA during the file transfer.
+    setup_utils.wait_for_wifi_auto_join(
+        self.discoverer
+    )
 
 
 if __name__ == '__main__':

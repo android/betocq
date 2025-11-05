@@ -134,14 +134,6 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
     )
 
-  def setup_test(self):
-    super().setup_test()
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
-
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
@@ -149,7 +141,7 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
   def test_scc_5g_wifilan_sta(self):
     """Test the performance for Wifi SCC with 5G WifiLAN and STA."""
     # Test Step: Connect discoverer to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    discoverer_connected = nc_utils.connect_ad_to_wifi_sta(
         self.discoverer,
         self.wifi_info.discoverer_wifi_ssid,
         self.wifi_info.discoverer_wifi_password,
@@ -166,16 +158,17 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Test Step: Connect advertiser to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    advertiser_connected = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
         self.wifi_info.advertiser_wifi_ssid,
         self.wifi_info.advertiser_wifi_password,
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
-    # This is important especially for the transfer speed or WLAN test.
-    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+    if discoverer_connected or advertiser_connected:
+      # Let scan, DHCP and internet validation complete before NC.
+      # This is important especially for the transfer speed or WLAN test.
+      time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(

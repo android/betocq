@@ -38,9 +38,9 @@ Test preparations:
   Set country code to GB on Android devices.
 
 Test steps:
-  1. Connect discoverer to a 5G DFS Wi-Fi network.
+  1. Disconnect discoverer from the current connected Wi-Fi network.
   2. Set up a prior Nearby Connection through Bluetooth medium.
-  3. Connect advertiser to the same Wi-Fi network.
+  3. Connect advertiser to the 5G DFS Wi-Fi network.
   4. Set up a connection with Wi-Fi Direct as upgrade medium.
       * Nearby Connection will enable WFD GO + STA on the target device
         and STA on the source device which tries to connect to WFD GO.
@@ -167,27 +167,15 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         expected_value=False,
     )
 
-  def setup_test(self):
-    super().setup_test()
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
-
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
   )
   def test_mcc_5g_hotspot_dfs_5g_sta(self):
     """Test the performance for wifi MCC with 5G HOTSPOT and DFS 5G STA."""
-    # Test Step: Connect discoverer to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
-        self.discoverer,
-        self.wifi_info.discoverer_wifi_ssid,
-        self.wifi_info.discoverer_wifi_password,
-        self.current_test_result,
-        is_discoverer=True,
+    # Test Step: Disconnect discoverer from the current connected wifi sta.
+    discoverer_wifi_disconnected = (
+        setup_utils.remove_current_connected_wifi_network(self.discoverer)
     )
 
     # Test Step: Set up a prior BT connection.
@@ -199,16 +187,17 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Test Step: Connect advertiser to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    advertiser_wifi_connected = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
         self.wifi_info.advertiser_wifi_ssid,
         self.wifi_info.advertiser_wifi_password,
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
-    # This is important especially for the transfer speed or WLAN test.
-    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+    if discoverer_wifi_disconnected or advertiser_wifi_connected:
+      # Let scan, DHCP and internet validation complete before NC.
+      # This is important especially for the transfer speed or WLAN test.
+      time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(

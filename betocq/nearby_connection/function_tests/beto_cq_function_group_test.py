@@ -28,7 +28,6 @@ Test steps:
 import collections
 import datetime
 import logging
-import time
 
 from mobly import asserts
 from mobly import test_runner
@@ -249,8 +248,8 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
-    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+    # don't wait as the speed is not critical for function test.
+    # time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
     # due to (internal), the file transfer is not stable for wifi LAN medium.
     # Test Step: Set up nearby connection and transfer file.
