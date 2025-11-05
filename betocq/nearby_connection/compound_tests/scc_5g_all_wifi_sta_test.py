@@ -254,7 +254,9 @@ class Scc5gAllWifiStaTest(performance_test_base.PerformanceTestBase):
     # Wait for the STA to be connected as the 'DISRUPPTIVE' upgrade medium
     # will disconnect the STA during the file transfer.
     setup_utils.wait_for_wifi_auto_join(
-        self.discoverer
+        self.discoverer,
+        self.wifi_info.discoverer_wifi_ssid,
+        self.wifi_info.discoverer_wifi_password,
     )
 
 

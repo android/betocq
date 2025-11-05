@@ -306,6 +306,8 @@ def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
 
 def wait_for_wifi_auto_join(
     ad: android_device.AndroidDevice,
+    wifi_ssid: str,
+    wifi_password: str,
 ) -> None:
   """Waits for the wifi connection after disruptive test."""
   initial_max_wait_time_sec = 6
@@ -314,6 +316,8 @@ def wait_for_wifi_auto_join(
   while not wifi_is_connected and max_wait_time_sec > 0:
     time.sleep(1)
     wifi_is_connected = ad.nearby.isWifiConnected()
+    if not wifi_is_connected:
+      ad.nearby.wifiConnectSimple(wifi_ssid, wifi_password)
     max_wait_time_sec -= 1
   ad.log.info(
       f'Waiting {initial_max_wait_time_sec - max_wait_time_sec} seconds for'
