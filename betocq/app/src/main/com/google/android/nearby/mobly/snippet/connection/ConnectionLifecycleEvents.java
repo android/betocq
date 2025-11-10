@@ -80,6 +80,7 @@ public class ConnectionLifecycleEvents extends ConnectionLifecycleCallback {
     SnippetEvent snippetEvent = new SnippetEvent(callbackId, "onBandwidthChanged");
     Bundle eventData = snippetEvent.getData();
     eventData.putString("endpointId", endpointId);
+    eventData.putInt("upgradeStatus", bandwidthInfo.getUpgradeStatus());
     eventData.putInt("bwQuality", bandwidthInfo.getQuality());
     eventData.putBoolean("isHighBwQuality", bandwidthInfo.getQuality() == Quality.HIGH);
     eventData.putInt("medium", bandwidthInfo.getMedium());

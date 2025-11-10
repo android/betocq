@@ -96,7 +96,6 @@ def connect_ad_to_wifi_sta(
   """
   try:
     wifi_info = ad.nearby.wifiGetConnectionInfo()
-    ad.log.info(f'network_info: {wifi_info}')
     current_wifi_ssid = wifi_info.get('SSID', '')
     if current_wifi_ssid == wifi_ssid:
       ad.log.info(f'already connected to {wifi_ssid}')
