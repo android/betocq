@@ -180,6 +180,12 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
       # This is important especially for the transfer speed or WLAN test.
       time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
+    test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
+
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
         self.advertiser,
@@ -193,6 +199,18 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
     upgrade_medium = self.current_test_result.quality_info.upgrade_medium
     if upgrade_medium is not None:
       upgraded_medium_name = upgrade_medium.name
+
+    if upgrade_medium in [
+        nc_constants.NearbyConnectionMedium.WIFI_DIRECT,
+        nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT,
+    ]:
+      test_result_utils.set_and_assert_p2p_frequency(
+          self.advertiser,
+          self.current_test_result,
+          self.wifi_info.is_mcc,
+          self.test_runtime.is_dbs_mode,
+          sta_frequency=self.current_test_result.sta_frequency,
+      )
 
     # due to (internal), the file transfer is not stable for wifi LAN medium.
     do_file_transfer = True
@@ -220,25 +238,6 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
             file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP.format(
                 upgraded_medium_name=upgraded_medium_name
             ),
-        )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-      test_result_utils.assert_sta_frequency(
-          self.current_test_result,
-          expected_wifi_type=self.wifi_info.sta_type,
-      )
-      if upgrade_medium in [
-          nc_constants.NearbyConnectionMedium.WIFI_DIRECT,
-          nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT,
-      ]:
-        test_result_utils.assert_p2p_frequency(
-            self.current_test_result,
-            is_mcc=self.wifi_info.is_mcc,
-            is_dbs_mode=self.test_runtime.is_dbs_mode,
         )
 
     test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(

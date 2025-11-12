@@ -165,12 +165,6 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
       )
 
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-
     # Check the throughput and run iperf if needed.
     test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
         test_result=self.current_test_result,

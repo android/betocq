@@ -790,11 +790,13 @@ def clear_hermetic_overrides(
   ad.log.info('Clear hermetic flags override.')
 
 
-def get_target_sta_frequency_and_max_link_speed(
+def get_sta_frequency_and_max_link_speed(
     ad: android_device.AndroidDevice,
+    connection_info: dict[str, Any] | None = None,
 ) -> tuple[int, int]:
   """Gets the STA frequency and max link speed."""
-  connection_info = ad.nearby.wifiGetConnectionInfo()
+  if connection_info is None:
+    connection_info = ad.nearby.wifiGetConnectionInfo()
   sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
   sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
       connection_info

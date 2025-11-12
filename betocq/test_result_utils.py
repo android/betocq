@@ -44,36 +44,25 @@ def _float_to_str(value: float, precision: int) -> str:
   return f'{round(value, precision)}'
 
 
-def collect_nc_test_metrics(
-    test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
-):
-  """Collects general test metrics for nearby connection tests."""
-  advertiser = nc_test_runtime.advertiser
-  sta_frequency, max_link_speed_mbps = (
-      setup_utils.get_target_sta_frequency_and_max_link_speed(advertiser)
-  )
-  test_result.sta_frequency = sta_frequency
-  test_result.max_sta_link_speed_mbps = max_link_speed_mbps
-
-  if test_result.quality_info.upgrade_medium in [
-      nc_constants.NearbyConnectionMedium.WIFI_DIRECT,
-      nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT,
-  ]:
-    test_result.quality_info.medium_frequency = (
-        setup_utils.get_wifi_p2p_frequency(advertiser)
-    )
-
-
-def assert_p2p_frequency(
+def set_and_assert_p2p_frequency(
+    ad: android_device.AndroidDevice,
     test_result: SingleTestResult,
     is_mcc: bool,
     is_dbs_mode: bool,
+    sta_frequency: int,
+    additional_error_message: str = '',
 ):
   """Asserts the p2p frequency is expected."""
-  p2p_frequency = test_result.quality_info.medium_frequency
-  sta_frequency = test_result.sta_frequency
-  if p2p_frequency == nc_constants.INVALID_INT:
+  p2p_frequency = setup_utils.get_wifi_p2p_frequency(ad)
+  test_result.quality_info.medium_frequency = p2p_frequency
+  if (
+      p2p_frequency == nc_constants.INVALID_INT
+      or sta_frequency == nc_constants.INVALID_INT
+  ):
+    ad.log.warning(
+        'The P2P frequency ({p2p_frequency}) or STA frequency ({sta_frequency})'
+        ' is not available, the test result may not be expected.'
+    )
     return
 
   # Check for MCC.
@@ -85,8 +74,7 @@ def assert_p2p_frequency(
     )
     asserts.fail(
         f'P2P frequeny ({p2p_frequency}) is same as STA frequency'
-        f' ({sta_frequency}) in MCC test case. Check the device capability'
-        ' configuration especially for DBS, DFS, indoor capabilities.'
+        f' ({sta_frequency}) in MCC test case. {additional_error_message}'
     )
 
   # Check for SCC.
@@ -96,8 +84,7 @@ def assert_p2p_frequency(
     )
     asserts.fail(
         f'P2P frequeny ({p2p_frequency}) is different from STA frequency'
-        f' ({sta_frequency}) in SCC test case. Check the device capability'
-        ' configuration especially for DBS, DFS, indoor capabilities.'
+        f' ({sta_frequency}) in SCC test case. {additional_error_message}'
     )
   if is_dbs_mode and p2p_frequency == sta_frequency:
     test_result.set_active_nc_fail_reason(
@@ -105,23 +92,42 @@ def assert_p2p_frequency(
     )
     asserts.fail(
         f'P2P frequeny ({p2p_frequency}) is the same as STA frequency'
-        f' ({sta_frequency}) in SCC+DBS test case. Check the device capability'
-        ' configuration especially for DBS, DFS, indoor capabilities.'
+        f' ({sta_frequency}) in SCC+DBS test case. {additional_error_message}'
     )
 
 
-def assert_sta_frequency(
+def set_and_assert_sta_frequency(
+    ad: android_device.AndroidDevice,
     test_result: SingleTestResult,
     expected_wifi_type: nc_constants.WifiType,
 ):
   """Asserts the STA frequency is expected."""
-  sta_frequency = test_result.sta_frequency
-  # Check whether the device is still connected to the AP.
+
+  connection_info = ad.nearby.wifiGetConnectionInfo()
+  sta_frequency, max_link_speed_mbps = (
+      setup_utils.get_sta_frequency_and_max_link_speed(ad, connection_info)
+  )
+  test_result.sta_frequency = sta_frequency
+  test_result.max_sta_link_speed_mbps = max_link_speed_mbps
+
   if sta_frequency == nc_constants.INVALID_INT:
-    test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.DISCONNECTED_FROM_AP
+    ad.log.info(
+        'The STA frequency is not available, connection_info:'
+        f' {connection_info}, the test may not be expected.'
     )
-    asserts.fail('Target device is disconnected from AP. Check AP DHCP config.')
+    if (
+        connection_info.get('SupplicantState', '')
+        != nc_constants.WIFI_SUPPLICANT_STATE_COMPLETED
+    ):
+      if ad.role == 'target':
+        test_result.test_failure_reason = (
+            nc_constants.SingleTestFailureReason.TARGET_WIFI_CONNECTION
+        )
+      else:
+        test_result.test_failure_reason = (
+            nc_constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
+        )
+      asserts.fail(test_result.test_failure_reason)
 
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
@@ -144,7 +150,11 @@ def assert_sta_frequency(
   test_result.set_active_nc_fail_reason(
       nc_constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
   )
-  asserts.fail(f'AP is set to a wrong frequency {sta_frequency}')
+  # The correct frequency is critical
+  asserts.abort_all(
+      f'AP is set to a wrong frequency {sta_frequency}, check the AP'
+      ' configuration and the test configuration.'
+  )
 
 
 def assert_2g_wifi_throughput_and_run_iperf_if_needed(

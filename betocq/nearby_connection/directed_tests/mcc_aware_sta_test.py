@@ -165,6 +165,20 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
       # This is important especially for the transfer speed or WLAN test.
       time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
+    # TODO: differentiate the discoverer and advertiser
+    # STA frequency in the test result.
+    test_result_utils.set_and_assert_sta_frequency(
+        self.discoverer,
+        self.current_test_result,
+        nc_constants.WifiType.FREQ_5G,
+    )
+
+    test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        self.current_test_result,
+        nc_constants.WifiType.FREQ_5G_DFS,
+    )
+
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
         self.advertiser,
@@ -190,16 +204,6 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
           active_snippet.test_failure_reason,
           self.current_test_result,
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-      test_result_utils.assert_sta_frequency(
-          self.current_test_result,
-          expected_wifi_type=nc_constants.WifiType.FREQ_5G_DFS,
       )
 
     # Check the throughput and run iperf if needed.

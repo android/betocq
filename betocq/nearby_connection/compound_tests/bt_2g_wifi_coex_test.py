@@ -29,9 +29,7 @@ Test steps:
   1. Connect discoverer to a 2G Wi-Fi network.
   2. Set up a prior Nearby Connection through Bluetooth medium.
   3. Connect advertiser to the same Wi-Fi network.
-  4. Set up a connection and upgrade to any available Wi-Fi medium.
-      * The expected wifi medium is WFD, but other mediums will be tried if
-        WFD is failed.
+  4. Set up a connection and upgrade to WFD.
   5. Transfer file on the connection established in step 4.
   6. Tear down all Nearby Connections.
 
@@ -158,6 +156,17 @@ class Bt2gWifiCoexTest(performance_test_base.PerformanceTestBase):
     # and internet validation complete. But we don't need to wait in this test
     # case as we don't care speed.
 
+    test_result_utils.set_and_assert_sta_frequency(
+        self.discoverer,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
+    test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
+
     # Test Step: Set up a NC connection for file transfer.
     # use NON_DISRUPTIVE to avoid wifi disconnection during file transfer as
     # data throughput is not the goal of this test case.
@@ -186,16 +195,6 @@ class Bt2gWifiCoexTest(performance_test_base.PerformanceTestBase):
           active_snippet.test_failure_reason,
           self.current_test_result,
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-      test_result_utils.assert_sta_frequency(
-          self.current_test_result,
-          expected_wifi_type=self.wifi_info.sta_type,
       )
 
     prior_bt_snippet.disconnect_endpoint()

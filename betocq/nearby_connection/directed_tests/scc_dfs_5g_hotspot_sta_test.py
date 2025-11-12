@@ -194,11 +194,17 @@ class SccDfs5gHotspotStaTest(performance_test_base.PerformanceTestBase):
         self.wifi_info.advertiser_wifi_password,
         self.current_test_result,
         is_discoverer=False,
-    ) or discoverer_sta_op
-    if advertiser_sta_op:
+    )
+    if discoverer_sta_op or advertiser_sta_op:
       # Let scan, DHCP and internet validation complete before NC.
       # This is important especially for the transfer speed or WLAN test.
       time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+
+    test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
@@ -208,6 +214,14 @@ class SccDfs5gHotspotStaTest(performance_test_base.PerformanceTestBase):
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
+    )
+
+    test_result_utils.set_and_assert_p2p_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.is_mcc,
+        self.test_runtime.is_dbs_mode,
+        sta_frequency=self.current_test_result.sta_frequency,
     )
 
     # Test Step: Transfer file on the established NC.
@@ -225,21 +239,6 @@ class SccDfs5gHotspotStaTest(performance_test_base.PerformanceTestBase):
           active_snippet.test_failure_reason,
           self.current_test_result,
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-      test_result_utils.assert_sta_frequency(
-          self.current_test_result,
-          expected_wifi_type=self.wifi_info.sta_type,
-      )
-      test_result_utils.assert_p2p_frequency(
-          self.current_test_result,
-          is_mcc=self.wifi_info.is_mcc,
-          is_dbs_mode=self.test_runtime.is_dbs_mode,
       )
 
     # Check the throughput and run iperf if needed.
