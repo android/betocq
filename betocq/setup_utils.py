@@ -17,7 +17,7 @@
 from collections.abc import Callable
 import datetime
 import time
-from typing import Any
+from typing import Any, Literal
 
 from mobly import asserts
 from mobly.controllers import android_device
@@ -1042,3 +1042,24 @@ def reset_nearby_connection(ad: android_device.AndroidDevice,) -> None:
       nearby.stopDiscovery()
       nearby.stopAllEndpoints()
   time.sleep(nc_constants.NEARBY_RESET_WAIT_TIME.total_seconds())
+
+
+_Priority = Literal['d', 'e', 'f', 'i', 'v', 'w', 's']
+
+
+def log_message_to_logcat(
+    ad: android_device.AndroidDevice,
+    message: str,
+    tag: str = 'BetoCQ',
+    priority: _Priority = 'd',
+):
+  """logs a message to logcat.
+
+  Args:
+    ad: A AndroidDevice instances.
+    message: The message to log.
+    tag: The tag of the log.
+    priority: The priority of the log. Default is 'd' (debug). d: DEBUG  e:
+      ERROR  f: FATAL  i: INFO  v: VERBOSE  w: WARN  s: SILENT
+  """
+  ad.adb.shell(f'log -p {priority} -t {tag} "{message}"')

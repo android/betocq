@@ -235,6 +235,20 @@ class BaseTestClass(base_test.BaseTestClass):
     })
     self._stop_packet_capture(ignore_packets=True)
     self._start_packet_capture()
+    self._log_test_start_on_device(self.advertiser)
+    self._log_test_start_on_device(self.discoverer)
+
+  def _log_test_start_on_device(self, ad: android_device.AndroidDevice):
+    setup_utils.log_message_to_logcat(
+        ad,
+        f'TEST START: {self.current_test_info.name}',
+    )
+
+  def _log_test_end_on_device(self, ad: android_device.AndroidDevice):
+    setup_utils.log_message_to_logcat(
+        ad,
+        f'TEST END: {self.current_test_info.name}',
+    )
 
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
@@ -242,6 +256,8 @@ class BaseTestClass(base_test.BaseTestClass):
     setup_utils.enable_gms_auto_updates(ad)
 
   def teardown_test(self) -> None:
+    self._log_test_end_on_device(self.advertiser)
+    self._log_test_end_on_device(self.discoverer)
     utils.concurrent_exec(
         lambda d: d.services.create_output_excerpts_all(self.current_test_info),
         param_list=[[ad] for ad in self.ads],
