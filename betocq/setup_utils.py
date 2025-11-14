@@ -809,6 +809,24 @@ def get_sta_frequency_and_max_link_speed(
   return (sta_frequency, sta_max_link_speed_mbps)
 
 
+# Add back temporarily, will be removed after refractoring refactor DCT tests.
+def get_target_sta_frequency_and_max_link_speed(
+    ad: android_device.AndroidDevice,
+) -> tuple[int, int]:
+  """Gets the STA frequency and max link speed."""
+  connection_info = ad.nearby.wifiGetConnectionInfo()
+  sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
+  sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
+      connection_info
+  )
+
+  # If the info is not available, try getting them by adb wifi status command.
+  if sta_frequency == nc_constants.INVALID_INT:
+    sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
+    sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
+  return (sta_frequency, sta_max_link_speed_mbps)
+
+
 def load_nearby_snippet(
     ad: android_device.AndroidDevice,
     config: nc_constants.SnippetConfig,

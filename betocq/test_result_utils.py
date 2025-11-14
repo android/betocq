@@ -96,6 +96,66 @@ def set_and_assert_p2p_frequency(
     )
 
 
+# Add back temporarily, will be removed after refractoring refactor DCT tests.
+def collect_nc_test_metrics(
+    test_result: SingleTestResult,
+    nc_test_runtime: nc_constants.NcTestRuntime,
+):
+  """Collects general test metrics for nearby connection tests."""
+  advertiser = nc_test_runtime.advertiser
+  sta_frequency, max_link_speed_mbps = (
+      setup_utils.get_target_sta_frequency_and_max_link_speed(advertiser)
+  )
+  test_result.sta_frequency = sta_frequency
+  test_result.max_sta_link_speed_mbps = max_link_speed_mbps
+
+  if test_result.quality_info.upgrade_medium in [
+      nc_constants.NearbyConnectionMedium.WIFI_DIRECT,
+      nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT,
+  ]:
+    test_result.quality_info.medium_frequency = (
+        setup_utils.get_wifi_p2p_frequency(advertiser)
+    )
+
+
+# Add back temporarily, will be removed after refractoring refactor DCT tests.
+def assert_sta_frequency(
+    test_result: SingleTestResult,
+    expected_wifi_type: nc_constants.WifiType,
+):
+  """Asserts the STA frequency is expected."""
+  sta_frequency = test_result.sta_frequency
+  # Check whether the device is still connected to the AP.
+  if sta_frequency == nc_constants.INVALID_INT:
+    test_result.set_active_nc_fail_reason(
+        nc_constants.SingleTestFailureReason.DISCONNECTED_FROM_AP
+    )
+    asserts.fail('Target device is disconnected from AP. Check AP DHCP config.')
+
+  # Check whether the STA frequency is expected.
+  match expected_wifi_type:
+    case nc_constants.WifiType.FREQ_2G:
+      is_valid_freq = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+    case nc_constants.WifiType.FREQ_5G:
+      is_valid_freq = sta_frequency > nc_constants.MAX_FREQ_2G_MHZ and (
+          sta_frequency < nc_constants.MIN_FREQ_5G_DFS_MHZ
+          or sta_frequency > nc_constants.MAX_FREQ_5G_DFS_MHZ
+      )
+    case nc_constants.WifiType.FREQ_5G_DFS:
+      is_valid_freq = (
+          sta_frequency >= nc_constants.MIN_FREQ_5G_DFS_MHZ
+          and sta_frequency <= nc_constants.MAX_FREQ_5G_DFS_MHZ
+      )
+
+  if is_valid_freq:
+    return
+
+  test_result.set_active_nc_fail_reason(
+      nc_constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
+  )
+  asserts.fail(f'AP is set to a wrong frequency {sta_frequency}')
+
+
 def set_and_assert_sta_frequency(
     ad: android_device.AndroidDevice,
     test_result: SingleTestResult,
