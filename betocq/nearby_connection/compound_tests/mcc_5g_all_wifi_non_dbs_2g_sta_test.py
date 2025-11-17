@@ -210,6 +210,10 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
           self.wifi_info.is_mcc,
           self.test_runtime.is_dbs_mode,
           sta_frequency=self.current_test_result.sta_frequency,
+          additional_error_message=(
+              'Check if the supports_dbs_sta_wfd is really false for the'
+              ' target device. If yes, work with the chipset vendor to fix it.'
+          ),
       )
 
     # due to (internal), the file transfer is not stable for wifi LAN medium.

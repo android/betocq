@@ -207,6 +207,9 @@ class Scc2gAllWifiStaTest(performance_test_base.PerformanceTestBase):
           self.wifi_info.is_mcc,
           self.test_runtime.is_dbs_mode,
           sta_frequency=self.current_test_result.sta_frequency,
+          additional_error_message=(
+              'Check if the device is really does not support 5G Wi-Fi.'
+          ),
       )
 
     # due to (internal), the file transfer is not stable for wifi LAN medium.

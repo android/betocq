@@ -217,6 +217,11 @@ class SccDfs5gWfdStaTest(performance_test_base.PerformanceTestBase):
         self.wifi_info.is_mcc,
         self.test_runtime.is_dbs_mode,
         sta_frequency=self.current_test_result.sta_frequency,
+        additional_error_message=(
+            'Check if enable_sta_dfs_channel_for_peer_network is really True'
+            ' for the target device. If yes, it is a real issue to be fixed.'
+            ' You may work with the chipset vendor.'
+        ),
     )
 
     # Test Step: Transfer file on the established NC.

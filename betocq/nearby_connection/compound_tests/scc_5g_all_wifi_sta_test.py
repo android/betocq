@@ -208,6 +208,10 @@ class Scc5gAllWifiStaTest(performance_test_base.PerformanceTestBase):
           self.wifi_info.is_mcc,
           self.test_runtime.is_dbs_mode,
           sta_frequency=self.current_test_result.sta_frequency,
+          additional_error_message=(
+              'This is a real issue to be fixed. You may work with the chipset'
+              ' vendor.'
+          ),
       )
 
     # due to (internal), the file transfer is not stable for wifi LAN medium.

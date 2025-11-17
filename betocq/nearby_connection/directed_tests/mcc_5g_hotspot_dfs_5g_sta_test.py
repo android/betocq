@@ -221,6 +221,11 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         self.wifi_info.is_mcc,
         self.test_runtime.is_dbs_mode,
         sta_frequency=self.current_test_result.sta_frequency,
+        additional_error_message=(
+            'Check if enable_sta_dfs_channel_for_peer_network is really False'
+            ' for the target device. If yes, the device violate the regulation'
+            ' of Wi-Fi 5G DFS channel. You may work with the chipset vendor.'
+        ),
     )
 
     # Test Step: Transfer file on the established NC.

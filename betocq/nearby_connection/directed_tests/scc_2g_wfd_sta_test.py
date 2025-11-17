@@ -200,6 +200,10 @@ class Scc2gWfdStaTest(performance_test_base.PerformanceTestBase):
         self.wifi_info.is_mcc,
         self.test_runtime.is_dbs_mode,
         sta_frequency=self.current_test_result.sta_frequency,
+        additional_error_message=(
+            'The device violates the regulation of Wi-Fi 5G indoor channel.'
+            'You may work with the chipset vendor.'
+        ),
     )
 
     # Test Step: Transfer file on the established NC.

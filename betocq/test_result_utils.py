@@ -188,33 +188,47 @@ def set_and_assert_sta_frequency(
             nc_constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
         )
       asserts.fail(test_result.test_failure_reason)
-
+  additional_error_message = ''
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
     case nc_constants.WifiType.FREQ_2G:
       is_valid_freq = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+      if not is_valid_freq:
+        additional_error_message = (
+            ' The channel is expected to be a 2G channel.'
+        )
     case nc_constants.WifiType.FREQ_5G:
       is_valid_freq = sta_frequency > nc_constants.MAX_FREQ_2G_MHZ and (
           sta_frequency < nc_constants.MIN_FREQ_5G_DFS_MHZ
           or sta_frequency > nc_constants.MAX_FREQ_5G_DFS_MHZ
       )
+      if not is_valid_freq:
+        additional_error_message = (
+            ' The channel is expected to be a 5G channel.'
+        )
     case nc_constants.WifiType.FREQ_5G_DFS:
       is_valid_freq = (
           sta_frequency >= nc_constants.MIN_FREQ_5G_DFS_MHZ
           and sta_frequency <= nc_constants.MAX_FREQ_5G_DFS_MHZ
       )
+      if not is_valid_freq:
+        additional_error_message = (
+            ' The channel is expected to be a 5G DFS channel.'
+            ' If the test is not in a shield box or room, the DFS channel may'
+            ' be changed by the AP due to radar signals detected, reset the AP'
+            ' to a DFS channel and run the test in a shield box or room to'
+            ' avoid such an issue in the future.'
+        )
 
-  if is_valid_freq:
-    return
-
-  test_result.set_active_nc_fail_reason(
-      nc_constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
-  )
-  # The correct frequency is critical
-  asserts.abort_all(
-      f'AP is set to a wrong frequency {sta_frequency}, check the AP'
-      ' configuration and the test configuration.'
-  )
+  if not is_valid_freq:
+    test_result.set_active_nc_fail_reason(
+        nc_constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
+    )
+    # The correct frequency is critical
+    asserts.abort_all(
+        f'AP is set to a wrong frequency {sta_frequency}, check the AP'
+        f' configuration and the test configuration.{additional_error_message}'
+    )
 
 
 def assert_2g_wifi_throughput_and_run_iperf_if_needed(
