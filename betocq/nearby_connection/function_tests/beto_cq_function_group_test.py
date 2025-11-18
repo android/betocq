@@ -28,6 +28,7 @@ Test steps:
 import collections
 import datetime
 import logging
+import time
 
 from mobly import asserts
 from mobly import test_runner
@@ -43,6 +44,8 @@ from betocq.nearby_connection import utils as nc_utils
 
 
 _COUNTRY_CODE = 'US'
+# The number of bits to use for the fraction part of the speed in MB/s.
+_SPEED_MBPS_FRACTION_BITS = 3
 _BT_BLE_FILE_TRANSFER_FAILURE_TIP = (
     'The Bluetooth performance is really bad or unknown reason.'
 )
@@ -248,8 +251,8 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.current_test_result,
         is_discoverer=False,
     )
-    # don't wait as the speed is not critical for function test.
-    # time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+
+    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
     # due to (internal), the file transfer is not stable for wifi LAN medium.
     # Test Step: Set up nearby connection and transfer file.
@@ -261,7 +264,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         file_transfer_failure_tip=_WIFILAN_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1MB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
         do_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
     )
@@ -488,11 +491,18 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     super().on_fail(record)
 
   def _record_single_test_case_report(self):
+    properties = {'result': self.current_test_result.result_message}
+    if self.current_test_result.file_transfer_throughput_kbps > 0:
+      # Convert the throughput to MB/s and record it as a property.
+      properties['speed_mbps'] = (
+          test_result_utils._float_to_str(
+              self.current_test_result.file_transfer_throughput_kbps / 1024,
+              _SPEED_MBPS_FRACTION_BITS,
+          )
+      )
     self.record_data({
         'Test Name': self.current_test_info.name,
-        'properties': {
-            'result': self.current_test_result.result_message,
-        },
+        'properties': properties,
     })
 
   def teardown_class(self):
