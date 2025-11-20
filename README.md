@@ -418,18 +418,17 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
       Check with the Wi-Fi engineering team about device capabilities details.
 
 
+### Set up results uploader  (first time use only)
+Follow instructions in [`results_uploader`](https://github.com/android/mobly-android-partner-tools) to get the test results.
+
 ### Run the test
-
-Follow instructions in [`results_uploader`](https://github.com/android/mobly-android-partner-tools) to setup GCP account if you haven't done so.
-
-Run the following command to run the test and get the visualized test report.
+Run the following command to run the test.
 
 ```
-mobly_runner betocq_test_suite -tb Quickstart -i -c cuj_and_test_config.yml -u [-- your-test-label]
+mobly_runner betocq_test_suite -tb CUJ_name -i -c cuj_and_test_config.yml -u [-- your-test-label]
 ```
 
-Note that `Quickstart` is the CUJ test name and there are
-a few other supported CUJ tests listed in `cuj_and_test_config.yml`.
+Note that `CUJ_name` is one of the supported CUJ tests listed in `cuj_and_test_config.yml`, e.g., "Quickstart".
 
 
 ### Debugging test failures
