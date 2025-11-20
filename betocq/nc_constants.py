@@ -173,6 +173,7 @@ class TestParameters:
   # TODO: Enable this test when the bug is fixed.
   do_nc_wlan_file_transfer_test: bool = False
   delay_nc_discovery_request: bool = False
+  is_tdls_enabled_in_dct_mode: bool = True
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':

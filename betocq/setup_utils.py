@@ -16,6 +16,7 @@
 
 from collections.abc import Callable
 import datetime
+import re
 import time
 from typing import Any, Literal
 
@@ -31,8 +32,6 @@ from betocq import resources
 
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
     '//wireless/android/platform/testing/bettertogether/betocq:dct_on_overrides'
-)
-    '//wireless/android/platform/testing/bettertogether/betocq:dct_usb_on_overrides'
 )
 _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:wifi_direct_hotspot_off_overrides'
 _FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
@@ -64,7 +63,7 @@ NEARBY_LOG_TAGS = [
 
 
 def get_betocq_device_specific_info(
-    ad: android_device.AndroidDevice
+    ad: android_device.AndroidDevice,
 ) -> dict[str, Any]:
   """Gets the device specific info from the class attribute."""
   # Check if the class attribute exists. If not, create it as an empty dict.
@@ -144,7 +143,7 @@ def enable_logs(ad: android_device.AndroidDevice) -> None:
   """Enables Nearby, WiFi and BT detailed logs."""
   ad.log.info('Enable Nearby loggings.')
   if ad.is_adb_root:
-  # Increase log buffer size.
+    # Increase log buffer size.
     ad.adb.shell('setprop persist.logd.size 8388608')  # 8M
   else:
     try:
@@ -280,8 +279,10 @@ def remove_current_connected_wifi_network(
     ad.log.info(f'disconnecting from {wifi_info.get("SSID", "")}')
     ad.nearby.wifiRemoveNetwork(network_id)
   else:
-    ad.log.warning(f'No valid network id for {wifi_info.get("SSID", "")}, try'
-                   ' to remove all networks.')
+    ad.log.warning(
+        f'No valid network id for {wifi_info.get("SSID", "")}, try'
+        ' to remove all networks.'
+    )
     remove_disconnect_wifi_network(ad)
 
   return True
@@ -724,6 +725,71 @@ def _get_resource_contents(name: str) -> str:
     return f.read()
 
 
+# set wifi tdls mode by using adb wl command. Only works with BRCM chipsets.
+def set_wifi_tdls_mode_by_adb_wl_command(
+    ad: android_device.AndroidDevice,
+    enable_tdls: bool,
+    catch_exception: bool = True,
+) -> None:
+  """Sets wifi tdls mode on the given device by using adb wl command.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+    enable_tdls: True to enable TDLS, False to disable.
+    catch_exception: True to catch exception, False to raise exception.
+  """
+  if not ad.is_adb_root:
+    ad.log.info('Skipped setting wifi tdls mode on unrooted device.')
+    return
+
+  try:
+    if enable_tdls:
+      ad.adb.shell('wl tdls_enable')
+      ad.log.info('Start wifi tdls through adb wl command')
+    else:
+      ad.adb.shell('wl tdls_enable 0')
+      ad.log.info('Stop wifi tdls through adb wl command')
+  except adb.AdbError as e:
+    if not catch_exception:
+      raise
+    ad.log.warning(f'Failed to set wifi tdls mode: {e}')
+    return
+
+
+def set_wifi_tdls_mode_by_wifi_manager_api(
+    ad: android_device.AndroidDevice,
+    remote_ad: android_device.AndroidDevice,
+    enable_tdls: bool,
+    catch_exception: bool = True,
+) -> None:
+  """Sets wifi tdls mode on the given device by using WifiManager API."""
+  # WifiManager.setTdlsEnabled() doesn't work with Pixel devices.
+  # Use the wl command instead.
+  remote_ip_address = None
+  try:
+    remote_status = (
+        remote_ad.adb.shell('cmd wifi status').decode('utf-8').strip()
+    )
+    for line in remote_status.splitlines():
+      if 'WifiInfo:' in line:
+        match = re.search(r'IP: /((?:[0-9]{1,3}\.){3}[0-9]{1,3})', line)
+        if match:
+          remote_ip_address = match.group(1)
+          break
+    if remote_ip_address is None:
+      remote_ad.log.warning('Cannot find IP address in "cmd wifi status".')
+      return
+  except (ValueError):
+    if not catch_exception:
+      raise
+    remote_ad.log.warning('Failed to get IP address from remote device.')
+    return
+
+  # ad.log.info(f'Remote device IP address: {remote_ip_address}')
+  ad.nearby.wifiSetTdlsEnable(remote_ip_address, enable_tdls)
+  ad.log.info(f'Set wifi tdls mode to {enable_tdls}')
+
+
 def set_flags(
     ad: android_device.AndroidDevice,
     output_path: str,
@@ -1044,7 +1110,9 @@ def abort_if_device_cap_not_match(
     )
 
 
-def reset_nearby_connection(ad: android_device.AndroidDevice,) -> None:
+def reset_nearby_connection(
+    ad: android_device.AndroidDevice,
+) -> None:
   """Resets Nearby Connection on the given device.
 
   Safe guard for the failure test, in case the previous test failed in the

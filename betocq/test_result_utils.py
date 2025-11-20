@@ -341,12 +341,14 @@ def assert_5g_wifi_throughput(
     nc_test_runtime: nc_constants.NcTestRuntime,
     low_throughput_tip: str,
     is_dct: bool = True,
+    is_tdls_enabled: bool = True,
 ):
   """Checks the throughput for 5G medium."""
   speed_target = _get_5g_wifi_throughput_benchmark(
       test_result=test_result,
       nc_test_runtime=nc_test_runtime,
       is_dct=is_dct,
+      is_tdls_enabled=is_tdls_enabled,
   )
   logging.info('speed target: %s', speed_target)
   assert_throughput(
@@ -360,6 +362,7 @@ def _get_5g_wifi_throughput_benchmark(
     test_result: SingleTestResult,
     nc_test_runtime: nc_constants.NcTestRuntime,
     is_dct: bool = False,
+    is_tdls_enabled: bool = True,
 ):
   """Gets the throughput benchmark as MBps."""
   discoverer = nc_test_runtime.discoverer
@@ -422,7 +425,7 @@ def _get_5g_wifi_throughput_benchmark(
       )
 
   # Cut the speed target by half if TDLS is not supported.
-  if is_wlan_medium and not is_tdls_supported:
+  if is_wlan_medium and (not is_tdls_supported or not is_tdls_enabled):
     min_throughput_mbyte_per_sec /= 2.0
 
   # Step 4. Calculate nc_min_throughput_mbyte_per_sec.
