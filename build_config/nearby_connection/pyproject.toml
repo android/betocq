@@ -23,4 +23,4 @@ betocq_auto_test_suite = "betocq.nearby_connection.betocq_android_auto_test_suit
 Homepage = "https://github.com/android/betocq"
 
 [tool.setuptools.packages.find]
-include = ["betocq/*"]
+include = ["betocq"]
