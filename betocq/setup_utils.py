@@ -198,6 +198,29 @@ def _do_grant_manage_external_storage_permission(
   _grant_manage_external_storage_permission(ad, package_name)
 
 
+def grant_permission(
+    ad: android_device.AndroidDevice,
+    pkg: str,
+    permission: str,
+) -> None:
+  """Grants the Android permission to specific package."""
+  try:
+    if permission == 'android.permission.MANAGE_EXTERNAL_STORAGE':
+      ad.adb.shell(f'appops set --uid {pkg} MANAGE_EXTERNAL_STORAGE allow')
+      return
+    # Get current user ID to grant permission to support multiuser devices
+    # (go/supporting-hsum)
+    user_id = ad.adb.shell(['am', 'get-current-user']).decode().strip()
+    ad.adb.shell(['pm', 'grant', f'--user {user_id}', pkg, permission])
+  except adb.AdbError as e:
+    no_such_permission_error = (
+        f'Package {pkg} has not requested permission {permission}'
+    )
+    if no_such_permission_error not in str(e):
+      raise
+    ad.log.warning(no_such_permission_error)
+
+
 def dump_gms_version(ad: android_device.AndroidDevice) -> int:
   """Dumps GMS version from dumpsys to sponge properties."""
   try:
