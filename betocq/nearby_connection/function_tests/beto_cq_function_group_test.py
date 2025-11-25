@@ -148,8 +148,14 @@ def _start_nearby_connection_and_transfer_file(
           test_result,
           file_transfer_failure_tip=file_transfer_failure_tip,
       )
-
-    nearby_snippet.disconnect_endpoint()
+    # TODO: Re-enable this once the bug is fixed.
+    # disconnect_endpoint() is returned right away even if the connection is
+    # not disconnected yet. So we need to use stop_all_endpoints() to stop
+    # endpoints from both devices.
+    if upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY:
+      nearby_snippet.stop_all_endpoints()
+    else:
+      nearby_snippet.disconnect_endpoint()
 
 
 class BetoCqFunctionGroupTest(base_test.BaseTestClass):

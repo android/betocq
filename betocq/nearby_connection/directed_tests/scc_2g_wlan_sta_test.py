@@ -218,7 +218,12 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
     )
 
     prior_bt_snippet.disconnect_endpoint()
-    active_snippet.disconnect_endpoint()
+    # TODO: Re-enable this once the bug is fixed.
+    # disconnect_endpoint() is returned right away even if the connection is
+    # not disconnected yet. So we need to use stop_all_endpoints() to stop
+    # endpoints from both devices.
+    # active_snippet.disconnect_endpoint()
+    active_snippet.stop_all_endpoints()
 
 
 if __name__ == '__main__':

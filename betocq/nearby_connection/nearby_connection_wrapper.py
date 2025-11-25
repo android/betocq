@@ -467,6 +467,11 @@ class NearbyConnectionWrapper:
         f'disconnected with endpoint: {self._advertiser_endpoint_id}'
     )
 
+  def stop_all_endpoints(self) -> None:
+    """Stops all Nearby Connection endpoints."""
+    self.advertiser_nearby.stopAllEndpoints()
+    self.discoverer_nearby.stopAllEndpoints()
+
   def start_nearby_connection(
       self,
       timeouts: nc_constants.ConnectionSetupTimeouts,
