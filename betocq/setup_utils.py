@@ -21,6 +21,9 @@ import time
 from typing import Any, Literal
 
 from mobly import asserts
+from mobly import base_test
+from mobly import records
+from mobly import signals
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import apk_utils
@@ -1024,6 +1027,26 @@ def abort_if_on_unrooted_device(
         not ad.is_adb_root,
         failed_messages,
     )
+
+
+def abort_all_and_report_error_on_setup(
+    test: base_test.BaseTestClass,
+    error_message: str):
+  """Aborts all tests and reports as class error (taken as 'PASS' by default)."""
+  test_result_record = records.TestResultRecord(
+      base_test.STAGE_NAME_SETUP_CLASS,
+      test.TAG,
+  )
+  test_result_record.test_begin()
+  termination_signal = signals.TestAbortAll(
+      f'Aborting all tests due to {error_message}.'
+  )
+  test_result_record.test_error(termination_signal)
+  test.results.add_class_error(test_result_record)
+  test.summary_writer.dump(
+      test_result_record.to_dict(), records.TestSummaryEntryType.RECORD
+  )
+  raise termination_signal
 
 
 def abort_if_2g_ap_not_ready(

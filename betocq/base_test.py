@@ -18,7 +18,6 @@ import logging
 
 import os
 
-from mobly import asserts
 from mobly import base_test
 from mobly import records
 from mobly import utils
@@ -83,6 +82,25 @@ class BaseTestClass(base_test.BaseTestClass):
     self.__skipped_test_class = True
 
   def setup_class(self) -> None:
+    if (
+        not self.test_parameters.use_programmable_ap
+        and self.test_parameters.abort_all_if_any_ap_not_ready
+    ):
+      error_messages = ''
+      if not self.test_parameters.wifi_2g_ssid:
+        error_messages += '2G AP is not ready for this test.\n'
+        logging.warning('2G AP is not ready for this test.')
+      if not self.test_parameters.wifi_5g_ssid:
+        error_messages += '5G AP is not ready for this test.\n'
+        logging.warning('5G AP is not ready for this test.')
+      if not self.test_parameters.wifi_dfs_5g_ssid:
+        error_messages += '5G DFS AP is not ready for this test.\n'
+        logging.warning('5G DFS AP is not ready for this test.')
+      if error_messages:
+        setup_utils.abort_all_and_report_error_on_setup(
+            self, error_messages
+        )
+
     self.ads = self.register_controller(android_device, min_number=2)
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
@@ -124,14 +142,15 @@ class BaseTestClass(base_test.BaseTestClass):
   def _assert_general_nc_test_conditions(self):
     if not self.test_parameters.allow_unrooted_device:
       logging.info('The test is not allowed to run on unrooted device.')
-      asserts.abort_all_if(
-          not self.advertiser.is_adb_root or not self.discoverer.is_adb_root,
-          'The test only can run on rooted device.',
+      if not self.advertiser.is_adb_root or not self.discoverer.is_adb_root:
+        logging.warning('The test is aborted because the device is unrooted.')
+        setup_utils.abort_all_and_report_error_on_setup(
+            self, 'The test only can run on rooted device.'
+        )
+    if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
+      setup_utils.abort_all_and_report_error_on_setup(
+          self, 'wifi_chipset is empty in the config file'
       )
-    asserts.abort_all_if(
-        not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset,
-        'wifi_chipset is empty in the config file',
-    )
 
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
