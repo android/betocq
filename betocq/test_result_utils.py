@@ -726,6 +726,9 @@ def gen_single_test_iter_report(
           [f'{k}: {v}' for k, v in transfer_quality_info.items()]
       ),
       'wlan_connection_latency': _summarize_station_connection_info(result),
+      'debug_reference_info': '\n'.join(
+          [f'{k}: {v}' for k, v in result.debug_reference_info.items()]
+      ),
   }
 
 
@@ -755,6 +758,7 @@ class SingleTestResult:
   max_sta_link_speed_mbps: int = nc_constants.INVALID_INT
   start_time: datetime.datetime = datetime.datetime.now()
   end_time: datetime.datetime | None = None
+  debug_reference_info: dict[str, Any] = dataclasses.field(default_factory=dict)
 
   def __post_init__(self):
     self.start_time = datetime.datetime.now()
@@ -770,6 +774,12 @@ class SingleTestResult:
     ):
       return self.prior_nc_fail_reason
     return self.active_nc_fail_reason
+
+  def add_debug_reference_info(
+      self, key: str, value: Any
+  ) -> None:
+    """Adds debug reference info for the current test iteration."""
+    self.debug_reference_info[key] = value
 
   def set_prior_nc_fail_reason(
       self,

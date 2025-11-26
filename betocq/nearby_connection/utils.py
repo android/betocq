@@ -66,8 +66,6 @@ def setup_android_device_for_nc_tests(
   if country_code != device_specific_dict.get('wifi_country_code', ''):
     setup_utils.set_country_code(ad, country_code)
     device_specific_dict['wifi_country_code'] = country_code
-  # TODO: Only get the thermal zone data on_fail
-  setup_utils.get_thermal_zone_data(ad)
 
 
 def connect_ad_to_wifi_sta(

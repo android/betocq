@@ -972,15 +972,21 @@ def wait_for_predicate(
   return False
 
 
-def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
+def get_thermal_zone_data(
+    ad: android_device.AndroidDevice,
+) -> dict[str, int]:
   """Reads and logs temperature and type from /sys/class/thermal/thermal_zone*.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    A dictionary mapping thermal zone types to their temperatures in integer
+    format, or an empty dictionary if data could not be retrieved.
   """
   if not ad.is_adb_root:
     ad.log.info('Skipped getting thermal zone data on unrooted device.')
-    return
+    return {}
   thermal_data = []
   try:
     thermal_zones = (
@@ -990,7 +996,7 @@ def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
     )
   except adb.AdbError as e:
     ad.log.error(f'Failed to list thermal zones: {e}')
-    return
+    return {}
 
   for zone_name in thermal_zones:
     zone_name = zone_name.strip()
@@ -1001,7 +1007,7 @@ def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
       try:
         temp = int(temp_str)
         if temp > 0:
-          thermal_data.append((zone_type, temp_str))
+          thermal_data.append((zone_type, temp))
         else:
           ad.log.debug(
               f'Ignoring thermal zone {zone_path} with temp {temp_str} <= 0'
@@ -1014,6 +1020,8 @@ def get_thermal_zone_data(ad: android_device.AndroidDevice) -> None:
       ad.log.debug(f'Failed to read thermal zone {zone_path}: {e}')
       continue
   ad.log.info(f'Thermal zone data: {thermal_data}')
+  # Return the thermal data in a dict for easier access.
+  return {zone_type: temp for zone_type, temp in thermal_data}
 
 
 def abort_if_on_unrooted_device(
