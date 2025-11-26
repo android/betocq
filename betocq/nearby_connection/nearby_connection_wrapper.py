@@ -144,14 +144,14 @@ class NearbyConnectionWrapper:
     asserts.assert_equal(
         endpoint_info['endpointName'],
         self.advertiser.serial,
-        'Received an unexpected endpoint during discovery: '
+        'Source device received an unexpected endpoint during discovery: '
         f'{endpoint_found_event}',
     )
 
     asserts.assert_equal(
         endpoint_info['serviceId'],
         self.service_id,
-        'Received an unexpected service id during discovery: '
+        'Source device received an unexpected service id during discovery: '
         f'{endpoint_found_event}',
     )
     self._advertiser_endpoint_id = endpoint_found_event.data['endpointId']
@@ -226,7 +226,8 @@ class NearbyConnectionWrapper:
     asserts.assert_equal(
         d_connection_info['endpointName'],
         self.advertiser.serial,
-        f'Received an unexpected endpoint: {d_connection_init_event}',
+        'Source device received an unexpected endpoint:'
+        f' {d_connection_init_event}',
     )
 
     # wait for the advertiser connection initialized.
@@ -238,14 +239,15 @@ class NearbyConnectionWrapper:
     a_connection_info = a_connection_init_event.data['connectionInfo']
     asserts.assert_true(
         a_connection_info['isIncomingConnection'],
-        f'Received an outgoing connection: {d_connection_init_event}'
-        'but expected an incoming connection',
+        'Target device received an outgoing connection:'
+        f' {a_connection_init_event} but expected an incoming connection',
     )
 
     asserts.assert_equal(
         a_connection_info['endpointName'],
         self.discoverer.serial,
-        f'Received an unexpected endpoint: {a_connection_init_event}',
+        'Target device received an unexpected endpoint:'
+        f' {a_connection_init_event}',
     )
 
     self._discoverer_endpoint_id = a_connection_init_event.data['endpointId']
@@ -280,13 +282,15 @@ class NearbyConnectionWrapper:
 
     asserts.assert_true(
         advertiser_connection_event.data['isSuccess'],
-        f'Received an unsuccessful event: {advertiser_connection_event}',
+        f'Target device received an unsuccessful event:'
+        f' {advertiser_connection_event}',
     )
 
     asserts.assert_equal(
         advertiser_connection_event.data['endpointId'],
         self._discoverer_endpoint_id,
-        f'Received an unexpected endpoint: {advertiser_connection_event}',
+        f'Target device received an unexpected endpoint:'
+        f' {advertiser_connection_event}',
     )
 
     discoverer_connection_event = (
@@ -303,7 +307,7 @@ class NearbyConnectionWrapper:
     asserts.assert_equal(
         discoverer_connection_event.data['endpointId'],
         self._advertiser_endpoint_id,
-        'Target device received an unexpected endpoint:'
+        'Source device received an unexpected endpoint:'
         f' {discoverer_connection_event}',
     )
 
@@ -461,7 +465,8 @@ class NearbyConnectionWrapper:
       asserts.assert_equal(
           disconnected_event.data['endpointId'],
           self._advertiser_endpoint_id,
-          f'Receive unexpected event on disconnect: {disconnected_event}',
+          'Source device received unexpected event on disconnect:'
+          f' {disconnected_event}',
       )
     self.discoverer.log.info(
         f'disconnected with endpoint: {self._advertiser_endpoint_id}'
