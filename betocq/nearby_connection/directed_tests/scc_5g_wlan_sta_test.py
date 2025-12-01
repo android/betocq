@@ -20,7 +20,7 @@ Test requirements:
   The device requirements:
     supports_5g=True in config file
   The AP requirements:
-    wifi channel: 36 (5180)
+    wifi channel: 36 (5180) or other 5G Non-DFS channels.
 
 Test preparations:
   Set country code to US on Android devices.

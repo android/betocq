@@ -32,7 +32,7 @@ Test requirements:
     (target device only) enable_sta_dfs_channel_for_peer_network=False in config
       file
   The AP requirements:
-    wifi channel: 52 (5260)
+    wifi channel: 52 (5260) or 112 (5560) or other DFS channels.
 
 Test preparations:
   Set country code to GB on Android devices.

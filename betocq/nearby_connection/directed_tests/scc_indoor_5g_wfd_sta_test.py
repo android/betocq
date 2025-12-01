@@ -27,7 +27,7 @@ Test requirements:
     enable_sta_indoor_channel_for_peer_network=True in config file
     support Wi-Fi Direct
   The AP requirements:
-    Wi-Fi channel: 36 (5180)
+    Wi-Fi channel: 36 (5180) or other 5G indoor channels in JP.
 
 Test preparations:
   Set country code to JP on Android devices.

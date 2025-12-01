@@ -27,7 +27,7 @@ Test requirements:
     enable_sta_dfs_channel_for_peer_network=True in config file
     support Wi-Fi Direct
   The AP requirements:
-    wifi channel: 52 (5260)
+    wifi channel: 52 (5260) or 112 (5560) or any other DFS channels.
 
 Test preparations:
   Set country code to GB on Android devices.

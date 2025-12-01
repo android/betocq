@@ -24,7 +24,7 @@ Test requirements:
     (target device only) supports_dbs_sta_wfd=True in config file
     support Wi-Fi Direct
   The AP requirements:
-    wifi channel: 6 (2437)
+    wifi channel: 6 (2437) or other 2G channels.
 
 Test preparations:
   Set country code to US on Android devices.

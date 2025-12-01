@@ -26,7 +26,7 @@ Test requirements:
   The device requirements:
     support Wi-Fi Direct
   The AP requirements:
-    Wi-Fi channel: 6 (2437)
+    Wi-Fi channel: 6 (2437) or other 2G channels.
 
 Test preparations:
   Set country code to JP on Android devices.

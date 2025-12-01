@@ -21,7 +21,10 @@ Test requirements:
     supports_5g=True in config file
     support Wi-Fi Aware
   The AP requirements:
-    Wi-Fi channel: 36 (5180) and 52 (5260) in the same subnet
+    Wi-Fi channels: 
+      * 5G Non-DFS channel: e.g. 36 (5180)
+      * 5G DFS channel: e.g. 52 (5260) or 112 (5560)
+    They should be in the same subnet.
 
 Test preparations:
   Set country code to US on Android devices.

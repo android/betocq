@@ -15,9 +15,10 @@
 """This test suite batches all tests to run in sequence.
 
 This requires 3 APs to be ready and configured in testbed.
-2G AP (wifi_2g_ssid): channel 6 (2437)
-5G AP (wifi_5g_ssid): channel 36 (5180)
-DFS 5G AP(wifi_dfs_5g_ssid): channel 52 (5260)
+2G AP (wifi_2g_ssid): channel 6 (2437) or other 2G channels.
+5G AP (wifi_5g_ssid): channel 36 (5180) or other 5G Non-DFS channels.
+5G DFS AP (wifi_dfs_5g_ssid): channel 52 (5260) or 112 (5560) or other DFS
+channels.
 """
 
 from mobly import base_suite
