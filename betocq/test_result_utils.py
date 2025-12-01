@@ -171,7 +171,7 @@ def set_and_assert_sta_frequency(
   test_result.max_sta_link_speed_mbps = max_link_speed_mbps
 
   if sta_frequency == nc_constants.INVALID_INT:
-    ad.log.info(
+    ad.log.warning(
         'The STA frequency is not available, connection_info:'
         f' {connection_info}, the test may not be expected.'
     )
@@ -187,7 +187,15 @@ def set_and_assert_sta_frequency(
         test_result.test_failure_reason = (
             nc_constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
         )
-      asserts.fail(test_result.test_failure_reason)
+      asserts.fail(
+          nc_constants.COMMON_TRIAGE_TIP[test_result.test_failure_reason]
+      )
+    ad.log.warning(
+        'The STA frequency is not available, but the STA is'
+        ' connected, the test result may not be expected.'
+    )
+    return
+
   additional_error_message = ''
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
