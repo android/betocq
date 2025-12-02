@@ -71,8 +71,14 @@ def run_iperf_test(
     speed in KB/s if there is a valid result or nc_constants.INVALID_INT.
   """
   speed_kbyte_sec = nc_constants.INVALID_INT
-  owner_addr = get_owner_ip_addr(ad_network_client, ad_network_owner, medium)
-  if not owner_addr:
+  try:
+    owner_addr = get_owner_ip_addr(ad_network_client, ad_network_owner, medium)
+    if not owner_addr:
+      return nc_constants.INVALID_INT
+  except android_device.adb.Error:
+    ad_network_client.log.info('get_owner_ip_addr() failed')
+    owner_ifconfig = get_ifconfig(ad_network_owner)
+    ad_network_owner.log.info(owner_ifconfig)
     return nc_constants.INVALID_INT
 
   client_arg = DEFAULT_IPV4_CLIENT_ARGS
@@ -119,22 +125,39 @@ def get_owner_ip_addr(
     ad_network_owner: android_device.AndroidDevice,
     medium: nc_constants.NearbyConnectionMedium,
 ) -> str:
-  """Get owner ip address which for ipv6 is postfix-ed by the client interface name."""
+  """Get owner ip address.
+
+  For IPv6, the address is postfixed by the client interface name.
+
+  Args:
+    ad_network_client: The AndroidDevice acting as the client.
+    ad_network_owner: The AndroidDevice acting as the group owner/server.
+    medium: The NearbyConnectionMedium being used.
+
+  Returns:
+    The IP address of the owner device.
+  """
   ip_addr = ''
   if medium == nc_constants.NearbyConnectionMedium.WIFI_DIRECT:
     ip_addr = get_group_owner_addr(ad_network_client)
   elif medium == nc_constants.NearbyConnectionMedium.WIFI_LAN:
     ip_addr = get_wlan_ip_addr(ad_network_owner)
     if len(ip_addr) > GROUP_OWNER_IPV4_ADDR_LEN_MAX:
-      ip_addr += '%' + get_wlan_ifname(ad_network_client)
+      ip_addr = f'{ip_addr}%{get_wlan_ifname(ad_network_client)}'
   elif medium == nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT:
-    ip_addr = get_p2p_ip_addr(ad_network_owner)
+    try:
+      ip_addr = get_p2p_ip_addr(ad_network_owner)
+    except android_device.adb.Error:
+      ad_network_owner.log.info(
+          'Failed to get p2p ip address, try to get wlan ip address.'
+      )
+      ip_addr = get_wlan_ip_addr(ad_network_owner)
     if len(ip_addr) > GROUP_OWNER_IPV4_ADDR_LEN_MAX:
-      ip_addr = ip_addr + '%' + get_wlan_ifname(ad_network_client)
+      ip_addr = f'{ip_addr}%{get_wlan_ifname(ad_network_client)}'
   elif medium == nc_constants.NearbyConnectionMedium.WIFI_AWARE:
     ip_addr = get_aware_ip_addr(ad_network_owner)
     if len(ip_addr) > GROUP_OWNER_IPV4_ADDR_LEN_MAX:
-      ip_addr = ip_addr + '%' + get_aware_ifname(ad_network_client)
+      ip_addr = f'{ip_addr}%{get_aware_ifname(ad_network_client)}'
   return ip_addr
 
 
