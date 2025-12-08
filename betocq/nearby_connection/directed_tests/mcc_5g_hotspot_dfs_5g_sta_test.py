@@ -92,7 +92,6 @@ _THROUGHPUT_LOW_TIP = (
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Hotspot connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
 )
 
 

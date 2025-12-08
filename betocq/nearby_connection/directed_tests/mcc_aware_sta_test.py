@@ -72,14 +72,12 @@ _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
 _THROUGHPUT_LOW_TIP = (
     'This is a MCC 5G test case with Aware and STA operating in different 5G'
     ' channels. Check with the wifi chip vendor about the possible firmware'
-    ' Tx/Rx issues in this mode. Also check if the AP channel is set correctly'
-    ' and is supported by the used wifi medium.'
+    ' Tx/Rx issues in this mode.'
 )
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Aware connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
 )
 
 

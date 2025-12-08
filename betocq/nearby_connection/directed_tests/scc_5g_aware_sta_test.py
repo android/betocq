@@ -71,14 +71,12 @@ _THROUGHPUT_LOW_TIP = (
     'This is a SCC 5G test case with Aware and STA operating at the same 5G'
     ' channel. Check STA and Aware frequencies in the target logs and ensure'
     ' they have the same value. Check with the wifi chip vendor about the'
-    ' possible firmware Tx/Rx issues in this mode. Also check if the AP'
-    ' channel is set correctly and is supported by the used wifi medium.'
+    ' possible firmware Tx/Rx issues in this mode.'
 )
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Aware connection might be broken, check related logs. '
-    f' {_THROUGHPUT_LOW_TIP}'
 )
 
 

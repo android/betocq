@@ -70,14 +70,14 @@ _COUNTRY_CODE = 'US'
 
 _THROUGHPUT_LOW_TIP = (
     ' This is a SCC 2G test case with WLAN medium. Check with the wifi chip'
-    ' vendor if TDLS is supported correctly. Also check if the AP has the'
-    ' firewall which could block the mDNS traffic.'
+    ' vendor if TDLS is supported correctly.'
 )
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The WLAN connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
+    ' and also check the log if the nearby connection got "SignatureException",'
+    ' which is a known nearby connection issue.'
 )
 
 

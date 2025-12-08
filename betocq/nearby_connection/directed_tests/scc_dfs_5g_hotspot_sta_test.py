@@ -81,8 +81,7 @@ _COUNTRY_CODE = 'GB'
 
 
 _THROUGHPUT_LOW_TIP = (
-    'This is 5G SCC DFS hotspot test case. Check STA and WFD GO frequencies in'
-    ' the target logs (dumpsys wifip2p) and ensure they have the same value. In'
+    'This is 5G SCC DFS hotspot test case. In'
     ' the configuration file, enable_sta_dfs_channel_for_peer_network is set to'
     ' true. Check if the target device does support WFD group owner in the'
     ' STA-associated DFS channel. Check if'
@@ -94,7 +93,6 @@ _THROUGHPUT_LOW_TIP = (
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Hotspot connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
 )
 
 

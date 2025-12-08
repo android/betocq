@@ -77,8 +77,9 @@ _THROUGHPUT_LOW_TIP = (
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
-    'The WLAN connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
+    'The WLAN connection might be broken, check related logs. and also check'
+    ' the log if nearby connection got "SignatureException", which is a'
+    ' known nearby connection issue.'
 )
 
 

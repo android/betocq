@@ -69,20 +69,15 @@ _FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
-
 _THROUGHPUT_LOW_TIP = (
     'This is a SCC 5G test case with WFD and STA operating at the same 5G'
-    ' channel. Check STA and WFD GO frequencies in the target logs (dumpsys'
-    ' wifip2p) and ensure they have the same value. Check with the wifi chip'
-    ' vendor about the possible firmware Tx/Rx issues in this mode. Also check'
-    ' if the AP channel is set correctly and is supported by the used wifi'
-    ' medium.'
+    ' channel.  Check with the wifi chip'
+    ' vendor about the possible firmware Tx/Rx issues in this mode.'
 )
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Direct connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
 )
 
 
