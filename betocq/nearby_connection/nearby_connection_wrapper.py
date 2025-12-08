@@ -468,6 +468,19 @@ class NearbyConnectionWrapper:
           'Source device received unexpected event on disconnect:'
           f' {disconnected_event}',
       )
+    if self._advertiser_connection_lifecycle_callback is not None:
+      disconnected_event = (
+          self._advertiser_connection_lifecycle_callback.waitAndGet(
+              'onDisconnected',
+              timeout=nc_constants.DISCONNECTION_TIMEOUT.total_seconds(),
+          )
+      )
+      asserts.assert_equal(
+          disconnected_event.data['endpointId'],
+          self._discoverer_endpoint_id,
+          'Target device received unexpected event on disconnect:'
+          f' {disconnected_event}',
+      )
     self.discoverer.log.info(
         f'disconnected with endpoint: {self._advertiser_endpoint_id}'
     )
