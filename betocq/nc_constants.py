@@ -130,6 +130,7 @@ TARGET_CUJ_QUICK_START = 'quick_start'
 TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
 TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
 TARGET_CUJ_QUICK_SHARE = 'quick_share'
+TARGET_CUJ_OEM_LAUNCH_APPROVAL = 'oem_launch_approval'
 
 MAX_FREQ_2G_MHZ = 2500
 MIN_FREQ_5G_DFS_MHZ = 5260
@@ -175,6 +176,8 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
+  # check if the test is running in debug mode.
+  debug_mode: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
@@ -203,6 +206,9 @@ class TestParameters:
 
     if test_parameters.target_cuj_name == TARGET_CUJ_QUICK_START:
       test_parameters.requires_bt_multiplex = True
+
+    if test_parameters.debug_mode:
+      test_parameters.skip_bug_report = True
 
     return test_parameters
 

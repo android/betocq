@@ -271,8 +271,11 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
-    setup_utils.clear_hermetic_overrides(ad)
+    # run it before clear_hermetic_overrides to make sure the GMS restart will
+    # not impact on the update of GMS.
     setup_utils.enable_gms_auto_updates(ad)
+    # TODO: should it give GMS some time to enable the auto updates?
+    setup_utils.clear_hermetic_overrides(ad)
 
   def teardown_test(self) -> None:
     self._log_test_end_on_device(self.advertiser)
@@ -346,6 +349,8 @@ class BaseTestClass(base_test.BaseTestClass):
     ]
     if 'suite_name' in self.user_params:
       suite_name_items.append(self.user_params['suite_name'])
+    if 'suite_version' in self.user_params:
+      suite_name_items.append(f'v{self.user_params['suite_version']}')
     suite_name_items.append(self.test_parameters.target_cuj_name)
     suite_name = '-'.join(suite_name_items)
     run_identifier_items = [
