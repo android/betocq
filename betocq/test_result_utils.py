@@ -625,6 +625,7 @@ def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
   return '\n'.join([
       f'serial: {ad.serial}',
       f'model: {ad.model}',
+      f'android_version: {ad.android_version}\n'
       f'build_info: {ad.build_info}',
       f'gms_version: {setup_utils.dump_gms_version(ad)}',
       f'wifi_chipset: {ad.wifi_chipset}',
@@ -632,15 +633,17 @@ def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
       f'support_5g: {ad.supports_5g}',
       f'support_dbs_sta_wfd: {ad.supports_dbs_sta_wfd}',
       (
-          'enable_sta_dfs_channel_for_wfd:'
+          'enable_sta_dfs_channel_for_peer_network:'
           f' {ad.enable_sta_dfs_channel_for_peer_network}'
       ),
       (
-          'enable_sta_indoor_channel_for_wfd:'
+          'enable_sta_indoor_channel_for_peer_network:'
           f' {ad.enable_sta_indoor_channel_for_peer_network}'
       ),
       f'max_num_streams: {ad.max_num_streams}',
       f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
+      f'max_phy_rate_5g_mbps: {ad.max_phy_rate_5g_mbps}',
+      f'max_phy_rate_2g_mbps: {ad.max_phy_rate_2g_mbps}',
       f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
   ])
 
