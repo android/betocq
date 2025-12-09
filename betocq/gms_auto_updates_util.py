@@ -17,6 +17,7 @@
 import logging
 import os
 import tempfile
+import traceback
 from xml.etree import ElementTree
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
@@ -106,10 +107,24 @@ class GmsAutoUpdatesUtil:
     self._device: android_device.AndroidDevice = ad
 
   def enable_gms_auto_updates(self) -> None:
-    self._config_gms_auto_updates(True)
+    try:
+      self._config_gms_auto_updates(enable_updates=True)
+    except (adb.AdbError, OSError, PermissionError):
+      self._device.log.warning(
+          'failed to enable gms auto updates (%s), the test result might be'
+          ' flaky due to the gms auto updates.',
+          traceback.format_exc(),
+      )
 
   def disable_gms_auto_updates(self) -> None:
-    self._config_gms_auto_updates(False)
+    try:
+      self._config_gms_auto_updates(enable_updates=False)
+    except (adb.AdbError, OSError, PermissionError):
+      self._device.log.warning(
+          'failed to disable gms auto updates (%s), you can enable it manually'
+          ' on the play store, and reboot the device.',
+          traceback.format_exc(),
+      )
 
   def _config_gms_auto_updates(self, enable_updates: bool) -> None:
     """Configures GMS auto updates."""
