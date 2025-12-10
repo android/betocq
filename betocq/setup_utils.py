@@ -865,11 +865,14 @@ def _install_overrides(
 
 def clear_hermetic_overrides(
     ad: android_device.AndroidDevice,
+    restart_gms_process: bool = True,
 ) -> None:
   """Clear hermetic overrides.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
+    restart_gms_process: Whether to restart GMS process after clearing
+      overrides.
   """
   if not ad.is_adb_root:
     ad.log.info('Skipped clearing hermetic overrides on unrooted device.')
@@ -879,7 +882,9 @@ def clear_hermetic_overrides(
       'rm -f'
       ' /data/user_de/0/com.google.android.gms/app_phenotype_hermetic/overrides.txt'
   )
-  ad.log.info('Clear hermetic flags override.')
+  ad.log.info('Cleared hermetic flags override.')
+  if restart_gms_process:
+    restart_gms(ad)
 
 
 def get_sta_frequency_and_max_link_speed(

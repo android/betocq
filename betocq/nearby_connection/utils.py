@@ -36,14 +36,15 @@ def setup_android_device_for_nc_tests(
   """Performs general Android device setup steps for NC tests."""
   # TODO: Double check if the set_flags() may break this as it will
   # restart GMS.
-  setup_utils.disable_gms_auto_updates(ad)
 
   for conf in snippet_confs:
     setup_utils.load_nearby_snippet(ad, conf)
 
-  setup_utils.clear_hermetic_overrides(ad)
   if not skip_flag_override:
+    setup_utils.clear_hermetic_overrides(ad, restart_gms_process=False)
     setup_utils.set_flags(ad, ad.log_path)
+  else:
+    setup_utils.clear_hermetic_overrides(ad)
 
   device_specific_dict = setup_utils.get_betocq_device_specific_info(ad)
   if not device_specific_dict.get('one_time_setup_done', False):
@@ -66,6 +67,8 @@ def setup_android_device_for_nc_tests(
   if country_code != device_specific_dict.get('wifi_country_code', ''):
     setup_utils.set_country_code(ad, country_code)
     device_specific_dict['wifi_country_code'] = country_code
+
+  setup_utils.disable_gms_auto_updates(ad)
 
 
 def connect_ad_to_wifi_sta(
