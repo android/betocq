@@ -17,6 +17,7 @@
 import logging
 
 import os
+import traceback
 
 from mobly import base_test
 from mobly import records
@@ -97,11 +98,15 @@ class BaseTestClass(base_test.BaseTestClass):
         error_messages += '5G DFS AP is not ready for this test.\n'
         logging.warning('5G DFS AP is not ready for this test.')
       if error_messages:
-        setup_utils.abort_all_and_report_error_on_setup(
-            self, error_messages
-        )
-
-    self.ads = self.register_controller(android_device, min_number=2)
+        setup_utils.abort_all_and_report_error_on_setup(self, error_messages)
+    try:
+      self.ads = self.register_controller(android_device, min_number=2)
+    except errors.Error as e:
+      setup_utils.abort_all_and_report_error_on_setup(
+          self,
+          'Failed to get Android devices with error: %s,'
+          f' {traceback.format_exception(e)}',
+      )
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']

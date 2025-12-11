@@ -1045,7 +1045,7 @@ def abort_if_on_unrooted_device(
 def abort_all_and_report_error_on_setup(
     test: base_test.BaseTestClass,
     error_message: str):
-  """Aborts all tests and reports as class error (taken as 'PASS' by default)."""
+  """Aborts all tests and reports as class error (asserts.abort_all in the set up is taken as 'PASS/SKIP' by default in test summary)."""
   test_result_record = records.TestResultRecord(
       base_test.STAGE_NAME_SETUP_CLASS,
       test.TAG,
@@ -1054,7 +1054,7 @@ def abort_all_and_report_error_on_setup(
   termination_signal = signals.TestAbortAll(
       f'Aborting all tests due to {error_message}.'
   )
-  test_result_record.test_error(termination_signal)
+  test_result_record.test_fail(termination_signal)
   test.results.add_class_error(test_result_record)
   test.summary_writer.dump(
       test_result_record.to_dict(), records.TestSummaryEntryType.RECORD
