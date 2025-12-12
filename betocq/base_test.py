@@ -306,6 +306,53 @@ class BaseTestClass(base_test.BaseTestClass):
     if self.__skipped_test_class:
       logging.info('Skipping on_fail.')
       return
+    logging.info(
+        'on_fail with result %s, termination_signal_type %s, stacktrace %s',
+        record.result,
+        record.termination_signal_type,
+        record.stacktrace,
+    )
+    # abort all test if ProtocolError or BrokenPipeError found in traceback
+    if record.result is records.TestResultEnums.TEST_RESULT_ERROR and (
+        record.termination_signal_type == 'ProtocolError'
+        or (
+            record.termination_signal_type == 'AdbError'
+            and 'not found' in record.stacktrace
+        )
+        or (
+            'Error' in record.termination_signal_type
+            and (
+                'mobly.snippet.errors.ProtocolError' in record.stacktrace
+                or 'BrokenPipeError' in record.stacktrace
+            )
+        )
+    ):
+      error_message = (
+          f'Abort all test due to the following error happened during the'
+          ' test:\n'
+          f'{record.stacktrace}\n'
+          'it could be one of the following issues:\n'
+          '1. system crashed;\n'
+          '2. GMS updating happened, check if the "com.google.android.gms" was'
+          ' killed from the logcat, disable the GMS auto update from the play'
+          ' store (Settings -> Network perferences) and retry the test;\n'
+          '3. The test snippet might be killed by a security app or service'
+          ' from the device, especially if this happens very frequently, check'
+          ' the logcat to verify if '
+          f' {nc_constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
+          f' {nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
+          f' {nc_constants.DCT_SNIPPET_PACKAGE_NAME} or'
+          f' {nc_constants.DCT_SNIPPET_2_PACKAGE_NAME} was killed; you should'
+          ' put them to the allowlist of the security app.\n'
+          '4. The USB cable or port is not stable, change the USB cable or the'
+          ' connection portal and try again;\n'
+          '5. The "Play protect" in the play store might disable the test'
+          ' snippets, disable the "Play Protect" and retry the test.\n'
+      )
+      logging.error(error_message)
+      # show the error in setup_class clearly.
+      setup_utils.abort_all_and_report_error_on_setup(self, error_message)
+
     # Reset the Nearby Connection state to ensure the testbed is in a good
     # state for the next test.
     utils.concurrent_exec(
@@ -316,15 +363,17 @@ class BaseTestClass(base_test.BaseTestClass):
 
     self._stop_packet_capture(ignore_packets=False)
     if self.test_parameters.skip_bug_report:
-      logging.info('Skipping bug report.')
-      return
-    self.num_bug_reports = self.num_bug_reports + 1
-    if self.num_bug_reports <= nc_constants.MAX_NUM_BUG_REPORT:
-      logging.info('take bug report for failure')
-      android_device.take_bug_reports(
-          self.ads,
-          destination=self.current_test_info.output_path,
-      )
+      logging.info('skip bug report for failure')
+    else:
+      self.num_bug_reports = self.num_bug_reports + 1
+      if self.num_bug_reports <= nc_constants.MAX_NUM_BUG_REPORT:
+        logging.info('take bug report for failure')
+        android_device.take_bug_reports(
+            self.ads,
+            destination=self.current_test_info.output_path,
+        )
+      else:
+        logging.info('reach the max number of bug reports, skip the rest')
 
   def on_pass(self, record: records.TestResultRecord) -> None:
     # Ignore captured packets when the test passes.
