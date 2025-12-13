@@ -44,8 +44,8 @@ from betocq.nearby_connection import utils as nc_utils
 
 
 _COUNTRY_CODE = 'US'
-# The number of bits to use for the fraction part of the speed in MB/s.
-_SPEED_MBPS_FRACTION_BITS = 3
+# The number of decimal places of precision for reporting the speed (MB/s).
+_SPEED_MBPS_DECIMAL_PLACES = 3
 _BT_BLE_FILE_TRANSFER_FAILURE_TIP = (
     'The Bluetooth performance is really bad or unknown reason.'
 )
@@ -174,7 +174,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     self._test_results = collections.OrderedDict()
 
   def setup_class(self):
-    """Setup steps that will be performed before exucuting any test case."""
+    """Setup steps that will be performed before executing any test case."""
     super().setup_class()
     utils.concurrent_exec(
         self._setup_android_device,
@@ -503,7 +503,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
       properties['speed_mbps'] = (
           test_result_utils._float_to_str(
               self.current_test_result.file_transfer_throughput_kbps / 1024,
-              _SPEED_MBPS_FRACTION_BITS,
+              _SPEED_MBPS_DECIMAL_PLACES,
           )
       )
     self.record_data({
