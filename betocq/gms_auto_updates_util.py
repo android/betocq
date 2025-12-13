@@ -14,7 +14,6 @@
 
 """class to enable/disable GMS auto update."""
 
-import logging
 import os
 import tempfile
 import traceback
@@ -141,6 +140,8 @@ class GmsAutoUpdatesUtil:
         self._configure_play_store_updates(
             _FINSKY_CONFIG_VALUE_DISABLE, _VENDING_CONFIG_VALUE_DISABLE
         )
+    # force stop the play store to apply the above config changes.
+    self._device.adb.shell('am force-stop com.android.vending')
     self._configure_gservice_updates(enable_updates)
     self._configure_gms_core_checkins_and_updates(enable_updates)
 
@@ -209,8 +210,12 @@ class GmsAutoUpdatesUtil:
         changing_element = ElementTree.SubElement(root, 'boolean')
       else:
         changing_element = ElementTree.SubElement(root, 'string')
-    logging.info('element for %s is %s, %s', name, changing_element.tag,
-                 changing_element.attrib)
+    self._device.log.info(
+        'reading element for %s is %s, %s',
+        name,
+        changing_element.tag,
+        changing_element.attrib,
+    )
     if value_type == _XML_BOOL_TYPE:
       changing_element.set('name', name)
       changing_element.set('value', value)
@@ -238,7 +243,7 @@ class GmsAutoUpdatesUtil:
       try:
         os.remove(finsky_config)
       except OSError as e:
-        logging.warning('failed to remove %s: %s', finsky_config, e)
+        self._device.log.warning('failed to remove %s: %s', finsky_config, e)
 
       vending_config = self._create_or_update_play_store_config(
           tmp_dir,
@@ -251,4 +256,4 @@ class GmsAutoUpdatesUtil:
       try:
         os.remove(vending_config)
       except OSError as e:
-        logging.warning('failed to remove %s: %s', vending_config, e)
+        self._device.log.warning('failed to remove %s: %s', vending_config, e)
