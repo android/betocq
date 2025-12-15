@@ -502,6 +502,7 @@ def assert_throughput(
 ):
   """Checks the file transfer throughput."""
   nc_speed_min_mbps = speed_target.nc_speed_mbtye_per_sec
+  test_result.speed_target = speed_target
   nc_speed_mbps = round(test_result.file_transfer_throughput_kbps / 1024, 3)
 
   if nc_speed_mbps >= nc_speed_min_mbps:
@@ -531,6 +532,7 @@ def assert_throughput_and_run_iperf_if_needed(
   upgrade_medium_under_test = nc_test_runtime.upgrade_medium_under_test
 
   nc_speed_min_mbps = speed_target.nc_speed_mbtye_per_sec
+  test_result.speed_target = speed_target
   iperf_speed_min_mbps = speed_target.iperf_speed_mbtye_per_sec
   nc_speed_mbps = round(test_result.file_transfer_throughput_kbps / 1024, 3)
   iperf_speed_mbps = 0
@@ -607,6 +609,10 @@ def assert_nc_throughput_meets_target(
     low_throughput_tip: str,
 ):
   """Checks the Nearby connection throughput meets the target."""
+  test_result.speed_target = nc_constants.SpeedTarget(
+      nc_speed_mbtye_per_sec=nc_speed_min_mbps,
+      iperf_speed_mbtye_per_sec=nc_constants.INVALID_INT
+  )
   nc_speed_mbps = round(test_result.file_transfer_throughput_kbps / 1024, 3)
   if nc_speed_mbps >= nc_speed_min_mbps:
     return
@@ -770,6 +776,8 @@ class SingleTestResult:
   start_time: datetime.datetime = datetime.datetime.now()
   end_time: datetime.datetime | None = None
   debug_reference_info: dict[str, Any] = dataclasses.field(default_factory=dict)
+  speed_target: nc_constants.SpeedTarget = nc_constants.SpeedTarget(
+      nc_constants.INVALID_INT, nc_constants.INVALID_INT)
 
   def __post_init__(self):
     self.start_time = datetime.datetime.now()
@@ -1007,6 +1015,17 @@ class PerformanceTestResults:
     iperf_stats = self._get_transfer_stats(
         [result.iperf_throughput_kbps for result in self._results],
     )
+    # find a valid benchmark speed from results.
+    benchmark_nc_speed_mbps = nc_constants.UNSET_THROUGHPUT_KBPS
+    benchmark_iperf_speed_mbps = nc_constants.UNSET_THROUGHPUT_KBPS
+    for result in self._results:
+      if result.speed_target.nc_speed_mbtye_per_sec > 0:
+        benchmark_nc_speed_mbps = result.speed_target.nc_speed_mbtye_per_sec
+        benchmark_iperf_speed_mbps = (
+            result.speed_target.iperf_speed_mbtye_per_sec
+        )
+        break
+
     stats = [
         f'discovery_count: {discovery_latency_stats.success_count}',
         f'discovery_latency_min: {discovery_latency_stats.min_val}',
@@ -1020,6 +1039,8 @@ class PerformanceTestResults:
         f'speed_mbps_min: {transfer_stats.min_val}',
         f'speed_mbps_med: {transfer_stats.median_val}',
         f'speed_mbps_max: {transfer_stats.max_val}',
+        f'benchmark_nc_speed_mbps: {benchmark_nc_speed_mbps}',
+        f'benchmark_iperf_speed_mbps: {benchmark_iperf_speed_mbps}',
     ]
 
     if self.current_test_result.iperf_throughput_kbps > 0:
