@@ -208,7 +208,7 @@ class TestParameters:
       test_parameters.requires_bt_multiplex = True
 
     if test_parameters.debug_mode:
-      test_parameters.skip_bug_report = True
+      test_parameters.skip_bug_report = False
 
     return test_parameters
 
