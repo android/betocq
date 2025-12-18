@@ -22,6 +22,7 @@ import logging
 from typing import Any
 
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import adb
 
 BETOCQ_NAME = 'BetoCQ'
 
@@ -675,6 +676,60 @@ class TestResultStats:
   min_val: float | None = None
   median_val: float | None = None
   max_val: float | None = None
+
+
+def _get_pids_from_ps_output(
+    ps_output: str, process_name: str
+) -> dict[str, int]:
+  """Gets uid and PID of the process from ps output."""
+  pids = {}
+  for line in ps_output.splitlines():
+    if not line.endswith(process_name):
+      continue
+    parts = line.split()
+    if len(parts) < 3:
+      continue
+    uid = parts[0]
+    pid = parts[1]
+    parsed_process_name = parts[-1]
+    if parsed_process_name == process_name and pid.isdigit():
+      pids[uid] = int(pid)
+  return pids
+
+
+@dataclasses.dataclass(frozen=False)
+class GmsInfo:
+  """The data class for GMS information.
+
+  Attributes:
+    gms_pids: The user to PID map for com.google.android.gms.
+    gms_persistent_pids: The user to PID map for
+      com.google.android.gms.persistent.
+  """
+
+  gms_pids: dict[str, int] = dataclasses.field(default_factory=dict)
+  gms_persistent_pids: dict[str, int] = dataclasses.field(default_factory=dict)
+
+  def update_pids(self, device: android_device.AndroidDevice) -> None:
+    """Updates the PIDs of GMS processes."""
+    try:
+      ps_output = device.adb.shell(['ps', '-A']).decode()
+      self.gms_pids = _get_pids_from_ps_output(
+          ps_output, 'com.google.android.gms'
+      )
+      self.gms_persistent_pids = _get_pids_from_ps_output(
+          ps_output, 'com.google.android.gms.persistent'
+      )
+    except (adb.AdbError, ValueError):
+      device.log.warning(
+          'Failed to get GMS PIDs from device %s.',
+          device.serial,
+          exc_info=True,
+      )
+
+  def has_valid_pids(self) -> bool:
+    """Whether the PIDs of GMS processes are valid."""
+    return bool(self.gms_pids) and bool(self.gms_persistent_pids)
 
 
 @dataclasses.dataclass(frozen=True)

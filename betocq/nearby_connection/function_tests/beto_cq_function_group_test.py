@@ -163,6 +163,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
   # Result information on the test currently being executed.
   current_test_result: test_result_utils.SingleTestResult
+  is_using_gms_api = True
 
   # Store test results of all test cases.
   _test_results: collections.OrderedDict[
@@ -493,6 +494,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     # If any exception is raised in `setup_class`, `on_fail` will be invoked
     # and we should not record any result because no test is executed.
     if self._test_results:
+      test_result_utils.update_result_message_with_gms_check(self)
       self._record_single_test_case_report()
     super().on_fail(record)
 

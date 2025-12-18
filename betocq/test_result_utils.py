@@ -26,6 +26,7 @@ from typing import Any
 
 from mobly import asserts
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import adb
 
 from betocq import iperf_utils
 from betocq import nc_constants
@@ -848,6 +849,64 @@ def gen_basic_test_summary(
   if hasattr(advertiser, 'wifi_env_ssid_count'):
     basic_test_summary['wifi_ap_number'] = f'{advertiser.wifi_env_ssid_count}'
   return basic_test_summary
+
+
+def check_gms_pids_changed(
+    ads: Sequence[android_device.AndroidDevice],
+) -> str | None:
+  """Checks if GMS PIDs changed on any device during test.
+
+  Args:
+    ads: A sequence of android devices.
+
+  Returns:
+    An error message if GMS PIDs changed, None otherwise.
+  """
+  for ad in ads:
+    try:
+      current_gms_info = nc_constants.GmsInfo()
+      current_gms_info.update_pids(ad)
+      if ad.gms_info.has_valid_pids() and ad.gms_info != current_gms_info:
+        ad.log.warning(
+            'Redo the test because GMS PIDs changed on device %s: %s -> %s',
+            ad.serial,
+            ad.gms_info,
+            current_gms_info,
+        )
+        return (
+            f'GMS PIDs changed on device {ad.serial} during test'
+            f' ({ad.gms_info} -> {current_gms_info}), GMS might have been'
+            ' killed or updated. This is very likely the cause of test'
+            ' failure. Please redo the test.'
+        )
+    except (adb.AdbError, ValueError):
+      ad.log.warning(
+          'Failed to get GMS PIDs from device %s',
+          ad.serial,
+          exc_info=True,
+      )
+  return None
+
+
+def update_result_message_with_gms_check(test_instance: typing.Any) -> None:
+  """Checks for GMS PID changes and prepends an error to the result message."""
+  if not getattr(test_instance, 'is_using_gms_api', False):
+    return
+
+  try:
+    current_test_result = test_instance.current_test_result
+  except (AttributeError, ValueError):
+    logging.warning('current_test_result not available, skipping GMS check.')
+    return
+
+  pids_changed_error = check_gms_pids_changed(test_instance.ads)
+  if pids_changed_error:
+    message = getattr(current_test_result, 'result_message', '')
+    current_test_result.result_message = (
+        f'{pids_changed_error}\n{message}'
+        if message
+        else pids_changed_error
+    )
 
 
 class PerformanceTestResults:

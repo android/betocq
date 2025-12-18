@@ -29,6 +29,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
   """Base test class for nearby connection E2E performance tests."""
 
   _test_results: test_result_utils.PerformanceTestResults
+  is_using_gms_api = True
 
   def setup_class(self):
     self._test_results = test_result_utils.PerformanceTestResults()
@@ -69,6 +70,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
           key='target_device_thermal_zone_data',
           value=setup_utils.get_thermal_zone_data(self.advertiser),
       )
+      test_result_utils.update_result_message_with_gms_check(self)
       self._record_single_test_iter_report()
     super().on_fail(record)
 

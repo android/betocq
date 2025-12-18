@@ -81,6 +81,7 @@ class BaseTestClass(base_test.BaseTestClass):
     self.num_bug_reports: int = 0
     # Skip the device clean up steps if the test class is skipped.
     self.__skipped_test_class = True
+    self.is_using_gms_api = True
 
   def setup_class(self) -> None:
     if (
@@ -110,6 +111,8 @@ class BaseTestClass(base_test.BaseTestClass):
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
+      if self.is_using_gms_api:
+        ad.gms_info = nc_constants.GmsInfo()
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'
@@ -261,6 +264,12 @@ class BaseTestClass(base_test.BaseTestClass):
     self._start_packet_capture()
     self._log_test_start_on_device(self.advertiser)
     self._log_test_start_on_device(self.discoverer)
+    if self.is_using_gms_api:
+      utils.concurrent_exec(
+          lambda ad: ad.gms_info.update_pids(ad),
+          param_list=[[ad] for ad in self.ads],
+          raise_on_exception=True,
+      )
 
   def _log_test_start_on_device(self, ad: android_device.AndroidDevice):
     setup_utils.log_message_to_logcat(
