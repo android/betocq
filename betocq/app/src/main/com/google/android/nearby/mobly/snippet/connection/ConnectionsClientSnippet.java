@@ -20,8 +20,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.SystemClock;
 import androidx.test.platform.app.InstrumentationRegistry;
+import com.google.android.gms.common.api.ApiException;
 import com.google.android.gms.nearby.Nearby;
+import com.google.android.gms.nearby.connection.ConnectionsStatusCodes;
 import com.google.android.gms.nearby.connection.Payload;
 // TODO: import com.google.android. ... .ConnectionsConnectionlessImpl;
 import com.google.android.gms.tasks.OnSuccessListener;
@@ -64,7 +67,7 @@ public class ConnectionsClientSnippet implements Snippet {
   @Rpc(description = "Get Local Endpoint Id.")
   public String getLocalEndpointId() throws Exception {
     verifyApiConnection();
-    return Tasks.await(Nearby.getConnectionsClient(context).getLocalEndpointId());
+    return retry(() -> Tasks.await(Nearby.getConnectionsClient(context).getLocalEndpointId()));
   }
 
   @AsyncRpc(description = "Start advertising.")
@@ -76,20 +79,24 @@ public class ConnectionsClientSnippet implements Snippet {
       int upgradeMedium)
       throws Exception {
     verifyApiConnection();
-    Tasks.await(
-        Nearby.getConnectionsClient(context)
-            .startAdvertising(
-                advertisingName,
-                advertisingServiceId,
-                new ConnectionLifecycleEvents(callbackId),
-                MediumSettingsFactory.getAdvertisingOptions(advertisingMedium, upgradeMedium))
-            .addOnSuccessListener(
-                new OnSuccessListener<Void>() {
-                  @Override
-                  public void onSuccess(Void unusedResult) {
-                    EventCache.getInstance().postEvent(new SnippetEvent(callbackId, "onSuccess"));
-                  }
-                }));
+    retry(
+        () ->
+            Tasks.await(
+                Nearby.getConnectionsClient(context)
+                    .startAdvertising(
+                        advertisingName,
+                        advertisingServiceId,
+                        new ConnectionLifecycleEvents(callbackId),
+                        MediumSettingsFactory.getAdvertisingOptions(
+                            advertisingMedium, upgradeMedium))
+                    .addOnSuccessListener(
+                        new OnSuccessListener<Void>() {
+                          @Override
+                          public void onSuccess(Void unusedResult) {
+                            EventCache.getInstance()
+                                .postEvent(new SnippetEvent(callbackId, "onSuccess"));
+                          }
+                        })));
   }
 
   @Rpc(description = "Stop advertising.")
@@ -102,12 +109,14 @@ public class ConnectionsClientSnippet implements Snippet {
   public void startDiscovery(String callbackId, String advertisingServiceId, int discoveryMedium)
       throws Exception {
     verifyApiConnection();
-    Tasks.await(
-        Nearby.getConnectionsClient(context)
-            .startDiscovery(
-                advertisingServiceId,
-                new EndpointDiscoveryEvents(callbackId),
-                MediumSettingsFactory.getDiscoveryMediumOptions(discoveryMedium)));
+    retry(
+        () ->
+            Tasks.await(
+                Nearby.getConnectionsClient(context)
+                    .startDiscovery(
+                        advertisingServiceId,
+                        new EndpointDiscoveryEvents(callbackId),
+                        MediumSettingsFactory.getDiscoveryMediumOptions(discoveryMedium))));
   }
 
   @Rpc(description = "Stop discovery.")
@@ -128,22 +137,30 @@ public class ConnectionsClientSnippet implements Snippet {
       int keepAliveTimeoutIntervalMillis)
       throws Exception {
     verifyApiConnection();
-    Tasks.await(
-        Nearby.getConnectionsClient(context)
-            .requestConnection(
-                connectionName.getBytes(UTF_8),
-                connectionEndpointId,
-                new ConnectionLifecycleEvents(callbackId),
-                MediumSettingsFactory.getConnectionMediumOptions(
-                    connectionMedium, upgradeMedium, mediumUpgradeType, keepAliveTimeoutMillis,
-                    keepAliveTimeoutIntervalMillis)));
+    retry(
+        () ->
+            Tasks.await(
+                Nearby.getConnectionsClient(context)
+                    .requestConnection(
+                        connectionName.getBytes(UTF_8),
+                        connectionEndpointId,
+                        new ConnectionLifecycleEvents(callbackId),
+                        MediumSettingsFactory.getConnectionMediumOptions(
+                            connectionMedium,
+                            upgradeMedium,
+                            mediumUpgradeType,
+                            keepAliveTimeoutMillis,
+                            keepAliveTimeoutIntervalMillis))));
   }
 
   @AsyncRpc(description = "Accept connection.")
   public void acceptConnection(String callbackId, String endpointId) throws Exception {
     verifyApiConnection();
     payloadEvents = new PayloadEvents(context, callbackId);
-    Tasks.await(Nearby.getConnectionsClient(context).acceptConnection(endpointId, payloadEvents));
+    retry(
+        () ->
+            Tasks.await(
+                Nearby.getConnectionsClient(context).acceptConnection(endpointId, payloadEvents)));
   }
 
   @Rpc(description = "Disconnect from endpoint.")
@@ -181,8 +198,11 @@ public class ConnectionsClientSnippet implements Snippet {
     verifyApiConnection();
     payloadEvents.startTransferStopwatch();
     for (int i = 0; i < numFiles; i++) {
-      Tasks.await(
-          Nearby.getConnectionsClient(context).sendPayload(Arrays.asList(endpointId), payload[i]));
+      Payload p = payload[i];
+      retry(
+          () ->
+              Tasks.await(
+                  Nearby.getConnectionsClient(context).sendPayload(Arrays.asList(endpointId), p)));
     }
     return payload[numFiles - 1].getId();
   }
@@ -259,5 +279,40 @@ public class ConnectionsClientSnippet implements Snippet {
   void verifyApiConnection() throws Exception {
     // TODO: Utils.verifyGoogleApiConnection(
         // (ConnectionsConnectionlessImpl) Nearby.getConnectionsClient(context));
+  }
+
+  /** Functional interface for boxing up lambdas of Nearby API calls that we want to retry. */
+  @FunctionalInterface
+  private interface NearbyCallable<T> {
+    T call() throws Exception;
+  }
+
+  @SuppressWarnings("PatternMatchingInstanceof")
+  private <T> T retry(NearbyCallable<T> callable) throws Exception {
+    Exception toThrow = null;
+    for (int i = 0; i < 3; i++) {
+      try {
+        return callable.call();
+      } catch (Exception e) {
+        ApiException apiException = null;
+        if (e instanceof ApiException) {
+          apiException = (ApiException) e;
+        } else if (e.getCause() instanceof ApiException) {
+          apiException = (ApiException) e.getCause();
+        }
+        if (apiException != null
+            && (apiException.getStatusCode() == ConnectionsStatusCodes.INTERNAL_ERROR
+                || apiException.getStatusCode()
+                    == ConnectionsStatusCodes.CONNECTION_SUSPENDED_DURING_CALL
+                || apiException.getStatusCode() == ConnectionsStatusCodes.NETWORK_ERROR)) {
+          Log.w("Failed to call Nearby API on attempt " + (i + 1) + ", retrying", e);
+          toThrow = e;
+          SystemClock.sleep(1000);
+        } else {
+          throw e;
+        }
+      }
+    }
+    throw toThrow;
   }
 }
