@@ -163,7 +163,7 @@ class BaseTestClass(base_test.BaseTestClass):
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
 
-  def _get_snippet_apk_path(self, snippet_name: str) -> str:
+  def _get_snippet_apk_path(self, snippet_name: str) -> str | None:
     """Gets the APK path for the given snippet name from user params.
 
     Args:
@@ -171,15 +171,14 @@ class BaseTestClass(base_test.BaseTestClass):
       APK in user_params (e.g., 'nearby_snippet').
 
     Returns:
-      The path to the snippet APK.
-
-    Raises:
-      ValueError: If the snippet APK is not configured correctly.
+      The path to the snippet APK, or None if not provided.
     """
     file_tag = 'files' if 'files' in self.user_params else 'mh_files'
     apk_paths = self.user_params.get(file_tag, {}).get(snippet_name, [''])
     if not apk_paths or not apk_paths[0]:
-      raise ValueError(f'{snippet_name} is not configured correctly.')
+      # allow the apk_path to be empty as github release does not install
+      # the apk in the script.
+      return None
     return apk_paths[0]
 
   @property

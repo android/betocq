@@ -218,6 +218,17 @@ class PayloadType(enum.IntEnum):
 
 
 @enum.unique
+class NcBandwidthUpgradeStatus(enum.IntEnum):
+  UNKNOWN = 0
+  # The upgrade is successful.
+  SUCCESS = 1
+  # The connection is lost, attempting to reconnect.
+  SUSPENDED = 2
+  # The upgrade is timed out.
+  TIMED_OUT = 3
+
+
+@enum.unique
 class NearbyMedium(enum.IntEnum):
   """Medium options for discovery, advertising, connection and upgrade."""
 
