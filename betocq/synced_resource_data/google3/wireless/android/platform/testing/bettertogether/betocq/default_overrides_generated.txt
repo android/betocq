@@ -25,6 +25,7 @@ content://com.google.android.gms.phenotype/com.google.android.gms.matchstick Dyn
 content://com.google.android.gms.phenotype/com.google.android.gms.matchstick DynamicTachystickThirdPartySignatures__partner_7 CAESLEVGNGpKTjgxWmpxcjJjTkhQbUtSeklMUDlCNWdCSThBaDBZU1hTYlY4eUE9EixXaDZrbjY4L0w5eE1kUExXMGhsRjZDb0dkZElXbm94QmU2R2cxV3A5SGxVPQ==
 content://com.google.android.gms.phenotype/com.google.android.gms.matchstick DynamicTachystickThirdPartySignatures__partner_8 CAESLDNBT1RpMStQaFJJcHYyUXhIZ3oyVVMzT3VoSVZPRjJxYmNqTHFOYXZML2c9
 content://com.google.android.gms.phenotype/com.google.android.gms.matchstick DynamicTachystickThirdPartySignatures__partner_9 CAESLDdoZFJURTZwR3Z4TDRXSHp3VEptZVdjVXpjS005eU1IaUU2bGJPSWZKTWs9
+content://com.google.android.gms.phenotype/com.google.android.gms.nearby 45749241 true
 content://com.google.android.gms.phenotype/com.google.android.gms.nearby mediums_supports_usb false
 content://com.google.android.gms.phenotype/com.google.android.gms.nearby mediums_supports_wifi_aware true
 content://com.google.android.gms.phenotype/com.google.android.gms.nearby mediums_wifi_aware_supports_instant_communication_mode true
