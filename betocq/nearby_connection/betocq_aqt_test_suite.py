@@ -43,17 +43,17 @@ from betocq.nearby_connection.directed_tests import scc_indoor_5g_wfd_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
 
 
-_SUITE_NAME = 'LaunchApproval'
+_SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '2'
+_SUITE_VERSION = '3'
 # LINT.ThenChange()
 
 
-# Test for IR/LR launch approval
+# Test for GTS AQT.
 # LINT.IfChange
-class BetoCqLaunchApprovalTestSuite(base_suite.BaseSuite):
+class BetoCqAqtTestSuite(base_suite.BaseSuite):
   """Add all BetoCQ tests to run in sequence."""
 
   def _assert_config_parameters(self, config):
@@ -63,8 +63,8 @@ class BetoCqLaunchApprovalTestSuite(base_suite.BaseSuite):
     )
     asserts.abort_all_if(
         test_params.target_cuj_name
-        != nc_constants.TARGET_CUJ_OEM_LAUNCH_APPROVAL,
-        'target_cuj_name is not oem_launch_approval',
+        != nc_constants.TARGET_CUJ_AQT,
+        'target_cuj_name is not aqt',
     )
     if not test_params.use_programmable_ap:
       asserts.abort_all_if(
