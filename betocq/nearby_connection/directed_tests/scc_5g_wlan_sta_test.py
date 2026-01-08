@@ -191,7 +191,7 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
     )
-    # due to (internal), the file transfer is not stable for wifi LAN medium.
+
     if self.test_parameters.do_nc_wlan_file_transfer_test:
       # Test Step: Transfer file on the established NC.
       try:
@@ -219,12 +219,13 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
     )
 
     prior_bt_snippet.disconnect_endpoint()
-    # TODO: Re-enable this once the bug is fixed.
-    # disconnect_endpoint() is returned right away even if the connection is
-    # not disconnected yet. So we need to use stop_all_endpoints() to stop
-    # endpoints from both devices.
-    # active_snippet.disconnect_endpoint()
-    active_snippet.stop_all_endpoints()
+
+    if setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(self.advertiser):
+      active_snippet.disconnect_endpoint()
+    else:
+      # use stop_all_endpoints() to stop endpoints from both devices as
+      # the data channel might be broken.
+      active_snippet.stop_all_endpoints()
 
 
 if __name__ == '__main__':

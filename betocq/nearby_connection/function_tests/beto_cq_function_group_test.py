@@ -148,11 +148,15 @@ def _start_nearby_connection_and_transfer_file(
           test_result,
           file_transfer_failure_tip=file_transfer_failure_tip,
       )
-    # TODO: Re-enable this once the bug is fixed.
-    # disconnect_endpoint() is returned right away even if the connection is
-    # not disconnected yet. So we need to use stop_all_endpoints() to stop
-    # endpoints from both devices.
-    if upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY:
+
+    if (
+        upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY
+        and not setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(
+            advertiser
+        )
+    ):
+      # use stop_all_endpoints() to stop endpoints from both devices as
+      # the data channel might be broken.
       nearby_snippet.stop_all_endpoints()
     else:
       nearby_snippet.disconnect_endpoint()
@@ -261,7 +265,6 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
     time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
-    # due to (internal), the file transfer is not stable for wifi LAN medium.
     # Test Step: Set up nearby connection and transfer file.
     _start_nearby_connection_and_transfer_file(
         self.advertiser,

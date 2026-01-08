@@ -47,7 +47,7 @@ _SUITE_NAME = 'LaunchApproval'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '1'
+_SUITE_VERSION = '2'
 # LINT.ThenChange()
 
 
@@ -81,11 +81,6 @@ class BetoCqLaunchApprovalTestSuite(base_suite.BaseSuite):
         not test_params.abort_all_if_any_ap_not_ready,
         'do not change testbed parameters, abort_all_if_any_ap_not_ready is'
         ' expected to be True',
-    )
-    asserts.abort_all_if(
-        test_params.do_nc_wlan_file_transfer_test,
-        'do not change testbed parameters, do_nc_wlan_file_transfer_test is'
-        ' expected to be False',
     )
     asserts.abort_all_if(
         test_params.skip_default_flag_override,

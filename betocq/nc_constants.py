@@ -168,8 +168,7 @@ class TestParameters:
   run_ble_performance_test: bool = False
   requires_bt_multiplex: bool = False
   allow_unrooted_device: bool = False
-  # TODO: Enable this test when the bug is fixed.
-  do_nc_wlan_file_transfer_test: bool = False
+  do_nc_wlan_file_transfer_test: bool = True
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False

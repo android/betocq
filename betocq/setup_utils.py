@@ -1206,3 +1206,26 @@ def log_message_to_logcat(
       ERROR  f: FATAL  i: INFO  v: VERBOSE  w: WARN  s: SILENT
   """
   ad.adb.shell(f'log -p {priority} -t {tag} "{message}"')
+
+
+def is_gms_version_above_required_version(
+    ad: android_device.AndroidDevice, required_version: int
+) -> bool:
+  """Checks if the GMS version is above the required version."""
+  gms_version = dump_gms_version(ad)
+  if gms_version is None:
+    ad.log.warning(
+        'Failed to get GMS version on device "%s", assuming it is below the'
+        ' required version.', ad.serial
+    )
+    return False
+  return int(gms_version) >= required_version
+
+
+def is_nc_wlan_file_transfer_flaky_issue_fixed(
+    advertiser: android_device.AndroidDevice,
+) -> bool:
+  """Checks if the nearby connection WLAN file transfer flaky issue is fixed, see (internal)."""
+  return is_gms_version_above_required_version(
+      advertiser, 260200000
+  )

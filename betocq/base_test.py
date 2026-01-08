@@ -147,6 +147,13 @@ class BaseTestClass(base_test.BaseTestClass):
     self._assert_test_conditions()
     self.__skipped_test_class = False
 
+    if setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(self.advertiser):
+      self.test_parameters.do_nc_wlan_file_transfer_test = True
+      logging.info(
+          'Overriding do_nc_wlan_file_transfer_test to True because the'
+          ' WLAN file transfer flaky issue is fixed.'
+      )
+
   def _assert_general_nc_test_conditions(self):
     if not self.test_parameters.allow_unrooted_device:
       logging.info('The test is not allowed to run on unrooted device.')

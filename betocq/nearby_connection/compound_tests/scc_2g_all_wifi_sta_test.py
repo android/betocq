@@ -212,11 +212,12 @@ class Scc2gAllWifiStaTest(performance_test_base.PerformanceTestBase):
           ),
       )
 
-    # due to (internal), the file transfer is not stable for wifi LAN medium.
     do_file_transfer = True
     if (
         upgrade_medium == nc_constants.NearbyMedium.WIFILAN_ONLY
-        and self.test_parameters.do_nc_wlan_file_transfer_test
+        and not setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(
+            self.advertiser
+        )
     ):
       do_file_transfer = self.test_parameters.do_nc_wlan_file_transfer_test
 
