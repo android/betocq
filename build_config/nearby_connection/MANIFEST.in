@@ -1,3 +1,8 @@
 recursive-include betocq/snippets *
 recursive-include betocq/synced_resource_data *
+recursive-include doc *
+include betocq/cuj_and_test_config.yml
+include betocq/nearby_connection/CHANGELOG.md
+include CONTRIBUTING.md
+
 exclude betocq/tools/**
