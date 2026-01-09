@@ -27,6 +27,7 @@ from mobly import signals
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import apk_utils
+from mobly.snippet import errors
 
 from betocq.gms import hermetic_overrides_partner
 from betocq import gms_auto_updates_util
@@ -48,6 +49,8 @@ _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
 
 WIFI_SCAN_WAIT_TIME_SEC = 5
+_WIFI_CONNECT_INTERVAL_SEC = 2
+_WIFI_CONNECT_RETRY_TIMES = 3
 
 MAX_SSID_THRESHOLD = 10
 
@@ -267,7 +270,9 @@ def connect_to_wifi_sta_till_success(
   wifi_connect_start = datetime.datetime.now()
   if not wifi_password:
     wifi_password = None
-  connect_to_wifi(ad, wifi_ssid, wifi_password)
+  connect_to_wifi(
+      ad, wifi_ssid, wifi_password, num_retries=_WIFI_CONNECT_RETRY_TIMES
+  )
   return datetime.datetime.now() - wifi_connect_start
 
 
@@ -275,6 +280,7 @@ def connect_to_wifi(
     ad: android_device.AndroidDevice,
     ssid: str,
     password: str | None = None,
+    num_retries: int = 1,
 ) -> None:
   """Connects to the specified wifi AP and raise exception if failed."""
   if not ad.nearby.wifiIsEnabled():
@@ -282,7 +288,22 @@ def connect_to_wifi(
   # return until the wifi is connected.
   password = password or None
   ad.log.info('Connect to wifi: ssid: %s, password: %s', ssid, password)
-  ad.nearby.wifiConnectSimple(ssid, password)
+  for i in range(num_retries):
+    try:
+      ad.nearby.wifiConnectSimple(ssid, password)
+      return
+    except errors.ApiError:
+      ad.log.warning(
+          f'Failed to connect to wifi {ssid}, retry attempt {i + 1}'
+      )
+      if i < num_retries - 1:
+        time.sleep(_WIFI_CONNECT_INTERVAL_SEC)
+      else:
+        ad.log.error(
+            f'Still failed to connect to wifi {ssid} after'
+            f' {num_retries} attempts.', exc_info=True
+        )
+        raise
 
 
 def remove_current_connected_wifi_network(
