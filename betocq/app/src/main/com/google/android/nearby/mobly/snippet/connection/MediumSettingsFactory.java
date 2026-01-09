@@ -33,7 +33,6 @@ import com.google.android.gms.nearby.connection.Strategy;
 import java.util.stream.IntStream;
 
 /** A factory to create advertising/discovery/connection medium options for Nearby connections. */
-@SuppressWarnings("AndroidJdkLibsChecker")
 public final class MediumSettingsFactory {
   private static final int AUTO = 0;
 
@@ -63,80 +62,60 @@ public final class MediumSettingsFactory {
 
     AdvertisingOptions.Builder builder = new AdvertisingOptions.Builder().setStrategy(STRATEGY);
 
-    switch (advertisingMedium) {
-      case AUTO:
-        advertisingMediums = null;
-        break;
-      case MEDIUM_BT_ONLY:
-        advertisingMediums = IntStream.of(BLUETOOTH);
-        break;
-      case MEDIUM_BLE_ONLY:
-      case MEDIUM_BLE_L2CAP_ONLY:
-        advertisingMediums = IntStream.of(BLE);
-        break;
-      case MEDIUM_WIFILAN_ONLY:
-        advertisingMediums = IntStream.of(WIFI_LAN);
-        break;
-      case MEDIUM_WIFIAWARE_ONLY:
-        advertisingMediums = IntStream.of(BLE, WIFI_AWARE);
-        break;
-      case MEDIUM_UPGRADE_TO_WEBRTC:
-        advertisingMediums = IntStream.of(BLE, WEB_RTC);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT:
-        advertisingMediums = IntStream.of(BLE, WIFI_HOTSPOT);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIDIRECT:
-        advertisingMediums = IntStream.of(BLE, WIFI_DIRECT);
-        break;
-      case MEDIUM_UPGRADE_TO_ALL_WIFI:
-        advertisingMediums = IntStream.of(BLE, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_LAN, WIFI_AWARE);
-        break;
-      default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported advertising medium: %d", advertisingMedium));
-    }
+    advertisingMediums =
+        switch (advertisingMedium) {
+          case AUTO -> null;
+          case MEDIUM_BT_ONLY -> IntStream.of(BLUETOOTH);
+          case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> IntStream.of(BLE);
+          case MEDIUM_WIFILAN_ONLY -> IntStream.of(WIFI_LAN);
+          case MEDIUM_WIFIAWARE_ONLY -> IntStream.of(BLE, WIFI_AWARE);
+          case MEDIUM_UPGRADE_TO_WEBRTC -> IntStream.of(BLE, WEB_RTC);
+          case MEDIUM_UPGRADE_TO_WIFIHOTSPOT -> IntStream.of(BLE, WIFI_HOTSPOT);
+          case MEDIUM_UPGRADE_TO_WIFIDIRECT -> IntStream.of(BLE, WIFI_DIRECT);
+          case MEDIUM_UPGRADE_TO_ALL_WIFI ->
+              IntStream.of(BLE, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_LAN, WIFI_AWARE);
+          default ->
+              throw new IllegalArgumentException(
+                  String.format("Unsupported advertising medium: %d", advertisingMedium));
+        };
 
     switch (upgradeMedium) {
-      case AUTO:
+      case AUTO -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = null;
-        break;
-      case MEDIUM_BT_ONLY:
-        upgradeMediums = IntStream.of(BLUETOOTH);
-        break;
-      case MEDIUM_BLE_ONLY:
-      case MEDIUM_BLE_L2CAP_ONLY:
+      }
+      case MEDIUM_BT_ONLY -> upgradeMediums = IntStream.of(BLUETOOTH);
+      case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> {
         lowPower = true;
         upgradeMediums = IntStream.of(BLE);
-        break;
-      case MEDIUM_WIFILAN_ONLY:
+      }
+      case MEDIUM_WIFILAN_ONLY -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = IntStream.of(WIFI_LAN);
-        break;
-      case MEDIUM_WIFIAWARE_ONLY:
+      }
+      case MEDIUM_WIFIAWARE_ONLY -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = IntStream.of(WIFI_AWARE, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_WEBRTC:
+      }
+      case MEDIUM_UPGRADE_TO_WEBRTC -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = IntStream.of(WEB_RTC, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT:
+      }
+      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = IntStream.of(WIFI_HOTSPOT, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIDIRECT:
+      }
+      case MEDIUM_UPGRADE_TO_WIFIDIRECT -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = IntStream.of(WIFI_DIRECT, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_ALL_WIFI:
+      }
+      case MEDIUM_UPGRADE_TO_ALL_WIFI -> {
         autoUpgradeBandwidth = true;
-        upgradeMediums =IntStream.of(WIFI_DIRECT, WIFI_AWARE, WIFI_HOTSPOT, WIFI_LAN);
-        break;
-      default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported upgrade medium: %d", upgradeMedium));
+        upgradeMediums = IntStream.of(WIFI_DIRECT, WIFI_AWARE, WIFI_HOTSPOT, WIFI_LAN);
+      }
+      default ->
+          throw new IllegalArgumentException(
+              String.format("Unsupported upgrade medium: %d", upgradeMedium));
     }
 
     builder
@@ -155,8 +134,6 @@ public final class MediumSettingsFactory {
     return builder.build();
   }
 
-
-
   public static DiscoveryOptions getDiscoveryMediumOptions(int discoveryMedium) {
     boolean forwardUnrecognizedBluetoothDevices = false;
     boolean lowPower = false;
@@ -165,31 +142,17 @@ public final class MediumSettingsFactory {
     DiscoveryOptions.Builder builder = new DiscoveryOptions.Builder().setStrategy(STRATEGY);
 
     switch (discoveryMedium) {
-      case AUTO:
-        break;
-      case MEDIUM_BT_ONLY:
-        discoveryMediums = IntStream.of(BLUETOOTH);
-        break;
-      case MEDIUM_BLE_ONLY:
-      case MEDIUM_BLE_L2CAP_ONLY:
-        discoveryMediums = IntStream.of(BLE);
-        break;
-      case MEDIUM_WIFILAN_ONLY:
-        discoveryMediums = IntStream.of(WIFI_LAN);
-        break;
-      case MEDIUM_WIFIAWARE_ONLY:
-        discoveryMediums = IntStream.of(BLE, WIFI_AWARE);
-        break;
-      case MEDIUM_UPGRADE_TO_WEBRTC:
-      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT:
-      case MEDIUM_UPGRADE_TO_WIFIDIRECT:
-        discoveryMediums = IntStream.of(BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_ALL_WIFI:
-        discoveryMediums = IntStream.of(BLE, WIFI_LAN, WIFI_AWARE);
-        break;
-      default:
+      case AUTO -> {}
+      case MEDIUM_BT_ONLY -> discoveryMediums = IntStream.of(BLUETOOTH);
+      case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> discoveryMediums = IntStream.of(BLE);
+      case MEDIUM_WIFILAN_ONLY -> discoveryMediums = IntStream.of(WIFI_LAN);
+      case MEDIUM_WIFIAWARE_ONLY -> discoveryMediums = IntStream.of(BLE, WIFI_AWARE);
+      case MEDIUM_UPGRADE_TO_WEBRTC, MEDIUM_UPGRADE_TO_WIFIHOTSPOT, MEDIUM_UPGRADE_TO_WIFIDIRECT ->
+          discoveryMediums = IntStream.of(BLE);
+      case MEDIUM_UPGRADE_TO_ALL_WIFI -> discoveryMediums = IntStream.of(BLE, WIFI_LAN, WIFI_AWARE);
+      default -> {
         return builder.build();
+      }
     }
 
     builder
@@ -203,9 +166,11 @@ public final class MediumSettingsFactory {
     return builder.build();
   }
 
-
   public static ConnectionOptions getConnectionMediumOptions(
-      int connectionMedium, int upgradeMedium, int mediumUpgradeType, int keepAliveTimeoutMillis,
+      int connectionMedium,
+      int upgradeMedium,
+      int mediumUpgradeType,
+      int keepAliveTimeoutMillis,
       int keepAliveIntervalMillis) {
     IntStream connectionMediums = IntStream.empty();
     IntStream upgradeMediums = IntStream.empty();
@@ -226,80 +191,45 @@ public final class MediumSettingsFactory {
       builder.setKeepAliveIntervalMillis(keepAliveIntervalMillis);
     }
 
-    switch (connectionMedium) {
-      case AUTO:
-        connectionMediums = null;
-        break;
-      case MEDIUM_BT_ONLY:
-        connectionMediums = IntStream.of(BLUETOOTH);
-        break;
-      case MEDIUM_BLE_ONLY:
-        connectionMediums = IntStream.of(BLE);
-        break;
-      case MEDIUM_BLE_L2CAP_ONLY:
-        connectionMediums = IntStream.of(BLE_L2CAP);
-        break;
-      case MEDIUM_WIFILAN_ONLY:
-        connectionMediums = IntStream.of(WIFI_LAN);
-        break;
-      case MEDIUM_WIFIAWARE_ONLY:
-        connectionMediums = IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_AWARE);
-        break;
-      case MEDIUM_UPGRADE_TO_WEBRTC:
-        connectionMediums = IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WEB_RTC);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT:
-        connectionMediums = IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_HOTSPOT);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIDIRECT:
-        connectionMediums = IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_DIRECT);
-        break;
-      case MEDIUM_UPGRADE_TO_ALL_WIFI:
-        connectionMediums =
-            IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_AWARE);
-        break;
-      default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported connection medium: %d", upgradeMedium));
-    }
+    connectionMediums =
+        switch (connectionMedium) {
+          case AUTO -> null;
+          case MEDIUM_BT_ONLY -> IntStream.of(BLUETOOTH);
+          case MEDIUM_BLE_ONLY -> IntStream.of(BLE);
+          case MEDIUM_BLE_L2CAP_ONLY -> IntStream.of(BLE_L2CAP);
+          case MEDIUM_WIFILAN_ONLY -> IntStream.of(WIFI_LAN);
+          case MEDIUM_WIFIAWARE_ONLY -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_AWARE);
+          case MEDIUM_UPGRADE_TO_WEBRTC -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WEB_RTC);
+          case MEDIUM_UPGRADE_TO_WIFIHOTSPOT ->
+              IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_HOTSPOT);
+          case MEDIUM_UPGRADE_TO_WIFIDIRECT -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_DIRECT);
+          case MEDIUM_UPGRADE_TO_ALL_WIFI ->
+              IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_AWARE);
+          default ->
+              throw new IllegalArgumentException(
+                  String.format("Unsupported connection medium: %d", upgradeMedium));
+        };
 
     if (connectionMediums != null) {
       builder.setConnectionMediums(connectionMediums.toArray());
     }
 
-    switch (upgradeMedium) {
-      case AUTO:
-        upgradeMediums = null;
-        break;
-      case MEDIUM_BT_ONLY:
-        upgradeMediums = IntStream.of(BLUETOOTH, BLE);
-        break;
-      case MEDIUM_BLE_ONLY:
-      case MEDIUM_BLE_L2CAP_ONLY:
-        upgradeMediums = IntStream.of(BLE_L2CAP);
-        break;
-      case MEDIUM_WIFILAN_ONLY:
-        upgradeMediums = IntStream.of(WIFI_LAN);
-        break;
-      case MEDIUM_WIFIAWARE_ONLY:
-        upgradeMediums = IntStream.of(WIFI_AWARE, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_WEBRTC:
-        upgradeMediums = IntStream.of(WEB_RTC, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT:
-        upgradeMediums = IntStream.of(WIFI_HOTSPOT, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_WIFIDIRECT:
-        upgradeMediums = IntStream.of(WIFI_DIRECT, BLE_L2CAP, BLUETOOTH, BLE);
-        break;
-      case MEDIUM_UPGRADE_TO_ALL_WIFI:
-        upgradeMediums = IntStream.of(WIFI_DIRECT, WIFI_HOTSPOT, WIFI_LAN);
-        break;
-      default:
-        throw new IllegalArgumentException(
-            String.format("Unsupported connection medium: %d", upgradeMedium));
-    }
+    upgradeMediums =
+        switch (upgradeMedium) {
+          case AUTO -> null;
+          case MEDIUM_BT_ONLY -> IntStream.of(BLUETOOTH, BLE);
+          case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> IntStream.of(BLE_L2CAP);
+          case MEDIUM_WIFILAN_ONLY -> IntStream.of(WIFI_LAN);
+          case MEDIUM_WIFIAWARE_ONLY -> IntStream.of(WIFI_AWARE, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_WEBRTC -> IntStream.of(WEB_RTC, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_WIFIHOTSPOT ->
+              IntStream.of(WIFI_HOTSPOT, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_WIFIDIRECT -> IntStream.of(WIFI_DIRECT, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_ALL_WIFI -> IntStream.of(WIFI_DIRECT, WIFI_HOTSPOT, WIFI_LAN);
+          default ->
+              throw new IllegalArgumentException(
+                  String.format("Unsupported connection medium: %d", upgradeMedium));
+        };
 
     if (upgradeMediums != null) {
       builder.setUpgradeMediums(upgradeMediums.toArray());

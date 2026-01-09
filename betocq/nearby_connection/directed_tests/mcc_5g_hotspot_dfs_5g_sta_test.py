@@ -32,15 +32,15 @@ Test requirements:
     (target device only) enable_sta_dfs_channel_for_peer_network=False in config
       file
   The AP requirements:
-    wifi channel: 52 (5260)
+    wifi channel: 52 (5260) or 112 (5560) or other DFS channels.
 
 Test preparations:
   Set country code to GB on Android devices.
 
 Test steps:
-  1. Connect discoverer to a 5G DFS Wi-Fi network.
+  1. Disconnect discoverer from the current connected Wi-Fi network.
   2. Set up a prior Nearby Connection through Bluetooth medium.
-  3. Connect advertiser to the same Wi-Fi network.
+  3. Connect advertiser to the 5G DFS Wi-Fi network.
   4. Set up a connection with Wi-Fi Direct as upgrade medium.
       * Nearby Connection will enable WFD GO + STA on the target device
         and STA on the source device which tries to connect to WFD GO.
@@ -64,10 +64,10 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
@@ -92,7 +92,6 @@ _THROUGHPUT_LOW_TIP = (
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Hotspot connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
 )
 
 
@@ -134,7 +133,10 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
-    self._assert_test_conditions()
+    # Check device capabilities.
+    setup_utils.abort_if_wifi_hotspot_not_supported(
+        [self.discoverer, self.advertiser]
+    )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
@@ -142,34 +144,26 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         ad,
         snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
         country_code=self.test_runtime.country_code,
-        debug_output_dir=self.current_test_info.output_path,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
+    # Check rooted devices.
+    setup_utils.abort_if_on_unrooted_device(
+        [self.discoverer, self.advertiser],
+        'the country code can not be set.'
+    )
     # Check WiFi AP.
-    nc_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
+    setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
-    nc_utils.abort_if_device_cap_not_match(
+    setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
     )
-    nc_utils.abort_if_wifi_direct_not_supported(
-        [self.discoverer, self.advertiser]
-    )
-    nc_utils.abort_if_device_cap_not_match(
+    setup_utils.abort_if_device_cap_not_match(
         [self.advertiser],
         'enable_sta_dfs_channel_for_peer_network',
         expected_value=False,
-    )
-
-  def setup_test(self):
-    super().setup_test()
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
     )
 
   @base_test.repeat(
@@ -178,31 +172,37 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
   )
   def test_mcc_5g_hotspot_dfs_5g_sta(self):
     """Test the performance for wifi MCC with 5G HOTSPOT and DFS 5G STA."""
-    # Test Step: Connect discoverer to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
-        self.discoverer,
-        self.wifi_info.discoverer_wifi_ssid,
-        self.wifi_info.discoverer_wifi_password,
-        self.current_test_result,
-        is_discoverer=True,
+    # Test Step: Disconnect discoverer from the current connected wifi sta.
+    discoverer_wifi_disconnected = (
+        setup_utils.remove_current_connected_wifi_network(self.discoverer)
     )
 
     # Test Step: Set up a prior BT connection.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
-        self.advertiser, self.discoverer, self.current_test_result
+        self.advertiser,
+        self.discoverer,
+        self.current_test_result,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Connect advertiser to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    advertiser_wifi_connected = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
         self.wifi_info.advertiser_wifi_ssid,
         self.wifi_info.advertiser_wifi_password,
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
-    # This is important especially for the transfer speed or WLAN test.
-    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+    if discoverer_wifi_disconnected or advertiser_wifi_connected:
+      # Let scan, DHCP and internet validation complete before NC.
+      # This is important especially for the transfer speed or WLAN test.
+      time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+
+    test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
@@ -211,6 +211,20 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        test_parameters=self.test_parameters,
+    )
+
+    test_result_utils.set_and_assert_p2p_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.is_mcc,
+        self.test_runtime.is_dbs_mode,
+        sta_frequency=self.current_test_result.sta_frequency,
+        additional_error_message=(
+            'Check if enable_sta_dfs_channel_for_peer_network is really False'
+            ' for the target device. If yes, the device violate the regulation'
+            ' of Wi-Fi 5G DFS channel. You may work with the chipset vendor.'
+        ),
     )
 
     # Test Step: Transfer file on the established NC.
@@ -228,21 +242,6 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
           active_snippet.test_failure_reason,
           self.current_test_result,
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-      test_result_utils.assert_sta_frequency(
-          self.current_test_result,
-          expected_wifi_type=self.wifi_info.sta_type,
-      )
-      test_result_utils.assert_p2p_frequency(
-          self.current_test_result,
-          is_mcc=self.wifi_info.is_mcc,
-          is_dbs_mode=self.test_runtime.is_dbs_mode,
       )
 
     # Check the throughput and run iperf if needed.

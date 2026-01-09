@@ -14,9 +14,9 @@
 
 """class to enable/disable GMS auto update."""
 
-import logging
 import os
 import tempfile
+import traceback
 from xml.etree import ElementTree
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
@@ -46,6 +46,58 @@ _ENABLE_GSERVICES_CMD_TEMPLATE = [
     ),
 ]
 
+_ENABLE_GMS_CORE_CHECKINS_AND_UPDATES = [
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags Chimera__config_checkin_enabled --esa values true '
+        '--esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags "Chimera__disable_config_checkin_for_tests" '
+        '--esa values false --esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular --es SelfUpdate__do_not_schedule true'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular '
+        '--es AutoUpdateCodegen__gms_auto_update_enabled true'
+    )
+]
+
+_DISABLE_GMS_CORE_CHECKINS_AND_UPDATES = [
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags Chimera__config_checkin_enabled --esa values false '
+        '--esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.gms.phenotype.FLAG_OVERRIDE '
+        '--es package com.google.android.gms --es user "*" '
+        '--esa flags "Chimera__disable_config_checkin_for_tests" '
+        '--esa values true --esa types boolean com.google.android.gms'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular --es SelfUpdate__do_not_schedule false'
+    ),
+    (
+        'am broadcast -a com.google.android.finsky.shellservice.COMMAND '
+        '-p com.android.vending --es command override_phenotype_flags '
+        '--es flag_type regular '
+        '--es AutoUpdateCodegen__gms_auto_update_enabled false'
+    )
+]
+
 
 class GmsAutoUpdatesUtil:
   """class to enable/disable GMS auto updates."""
@@ -54,10 +106,24 @@ class GmsAutoUpdatesUtil:
     self._device: android_device.AndroidDevice = ad
 
   def enable_gms_auto_updates(self) -> None:
-    self._config_gms_auto_updates(True)
+    try:
+      self._config_gms_auto_updates(enable_updates=True)
+    except (adb.AdbError, OSError, PermissionError):
+      self._device.log.warning(
+          'failed to enable gms auto updates (%s), the test result might be'
+          ' flaky due to the gms auto updates.',
+          traceback.format_exc(),
+      )
 
   def disable_gms_auto_updates(self) -> None:
-    self._config_gms_auto_updates(False)
+    try:
+      self._config_gms_auto_updates(enable_updates=False)
+    except (adb.AdbError, OSError, PermissionError):
+      self._device.log.warning(
+          'failed to disable gms auto updates (%s), you can enable it manually'
+          ' on the play store, and reboot the device.',
+          traceback.format_exc(),
+      )
 
   def _config_gms_auto_updates(self, enable_updates: bool) -> None:
     """Configures GMS auto updates."""
@@ -74,7 +140,20 @@ class GmsAutoUpdatesUtil:
         self._configure_play_store_updates(
             _FINSKY_CONFIG_VALUE_DISABLE, _VENDING_CONFIG_VALUE_DISABLE
         )
+    # force stop the play store to apply the above config changes.
+    self._device.adb.shell('am force-stop com.android.vending')
     self._configure_gservice_updates(enable_updates)
+    self._configure_gms_core_checkins_and_updates(enable_updates)
+
+  def _configure_gms_core_checkins_and_updates(
+      self, enable_updates: bool
+  ) -> None:
+    if enable_updates:
+      for cmd in _ENABLE_GMS_CORE_CHECKINS_AND_UPDATES:
+        self._device.adb.shell(cmd)
+    else:
+      for cmd in _DISABLE_GMS_CORE_CHECKINS_AND_UPDATES:
+        self._device.adb.shell(cmd)
 
   def _configure_gservice_updates(self, enable_updates: bool) -> None:
     """Overwites Gservice to enable/disable updates."""
@@ -131,8 +210,12 @@ class GmsAutoUpdatesUtil:
         changing_element = ElementTree.SubElement(root, 'boolean')
       else:
         changing_element = ElementTree.SubElement(root, 'string')
-    logging.info('element for %s is %s, %s', name, changing_element.tag,
-                 changing_element.attrib)
+    self._device.log.info(
+        'reading element for %s is %s, %s',
+        name,
+        changing_element.tag,
+        changing_element.attrib,
+    )
     if value_type == _XML_BOOL_TYPE:
       changing_element.set('name', name)
       changing_element.set('value', value)
@@ -160,7 +243,7 @@ class GmsAutoUpdatesUtil:
       try:
         os.remove(finsky_config)
       except OSError as e:
-        logging.warning('failed to remove %s: %s', finsky_config, e)
+        self._device.log.warning('failed to remove %s: %s', finsky_config, e)
 
       vending_config = self._create_or_update_play_store_config(
           tmp_dir,
@@ -173,4 +256,4 @@ class GmsAutoUpdatesUtil:
       try:
         os.remove(vending_config)
       except OSError as e:
-        logging.warning('failed to remove %s: %s', vending_config, e)
+        self._device.log.warning('failed to remove %s: %s', vending_config, e)

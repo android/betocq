@@ -102,7 +102,19 @@ class NearbyConnectionWrapper:
   def start_discovery(
       self, timeout: datetime.timedelta, enable_target_discovery: bool = False
   ) -> None:
-    """Starts Nearby Connection discovery."""
+    """Starts Nearby Connection discovery.
+
+    Args:
+      timeout: The maximum time to wait for the onEndpointFound event.
+      enable_target_discovery: Whether to also start discovery on the advertiser
+        device.
+
+    Raises:
+      mobly.signals.TestFailure: If an unexpected endpoint is found or the
+        service ID does not match.
+      mobly.controllers.android_device_lib.errors.ControllerError: If the
+        onEndpointFound event times out.
+    """
     self.discoverer.log.info(
         f'Start discovery {self.advertising_discovery_medium.name}'
     )
@@ -132,14 +144,14 @@ class NearbyConnectionWrapper:
     asserts.assert_equal(
         endpoint_info['endpointName'],
         self.advertiser.serial,
-        'Received an unexpected endpoint during discovery: '
+        'Source device received an unexpected endpoint during discovery: '
         f'{endpoint_found_event}',
     )
 
     asserts.assert_equal(
         endpoint_info['serviceId'],
         self.service_id,
-        'Received an unexpected service id during discovery: '
+        'Source device received an unexpected service id during discovery: '
         f'{endpoint_found_event}',
     )
     self._advertiser_endpoint_id = endpoint_found_event.data['endpointId']
@@ -152,10 +164,10 @@ class NearbyConnectionWrapper:
   def stop_discovery(self, enable_target_discovery: bool = False) -> None:
     """Stops Nearby Connection discovery."""
     self.discoverer_nearby.stopDiscovery()
-    self.discoverer.log.info('Stop discovery')
+    self.discoverer.log.info('Stop discovery on discoverer')
     if enable_target_discovery:
       self.advertiser_nearby.stopDiscovery()
-      self.advertiser.log.info('Stop discovery')
+      self.advertiser.log.info('Stop discovery on advertiser')
 
   def request_connection(
       self,
@@ -164,7 +176,20 @@ class NearbyConnectionWrapper:
       keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
       keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
   ) -> None:
-    """Requests Nearby Connection."""
+    """Requests Nearby Connection.
+
+    Args:
+      medium_upgrade_type: The type of medium upgrade to request.
+      timeout: The maximum time to wait for connection initiation events.
+      keep_alive_timeout_ms: Keep alive timeout in milliseconds.
+      keep_alive_interval_ms: Keep alive interval in milliseconds.
+
+    Raises:
+      mobly.signals.TestFailure: If connection initiation fails or unexpected
+        endpoint/connection info is received.
+      mobly.controllers.android_device_lib.errors.ControllerError: If
+        onConnectionInitiated event times out.
+    """
 
     self.discoverer.log.info(
         'Start connection request with keep_alive_timeout_ms'
@@ -201,7 +226,8 @@ class NearbyConnectionWrapper:
     asserts.assert_equal(
         d_connection_info['endpointName'],
         self.advertiser.serial,
-        f'Received an unexpected endpoint: {d_connection_init_event}',
+        'Source device received an unexpected endpoint:'
+        f' {d_connection_init_event}',
     )
 
     # wait for the advertiser connection initialized.
@@ -213,20 +239,32 @@ class NearbyConnectionWrapper:
     a_connection_info = a_connection_init_event.data['connectionInfo']
     asserts.assert_true(
         a_connection_info['isIncomingConnection'],
-        f'Received an outgoing connection: {d_connection_init_event}'
-        'but expected an incoming connection',
+        'Target device received an outgoing connection:'
+        f' {a_connection_init_event} but expected an incoming connection',
     )
 
     asserts.assert_equal(
         a_connection_info['endpointName'],
         self.discoverer.serial,
-        f'Received an unexpected endpoint: {a_connection_init_event}',
+        'Target device received an unexpected endpoint:'
+        f' {a_connection_init_event}',
     )
 
     self._discoverer_endpoint_id = a_connection_init_event.data['endpointId']
 
   def accept_connection(self, timeout: datetime.timedelta) -> None:
-    """Accepts Nearby Connection."""
+    """Accepts Nearby Connection.
+
+    Args:
+      timeout: The maximum time to wait for connection result events.
+
+    Raises:
+      mobly.signals.TestFailure: If connection result is not successful,
+        or if bandwidth upgrade times out or fails.
+      TimeoutError: If upgrading to a high-quality medium times out.
+      mobly.controllers.android_device_lib.errors.ControllerError: If
+        onConnectionResult or onBandwidthChanged events time out.
+    """
     self._advertiser_payload_callback = self.advertiser_nearby.acceptConnection(
         self._discoverer_endpoint_id
     )
@@ -244,13 +282,15 @@ class NearbyConnectionWrapper:
 
     asserts.assert_true(
         advertiser_connection_event.data['isSuccess'],
-        f'Received an unsuccessful event: {advertiser_connection_event}',
+        f'Target device received an unsuccessful event:'
+        f' {advertiser_connection_event}',
     )
 
     asserts.assert_equal(
         advertiser_connection_event.data['endpointId'],
         self._discoverer_endpoint_id,
-        f'Received an unexpected endpoint: {advertiser_connection_event}',
+        f'Target device received an unexpected endpoint:'
+        f' {advertiser_connection_event}',
     )
 
     discoverer_connection_event = (
@@ -260,35 +300,66 @@ class NearbyConnectionWrapper:
     )
     asserts.assert_true(
         discoverer_connection_event.data['isSuccess'],
-        f'Received an unsuccessful event: {discoverer_connection_event}',
+        'Source device received an unsuccessful event:'
+        f' {discoverer_connection_event}',
     )
 
     asserts.assert_equal(
         discoverer_connection_event.data['endpointId'],
         self._advertiser_endpoint_id,
-        f'Received an unexpected endpoint: {discoverer_connection_event}',
+        'Source device received an unexpected endpoint:'
+        f' {discoverer_connection_event}',
     )
 
-    is_connection_medium_high_quality = False
-    discoverer_medium_connection_event = (
-        self._discoverer_connection_lifecycle_callback.waitAndGet(
-            'onBandwidthChanged',
-            nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
-        )
-    )
-    if self.connection_quality_info.connection_medium is None:
-      self.connection_quality_info.connection_medium = (
-          nc_constants.NearbyConnectionMedium(
-              discoverer_medium_connection_event.data['medium']
+    on_bandwidth_changed_event_success = False
+    discoverer_medium_connection_event = None
+    while not on_bandwidth_changed_event_success:
+      discoverer_medium_connection_event = (
+          self._discoverer_connection_lifecycle_callback.waitAndGet(
+              'onBandwidthChanged',
+              nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
           )
       )
-      if discoverer_medium_connection_event.data['isHighBwQuality']:
-        is_connection_medium_high_quality = True
-      self.discoverer.log.info(
-          'connect to medium:'
-          f' {self.connection_quality_info.connection_medium.name}, is high'
-          f' quality: {is_connection_medium_high_quality}'
+      upgrade_status = discoverer_medium_connection_event.data['upgradeStatus']
+      asserts.assert_false(
+          upgrade_status
+          == nc_constants.NcBandwidthUpgradeStatus.TIMED_OUT,
+          'Source device reported bandwidth changed failed for the initial'
+          ' bluetooth connection',
       )
+      if upgrade_status == nc_constants.NcBandwidthUpgradeStatus.SUCCESS:
+        on_bandwidth_changed_event_success = True
+      else:
+        self.discoverer.log.info(
+            f'onBandwidthChanged event upgrade status is {upgrade_status.name}'
+        )
+
+    discoverer_connection_medium = nc_constants.NearbyConnectionMedium(
+        discoverer_medium_connection_event.data['medium']
+    )
+    is_connection_medium_high_quality = (
+        discoverer_medium_connection_event.data['isHighBwQuality']
+    )
+
+    if discoverer_connection_medium == (
+        nc_constants.NearbyConnectionMedium.UNKNOWN
+    ):
+      self.discoverer.log.info(
+          'connection medium from onBandwidthChanged is unknown, set to the'
+          ' requested medium:'
+          f' {self.connection_medium.to_connection_medium().name} instead'
+      )
+      discoverer_connection_medium = (
+          self.connection_medium.to_connection_medium()
+      )
+    self.connection_quality_info.connection_medium = (
+        discoverer_connection_medium
+    )
+    self.discoverer.log.info(
+        'connect to medium:'
+        f' {self.connection_quality_info.connection_medium.name}, is high'
+        f' quality: {is_connection_medium_high_quality}'
+    )
 
     # check if it's instant connection
     if (
@@ -325,6 +396,15 @@ class NearbyConnectionWrapper:
         self.discoverer.log.info(
             f'medium upgrade to {discoverer_medium_upgrade_event.data}'
         )
+        medium_upgrade_status = nc_constants.NcBandwidthUpgradeStatus(
+            discoverer_medium_upgrade_event.data['upgradeStatus']
+        )
+        asserts.assert_false(
+            medium_upgrade_status
+            == nc_constants.NcBandwidthUpgradeStatus.TIMED_OUT,
+            'Source device reported bandwidth upgrade failed for the wifi'
+            ' medium upgrade',
+        )
         if discoverer_medium_upgrade_event.data['isHighBwQuality']:
           wait_high_quality = False
           self.connection_quality_info.medium_upgrade_latency = (
@@ -335,6 +415,17 @@ class NearbyConnectionWrapper:
                   discoverer_medium_upgrade_event.data['medium']
               )
           )
+          if self.connection_quality_info.upgrade_medium == (
+              nc_constants.NearbyConnectionMedium.UNKNOWN
+          ):
+            self.discoverer.log.info(
+                'medium upgrade from onBandwidthChanged is unknown, set to the'
+                ' upgrade medium:'
+                f' {self.upgrade_medium.to_connection_medium().name} instead'
+            )
+            self.connection_quality_info.upgrade_medium = (
+                self.upgrade_medium.to_connection_medium()
+            )
           self.connection_quality_info.medium_upgrade_expected = True
           self.discoverer.log.info(
               'upgraded to high quality medium: '
@@ -343,20 +434,26 @@ class NearbyConnectionWrapper:
         else:
           latency = datetime.datetime.now() - upgrade_start_time
           if latency >= nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT:
-            raise TimeoutError('medium upgrade timeout')
+            raise TimeoutError(
+                'Timeout to upgrade to high quality medium'
+                f' {self.upgrade_medium.name}'
+            )
 
   def disconnect_endpoint(self) -> None:
-    """Disconnects Nearby Connection endpoint."""
-    if self:
-      self.discoverer_nearby.disconnectFromEndpoint(
-          self._advertiser_endpoint_id
-      )
-      self.discoverer.log.info(
-          f'Start disconnecting from endpoint: {self._advertiser_endpoint_id}'
-      )
-    else:
-      self.discoverer.log.info('no nearby connecty setup yet')
-      return nc_constants.OpResult(nc_constants.Result.SUCCESS)
+    """Disconnects Nearby Connection endpoint.
+
+    Raises:
+      mobly.signals.TestFailure: If the disconnected event has an unexpected
+        endpoint ID.
+      mobly.controllers.android_device_lib.errors.ControllerError: If the
+        onDisconnected event times out.
+    """
+    self.discoverer_nearby.disconnectFromEndpoint(
+        self._advertiser_endpoint_id
+    )
+    self.discoverer.log.info(
+        f'Start disconnecting from endpoint: {self._advertiser_endpoint_id}'
+    )
 
     if self._discoverer_connection_lifecycle_callback is not None:
       disconnected_event = (
@@ -368,33 +465,70 @@ class NearbyConnectionWrapper:
       asserts.assert_equal(
           disconnected_event.data['endpointId'],
           self._advertiser_endpoint_id,
-          f'Receive unexpected event on disconnect: {disconnected_event}',
+          'Source device received unexpected event on disconnect:'
+          f' {disconnected_event}',
+      )
+    if self._advertiser_connection_lifecycle_callback is not None:
+      disconnected_event = (
+          self._advertiser_connection_lifecycle_callback.waitAndGet(
+              'onDisconnected',
+              timeout=nc_constants.DISCONNECTION_TIMEOUT.total_seconds(),
+          )
+      )
+      asserts.assert_equal(
+          disconnected_event.data['endpointId'],
+          self._discoverer_endpoint_id,
+          'Target device received unexpected event on disconnect:'
+          f' {disconnected_event}',
       )
     self.discoverer.log.info(
         f'disconnected with endpoint: {self._advertiser_endpoint_id}'
     )
 
+  def stop_all_endpoints(self) -> None:
+    """Stops all Nearby Connection endpoints."""
+    self.advertiser_nearby.stopAllEndpoints()
+    self.discoverer_nearby.stopAllEndpoints()
+
   def start_nearby_connection(
       self,
       timeouts: nc_constants.ConnectionSetupTimeouts,
-      medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DEFAULT,
+      medium_upgrade_type: nc_constants.MediumUpgradeType = (
+          nc_constants.MediumUpgradeType.DEFAULT
+      ),
       keep_alive_timeout_ms: int = 0,
       keep_alive_interval_ms: int = 0,
       enable_target_discovery: bool = False,
+      test_parameters: nc_constants.TestParameters | None = None,
   ) -> None:
-    """Starts Nearby Connection between two Android devices."""
+    """Starts Nearby Connection between two Android devices.
+
+    Args:
+      timeouts: ConnectionSetupTimeouts object containing various timeouts.
+      medium_upgrade_type: The type of medium upgrade to request.
+      keep_alive_timeout_ms: Keep alive timeout in milliseconds.
+      keep_alive_interval_ms: Keep alive interval in milliseconds.
+      enable_target_discovery: Whether to also start discovery on the advertiser
+        device.
+      test_parameters: Optional parameters for the test.
+
+    Raises:
+      Exceptions from called methods like start_advertising, start_discovery,
+      request_connection, and accept_connection.
+    """
     self.test_failure_reason = (
         nc_constants.SingleTestFailureReason.TARGET_START_ADVERTISING
     )
     # Start advertising.
     self.start_advertising()
-    # Add a random delay between adversting and discovery
-    # to mimic the random delay between two devices' user action
-    time.sleep(
-        ADV_TO_DISCOVERY_MIN_DELAY_SEC
-        + (ADV_TO_DISCOVERY_MAX_DELAY_SEC - ADV_TO_DISCOVERY_MIN_DELAY_SEC)
-        * random.random()
-    )
+    if test_parameters and test_parameters.delay_nc_discovery_request:
+      # Add a random delay between adversting and discovery
+      # to mimic the random delay between two devices' user action
+      time.sleep(
+          ADV_TO_DISCOVERY_MIN_DELAY_SEC
+          + (ADV_TO_DISCOVERY_MAX_DELAY_SEC - ADV_TO_DISCOVERY_MIN_DELAY_SEC)
+          * random.random()
+      )
 
     self.test_failure_reason = (
         nc_constants.SingleTestFailureReason.SOURCE_START_DISCOVERY
@@ -436,7 +570,23 @@ class NearbyConnectionWrapper:
       payload_type: nc_constants.PayloadType,
       num_files: int = nc_constants.TRANSFER_FILE_NUM_DEFAULT,
   ) -> float:
-    """Sends payloads and returns the transfer speed in kilo byte per second."""
+    """Sends payloads and returns the transfer speed in kilo byte per second.
+
+    Args:
+      file_size_kb: The size of each file to transfer in kilobytes.
+      timeout: The maximum time to wait for each payload transfer event.
+      payload_type: The type of payload to send (e.g., FILE, BYTES).
+      num_files: The number of files/payloads to transfer.
+
+    Returns:
+      The calculated transfer speed in kilobytes per second.
+
+    Raises:
+      mobly.signals.TestFailure: If file transfer fails or payload IDs do not
+        match.
+      mobly.controllers.android_device_lib.errors.ControllerError: If payload
+        transfer events time out.
+    """
     try:
       self.test_failure_reason = (
           nc_constants.SingleTestFailureReason.FILE_TRANSFER_FAIL
@@ -486,37 +636,61 @@ class NearbyConnectionWrapper:
         'No nearby connection is set up, discoverer payload cb is none.',
     )
 
-    def on_receive(event: callback_event.CallbackEvent) -> bool:
+    def on_advertiser_receive(event: callback_event.CallbackEvent) -> bool:
       return event.data['endpointId'] == self._discoverer_endpoint_id
+    def on_discoverer_receive(event: callback_event.CallbackEvent) -> bool:
+      return event.data['endpointId'] == self._advertiser_endpoint_id
 
     transfer_time_s = 0
     for _ in range(num_files):
-      # Ensure the order of payload transfer events are the same on both sides.
-
-      rx_received_event = self._advertiser_payload_callback.waitForEvent(
-          'onPayloadReceived',
-          predicate=on_receive,
+      # NC guarantees the order of payload transfer events are the same on both
+      # sides.
+      # Use this order to wait for events as the tx, rx transfer update event
+      # may got failure and it can terminate early to avoid the timeout.
+      tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
+          'onPayloadTransferUpdate',
+          predicate=on_discoverer_receive,
           timeout=timeout.total_seconds(),
+      )
+      asserts.assert_true(
+          tx_transfer_event.data['update']['isSuccess'],
+          'file transfer failure reported on the source side for payload id:'
+          f' {tx_transfer_event.data["update"]["payloadId"]}',
       )
 
       rx_transfer_event = self._advertiser_payload_callback.waitForEvent(
           'onPayloadTransferUpdate',
-          predicate=lambda event: event.data['update']['isSuccess'],
+          predicate=on_advertiser_receive,
           timeout=timeout.total_seconds(),
       )
+      asserts.assert_true(
+          rx_transfer_event.data['update']['isSuccess'],
+          'file transfer failure reported on the target side for payload id:'
+          f' {rx_transfer_event.data["update"]["payloadId"]}',
+      )
 
-      tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
-          'onPayloadTransferUpdate',
-          predicate=lambda event: event.data['update']['isSuccess'],
-          # and event.data['update']['payloadId'] == last_payload_id,
+      rx_received_event = self._advertiser_payload_callback.waitForEvent(
+          'onPayloadReceived',
+          predicate=on_advertiser_receive,
           timeout=timeout.total_seconds(),
       )
       tx_id = tx_transfer_event.data['update']['payloadId']
       rx_id_payload_received = rx_received_event.data['payload']['id']
       rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
       if payload_type == nc_constants.PayloadType.FILE:
-        asserts.assert_equal(tx_id, rx_id_payload_received)
-        asserts.assert_equal(tx_id, rx_id_transfer_update)
+        asserts.assert_equal(
+            tx_id,
+            rx_id_payload_received,
+            f'payload id mismatch between sent - {tx_id} and '
+            f'received 1st time - {rx_id_payload_received}',
+        )
+        asserts.assert_equal(
+            tx_id,
+            rx_id_transfer_update,
+            f'payload id mismatch between sent - {tx_id} and '
+            f'received completely - {rx_id_transfer_update}',
+            )
+
       if tx_id == last_payload_id:
         transfer_time_s = datetime.timedelta(
             microseconds=tx_transfer_event.data['transferTimeNs'] / 1_000

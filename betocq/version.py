@@ -24,7 +24,11 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 # '2.3.0': 'fix the low NC speed issue.'
 # '2.3.1': 'fix WLAN function test and improve the report format.'
 # '2.3.2': 'add TDLS/Aware device capability check.'
-# '2.4.0': 'add multi-payload test parameters and optimize multi-payload transfer tests.'
+# '2.4.0': ('add multi-payload test parameters and optimize multi-payload '
+#          'transfer tests.')
 # '2.4.1': 'add android auto test case.'
 # '2.4.2': 'fix wifi direct capability check issue.'
-# '2.5.0': 'refactor tests for improved readability; split 3 functional cases into 6.'
+# '2.5.0': ('refactor tests for improved readability; '
+#          'split 3 functional cases into 6.')
+# '2.6.0': ('optimize the test steps to reduce the test time.')
+#          'improve the test stability and fix some bugs.')

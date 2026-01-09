@@ -40,10 +40,10 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 THROUGHPUT_TARGET = nc_constants.BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS
@@ -96,22 +96,21 @@ class BlePerformanceTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
+    # try to disconnect the wifi sta if it is connected.
+    # This is to avoid the wifi sta connection interfering the BLE connection
+    # in the middle of the test.
+    utils.concurrent_exec(
+        setup_utils.remove_current_connected_wifi_network,
+        param_list=[[self.discoverer], [self.advertiser]],
+        raise_on_exception=False,
+    )
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     nc_utils.setup_android_device_for_nc_tests(
         ad,
         snippet_confs=[self.nearby_snippet_config],
         country_code=self.test_runtime.country_code,
-        debug_output_dir=self.current_test_info.output_path,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
-    )
-
-  def setup_test(self):
-    super().setup_test()
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
     )
 
   @base_test.repeat(
@@ -130,6 +129,7 @@ class BlePerformanceTest(performance_test_base.PerformanceTestBase):
         connect_timeout=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
         keep_alive_timeout_ms=nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
         keep_alive_interval_ms=nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Transfer file on the established NC.

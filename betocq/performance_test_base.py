@@ -21,6 +21,7 @@ from mobly import records
 
 from betocq import base_test
 from betocq import nc_constants
+from betocq import setup_utils
 from betocq import test_result_utils
 
 
@@ -28,6 +29,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
   """Base test class for nearby connection E2E performance tests."""
 
   _test_results: test_result_utils.PerformanceTestResults
+  is_using_gms_api = True
 
   def setup_class(self):
     self._test_results = test_result_utils.PerformanceTestResults()
@@ -60,6 +62,15 @@ class PerformanceTestBase(base_test.BaseTestClass):
     # If any exception is raised in `setup_class`, `on_fail` will be invoked
     # and we should not record any result because no test iteration is executed.
     if self._test_results.is_any_test_iter_executed():
+      self.current_test_result.add_debug_reference_info(
+          key='source_device_thermal_zone_data',
+          value=setup_utils.get_thermal_zone_data(self.discoverer),
+      )
+      self.current_test_result.add_debug_reference_info(
+          key='target_device_thermal_zone_data',
+          value=setup_utils.get_thermal_zone_data(self.advertiser),
+      )
+      test_result_utils.update_result_message_with_gms_check(self)
       self._record_single_test_iter_report()
     super().on_fail(record)
 

@@ -40,10 +40,10 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 TEST_ITERATION_NUM = nc_constants.LOHS_PERFORMANCE_TEST_COUNT
@@ -110,31 +110,26 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
         self.advertiser, self.current_test_info.output_path
     )
 
-    self._assert_test_conditions()
+    # try to disconnect the wifi sta if it is connected.
+    utils.concurrent_exec(
+        setup_utils.remove_current_connected_wifi_network,
+        param_list=[[self.discoverer], [self.advertiser]],
+        raise_on_exception=False,
+    )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     nc_utils.setup_android_device_for_nc_tests(
         ad,
         snippet_confs=[self.nearby_snippet_config],
         country_code=self.test_runtime.country_code,
-        debug_output_dir=self.current_test_info.output_path,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
     # Check device capabilities.
-    nc_utils.abort_if_device_cap_not_match(
+    setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
-
-  def setup_test(self):
-    super().setup_test()
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
     )
 
   @base_test.repeat(
@@ -150,6 +145,7 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Transfer file on the established connection.
@@ -167,12 +163,6 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
           active_snippet.test_failure_reason,
           self.current_test_result,
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
       )
 
     # Check the throughput and run iperf if needed.

@@ -23,7 +23,7 @@ Test requirements:
   The device requirements:
     supports_5g=False in config file
   The AP requirements:
-    wifi channel: 6 (2437)
+    wifi channel: 6 (2437) or other 2G channels.
 
 Test preparations:
   Set country code to US on Android devices.
@@ -52,10 +52,10 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 TEST_ITERATION_NUM = nc_constants.SCC_PERFORMANCE_TEST_COUNT
@@ -70,14 +70,14 @@ _COUNTRY_CODE = 'US'
 
 _THROUGHPUT_LOW_TIP = (
     ' This is a SCC 2G test case with WLAN medium. Check with the wifi chip'
-    ' vendor if TDLS is supported correctly. Also check if the AP has the'
-    ' firewall which could block the mDNS traffic.'
+    ' vendor if TDLS is supported correctly.'
 )
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The WLAN connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
+    ' and also check the log if the nearby connection got "SignatureException",'
+    ' which is a known nearby connection issue.'
 )
 
 
@@ -115,34 +115,22 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
-    self._assert_test_conditions()
-
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
         ad,
         snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
         country_code=self.test_runtime.country_code,
-        debug_output_dir=self.current_test_info.output_path,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
   def _assert_test_conditions(self):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
-    nc_utils.abort_if_2g_ap_not_ready(self.test_parameters)
+    setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
-    nc_utils.abort_if_device_cap_not_match(
+    setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser], 'supports_5g', expected_value=False
-    )
-
-  def setup_test(self):
-    super().setup_test()
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
-    utils.concurrent_exec(
-        setup_utils.remove_disconnect_wifi_network,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
     )
 
   @base_test.repeat(
@@ -152,7 +140,7 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
   def test_scc_2g_wifilan_sta(self):
     """Test the performance for Wifi SCC with 2G WifiLAN and STA."""
     # Test Step: Connect discoverer to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    discoverer_connected = nc_utils.connect_ad_to_wifi_sta(
         self.discoverer,
         self.wifi_info.discoverer_wifi_ssid,
         self.wifi_info.discoverer_wifi_password,
@@ -162,20 +150,35 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
 
     # Test Step: Set up a prior BT connection.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
-        self.advertiser, self.discoverer, self.current_test_result
+        self.advertiser,
+        self.discoverer,
+        self.current_test_result,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Connect advertiser to wifi sta.
-    nc_utils.connect_ad_to_wifi_sta(
+    advertiser_connected = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
         self.wifi_info.advertiser_wifi_ssid,
         self.wifi_info.advertiser_wifi_password,
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
-    # This is important especially for the transfer speed or WLAN test.
-    time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+    if discoverer_connected or advertiser_connected:
+      # Let scan, DHCP and internet validation complete before NC.
+      # This is important especially for the transfer speed or WLAN test.
+      time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
+
+    test_result_utils.set_and_assert_sta_frequency(
+        self.discoverer,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
+    test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        self.current_test_result,
+        self.wifi_info.sta_type,
+    )
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
@@ -184,44 +187,43 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        test_parameters=self.test_parameters,
     )
 
-    # Test Step: Transfer file on the established NC.
-    try:
-      self.current_test_result.file_transfer_throughput_kbps = (
-          active_snippet.transfer_file(
-              file_size_kb=_FILE_TRANSFER_SIZE_KB,
-              timeout=_FILE_TRANSFER_TIMEOUT,
-              payload_type=_PAYLOAD_TYPE,
-              num_files=_FILE_TRANSFER_NUM,
-          )
-      )
-    finally:
-      nc_utils.handle_file_transfer_failure(
-          active_snippet.test_failure_reason,
-          self.current_test_result,
-          file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      test_result_utils.collect_nc_test_metrics(
-          self.current_test_result, self.test_runtime
-      )
-      test_result_utils.assert_sta_frequency(
-          self.current_test_result,
-          expected_wifi_type=self.wifi_info.sta_type,
-      )
+    if self.test_parameters.do_nc_wlan_file_transfer_test:
+      # Test Step: Transfer file on the established NC.
+      try:
+        self.current_test_result.file_transfer_throughput_kbps = (
+            active_snippet.transfer_file(
+                file_size_kb=_FILE_TRANSFER_SIZE_KB,
+                timeout=_FILE_TRANSFER_TIMEOUT,
+                payload_type=_PAYLOAD_TYPE,
+                num_files=_FILE_TRANSFER_NUM,
+            )
+        )
+      finally:
+        nc_utils.handle_file_transfer_failure(
+            active_snippet.test_failure_reason,
+            self.current_test_result,
+            file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
+        )
 
     # Check the throughput and run iperf if needed.
     test_result_utils.assert_2g_wifi_throughput_and_run_iperf_if_needed(
         test_result=self.current_test_result,
         nc_test_runtime=self.test_runtime,
         low_throughput_tip=_THROUGHPUT_LOW_TIP,
+        did_nc_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
     )
 
     prior_bt_snippet.disconnect_endpoint()
-    active_snippet.disconnect_endpoint()
+
+    if setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(self.advertiser):
+      active_snippet.disconnect_endpoint()
+    else:
+      # use stop_all_endpoints() to stop endpoints from both devices as
+      # the data channel might be broken.
+      active_snippet.stop_all_endpoints()
 
 
 if __name__ == '__main__':

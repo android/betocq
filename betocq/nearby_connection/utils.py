@@ -16,9 +16,7 @@
 
 from collections.abc import Sequence
 import logging
-import time
 
-from mobly import asserts
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import snippet_client_v2
 
@@ -33,22 +31,44 @@ def setup_android_device_for_nc_tests(
     ad: android_device.AndroidDevice,
     snippet_confs: Sequence[nc_constants.SnippetConfig],
     country_code: str,
-    debug_output_dir: str,
     skip_flag_override: bool = False,
-    skip_forget_wifi_network: bool = False,
 ) -> None:
   """Performs general Android device setup steps for NC tests."""
-  if not skip_forget_wifi_network:
-    android_wifi_utils.forget_all_wifi(ad)
-  setup_utils.disable_gms_auto_updates(ad)
+  # TODO: Double check if the set_flags() may break this as it will
+  # restart GMS.
+
   for conf in snippet_confs:
     setup_utils.load_nearby_snippet(ad, conf)
-  setup_utils.enable_logs(ad)
+
   if not skip_flag_override:
-    setup_utils.set_flags(ad, debug_output_dir)
-  setup_utils.set_country_code(ad, country_code)
-  setup_utils.toggle_airplane_mode(ad)
-  ad.nearby.wifiEnable()
+    setup_utils.clear_hermetic_overrides(ad, restart_gms_process=False)
+    setup_utils.set_flags(ad, ad.log_path)
+  else:
+    setup_utils.clear_hermetic_overrides(ad)
+
+  device_specific_dict = setup_utils.get_betocq_device_specific_info(ad)
+  if not device_specific_dict.get('one_time_setup_done', False):
+    setup_utils.enable_location_on_device(ad)
+    setup_utils.enable_logs(ad)
+
+    setup_utils.enable_airplane_mode(ad)
+    if ad.nearby.wifiIsEnabled():
+      ad.nearby.wifiDisable()
+    # Put it here to work around the WifiManager#getConfiguredNetworks() issue
+    # before Android 15
+    ad.log.info('Forgetting all wifi networks')
+    android_wifi_utils.forget_all_wifi(ad)
+    setup_utils.disable_airplane_mode(ad)
+    if not ad.nearby.wifiIsEnabled():
+      ad.nearby.wifiEnable()
+    setup_utils.reset_nearby_connection(ad)
+    device_specific_dict['one_time_setup_done'] = True
+
+  if country_code != device_specific_dict.get('wifi_country_code', ''):
+    setup_utils.set_country_code(ad, country_code)
+    device_specific_dict['wifi_country_code'] = country_code
+
+  setup_utils.disable_gms_auto_updates(ad)
 
 
 def connect_ad_to_wifi_sta(
@@ -57,18 +77,44 @@ def connect_ad_to_wifi_sta(
     wifi_password: str,
     test_result: test_result_utils.SingleTestResult,
     is_discoverer: bool,
-):
+) -> bool:
   """Connects NC discoverer or advertiser to the given Wi-Fi STA.
 
   Args:
-    ad: The device to connect to wifi sta.
+    ad: The device to connect to Wi-Fi STA.
     wifi_ssid: The Wi-Fi SSID.
     wifi_password: The Wi-Fi password.
     test_result: The object to record test result and metrics.
     is_discoverer: Whether the device is the NC discoverer. This is used for
       generating test failure reason and result summary info.
+
+  Returns:
+    True if the device successfully connected to a new Wi-Fi network, False if
+    the device was already connected to the specified Wi-Fi network.
+
+  Raises:
+    Exception: If an error occurs during the Wi-Fi connection process.
   """
   try:
+    wifi_info = ad.nearby.wifiGetConnectionInfo()
+    current_wifi_ssid = wifi_info.get('SSID', '')
+    if current_wifi_ssid == wifi_ssid:
+      ad.log.info(f'already connected to {wifi_ssid}')
+      return False
+
+    if (
+        current_wifi_ssid
+        and current_wifi_ssid != nc_constants.WIFI_UNKNOWN_SSID
+    ):
+      network_id = setup_utils.get_sta_network_id_from_wifi_info(wifi_info)
+      if network_id != nc_constants.INVALID_NETWORK_ID:
+        ad.log.info(f'disconnecting from {current_wifi_ssid})')
+        ad.nearby.wifiRemoveNetwork(network_id)
+      else:
+        ad.log.warning(f'No valid network id for {current_wifi_ssid}, try'
+                       f' to remove all networks.')
+        setup_utils.remove_disconnect_wifi_network(ad)
+
     latency = setup_utils.connect_to_wifi_sta_till_success(
         ad, wifi_ssid, wifi_password
     )
@@ -96,6 +142,7 @@ def connect_ad_to_wifi_sta(
     test_result.set_active_nc_fail_reason(
         fail_reason, result_message=' '.join(result_messages)
     )
+    setup_utils.log_sta_event_list(ad)
     raise
 
   if is_discoverer:
@@ -103,20 +150,25 @@ def connect_ad_to_wifi_sta(
   else:
     test_result.advertiser_sta_latency = latency
   ad.log.info('connecting to wifi in %d s', round(latency.total_seconds()))
+  new_wifi_info = ad.nearby.wifiGetConnectionInfo()
   ad.log.info(
-      'sta frequency: %s',
-      ad.nearby.wifiGetConnectionInfo().get('mFrequency'),
+      'sta frequency: %s, rssi: %s for new wifi connection',
+      setup_utils.get_sta_frequency_from_wifi_info(
+          new_wifi_info),
+      setup_utils.get_sta_rssi_from_wifi_info(new_wifi_info),
   )
+
+  return True
 
 
 def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
+    test_parameters: nc_constants.TestParameters | None = None,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
-
   """Starts a prior BT Nearby Connection."""
-  logging.info('set up a prior BT connection.')
+  logging.info('Set up a prior BT connection.')
   prior_bt_snippet = _get_snippet(
       advertiser,
       discoverer,
@@ -130,6 +182,7 @@ def start_prior_bt_nearby_connection(
     prior_bt_snippet.start_nearby_connection(
         timeouts=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
         medium_upgrade_type=nc_constants.MediumUpgradeType.NON_DISRUPTIVE,
+        test_parameters=test_parameters,
     )
   finally:
     test_result.prior_nc_quality_info = prior_bt_snippet.connection_quality_info
@@ -142,6 +195,7 @@ def start_main_nearby_connection(
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
     upgrade_medium_under_test: nc_constants.NearbyMedium,
+    test_parameters: nc_constants.TestParameters | None = None,
     connection_medium: nc_constants.NearbyMedium = nc_constants.NearbyMedium.BT_ONLY,
     connect_timeout: nc_constants.ConnectionSetupTimeouts = nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
     medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DISRUPTIVE,
@@ -149,7 +203,7 @@ def start_main_nearby_connection(
     keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a main Nearby Connection which is used for file transfer."""
-  logging.info('set up a nearby connection for file transfer.')
+  logging.info('Set up a nearby connection for file transfer.')
 
   active_snippet = _get_snippet(
       advertiser,
@@ -167,6 +221,7 @@ def start_main_nearby_connection(
         keep_alive_timeout_ms=keep_alive_timeout_ms,
         keep_alive_interval_ms=keep_alive_interval_ms,
         enable_target_discovery=False,
+        test_parameters=test_parameters,
     )
   finally:
     test_result.quality_info = active_snippet.connection_quality_info
@@ -174,7 +229,7 @@ def start_main_nearby_connection(
     result_message = None
     if fail_reason == nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
       default_message = (
-          f'unexpected upgrade medium - {upgrade_medium_under_test.name}'
+          f'Unexpected upgrade medium - {upgrade_medium_under_test.name}.'
       )
       result_message = nc_constants.MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS.get(
           upgrade_medium_under_test, default_message
@@ -198,113 +253,6 @@ def handle_file_transfer_failure(
   if fail_reason == nc_constants.SingleTestFailureReason.FILE_TRANSFER_FAIL:
     result_message = file_transfer_failure_tip
   test_result.set_active_nc_fail_reason(fail_reason, result_message)
-
-
-def reset_nearby_connection(
-    discoverer: android_device.AndroidDevice,
-    advertiser: android_device.AndroidDevice,
-) -> None:
-  """Resets any nearby connection on the devices."""
-  discoverer.nearby.stopDiscovery()
-  discoverer.nearby.stopAllEndpoints()
-  advertiser.nearby.stopAdvertising()
-  advertiser.nearby.stopAllEndpoints()
-  if getattr(discoverer, 'nearby2', None):
-    discoverer.nearby2.stopDiscovery()
-    discoverer.nearby2.stopAllEndpoints()
-  if getattr(advertiser, 'nearby2', None):
-    advertiser.nearby2.stopAdvertising()
-    advertiser.nearby2.stopAllEndpoints()
-  if getattr(discoverer, 'nearby3', None):
-    discoverer.nearby3p.stopDiscovery()
-    discoverer.nearby3p.stopAllEndpoints()
-  if getattr(advertiser, 'nearby3', None):
-    advertiser.nearby3p.stopAdvertising()
-    advertiser.nearby3p.stopAllEndpoints()
-  time.sleep(nc_constants.NEARBY_RESET_WAIT_TIME.total_seconds())
-
-
-def abort_if_2g_ap_not_ready(
-    test_parameters: nc_constants.TestParameters,
-) -> None:
-  """Aborts test class if 2G AP is not ready."""
-  asserts.abort_class_if(
-      not test_parameters.wifi_2g_ssid, '2G AP is not ready for this test.'
-  )
-
-
-def abort_if_5g_ap_not_ready(
-    test_parameters: nc_constants.TestParameters,
-) -> None:
-  """Aborts test class if 5G AP is not ready."""
-  asserts.abort_class_if(
-      not test_parameters.wifi_5g_ssid, '5G AP is not ready for this test.'
-  )
-
-
-def abort_if_dfs_5g_ap_not_ready(
-    test_parameters: nc_constants.TestParameters,
-) -> None:
-  """Aborts test class if DFS 5G AP is not ready."""
-  asserts.abort_class_if(
-      not test_parameters.wifi_dfs_5g_ssid,
-      '5G DFS AP is not ready for this test.',
-  )
-
-
-def abort_if_wifi_direct_not_supported(
-    ads: list[android_device.AndroidDevice],
-) -> None:
-  """Aborts test class if any device does not support Wi-Fi Direct."""
-  for ad in ads:
-    asserts.abort_class_if(
-        not setup_utils.is_wifi_direct_supported(ad),
-        f'Wifi Direct is not supported on the device {ad}.',
-    )
-
-
-def abort_if_wifi_hotspot_not_supported(
-    ads: list[android_device.AndroidDevice],
-) -> None:
-  """Aborts test class if any device does not support Wi-Fi Hotspot."""
-  for ad in ads:
-    # We are checking Wi-Fi Direct capability here because Wi-Fi Hotspot is
-    # implemented using Wi-Fi Direct in NC.
-    asserts.abort_class_if(
-        not setup_utils.is_wifi_direct_supported(ad),
-        f'Wifi Hotspot is not supported on the device {ad}.',
-    )
-
-
-def abort_if_wifi_aware_not_available(
-    ads: list[android_device.AndroidDevice],
-) -> None:
-  """Aborts test class if Wi-Fi Aware is not available in any device."""
-  for ad in ads:
-    # The utility function waits a small time. This is because Aware is not
-    # immediately available after enabling WiFi.
-    asserts.abort_class_if(
-        not setup_utils.wait_for_aware_available(ad),
-        f'Wifi Aware is not available in the device {ad}.',
-    )
-
-
-def abort_if_device_cap_not_match(
-    ads: list[android_device.AndroidDevice],
-    attribute_name: str,
-    expected_value: bool,
-) -> None:
-  """Aborts class if the device capability does not match the expected value."""
-  for ad in ads:
-    actual_value = getattr(ad, attribute_name)
-    asserts.abort_class_if(
-        actual_value != expected_value,
-        (
-            f'{ad}, "{attribute_name}" is'
-            f' {"enabled" if actual_value else "disabled"}, which does not'
-            ' match test case requirement.'
-        ),
-    )
 
 
 def _get_snippet(

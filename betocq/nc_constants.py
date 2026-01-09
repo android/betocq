@@ -22,8 +22,9 @@ import logging
 from typing import Any
 
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import adb
 
-BETOCQ_NAME = 'BeToCQ'
+BETOCQ_NAME = 'BetoCQ'
 
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
@@ -36,20 +37,20 @@ MCC_PERFORMANCE_TEST_COUNT = 50
 MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 SCC_PERFORMANCE_TEST_COUNT = 20
 SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-BT_PERFORMANCE_TEST_COUNT = 100
+BT_PERFORMANCE_TEST_COUNT = 20
 BT_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 BT_COEX_PERFORMANCE_TEST_COUNT = 100
 BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 LOHS_PERFORMANCE_TEST_COUNT = 100
 LOHS_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
-TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC = 10
 
 CHANNEL_2G = 6
 CHANNEL_5G = 36
 CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
-WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=1)
+WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=6)
+TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC = 10
 WIFI_AWARE_AVAILABLE_WAIT_TIME = datetime.timedelta(seconds=10)
 
 FIRST_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=30)
@@ -64,7 +65,7 @@ SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
 WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
-WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
+WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=40)
 WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=250)
@@ -78,8 +79,9 @@ MAX_PHY_RATE_PER_STREAM_N_20_MBPS = 72
 MCC_THROUGHPUT_MULTIPLIER = 0.25
 # MCC hotspot has lower throughput due to synchronization issue with STA.
 MCC_HOTSPOT_THROUGHPUT_MULTIPLIER = 0.2
-MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37
+MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37  # 866/8*0.37 = 40
 IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
+IPERF_TO_NC_THROUGHPUT_RATIO_DCT = 1
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
 WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
     15  # cap for WLAN medium due to encryption overhead
@@ -102,6 +104,7 @@ UNSET_THROUGHPUT_KBPS = -1.0
 MAX_NUM_BUG_REPORT = 5
 INVALID_INT = -1
 INVALID_RSSI = -128
+INVALID_NETWORK_ID = -1
 RSSI_HIGH_THRESHOLD = -15
 
 TRANSFER_FILE_SIZE_500MB = 500 * 1024  # kB
@@ -124,10 +127,15 @@ TARGET_CUJ_QUICK_START = 'quick_start'
 TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
 TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
 TARGET_CUJ_QUICK_SHARE = 'quick_share'
+TARGET_CUJ_AQT = 'aqt'
 
 MAX_FREQ_2G_MHZ = 2500
 MIN_FREQ_5G_DFS_MHZ = 5260
 MAX_FREQ_5G_DFS_MHZ = 5720
+
+WIFI_UNKNOWN_SSID = '<unknown ssid>'
+WIFI_SUPPLICANT_STATE_DISCONNECTED = 'DISCONNECTED'
+WIFI_SUPPLICANT_STATE_COMPLETED = 'COMPLETED'
 
 
 @dataclasses.dataclass(frozen=False)
@@ -159,6 +167,13 @@ class TestParameters:
   run_aware_test: bool = False
   run_ble_performance_test: bool = False
   requires_bt_multiplex: bool = False
+  allow_unrooted_device: bool = False
+  do_nc_wlan_file_transfer_test: bool = True
+  delay_nc_discovery_request: bool = False
+  is_tdls_enabled_in_dct_mode: bool = False
+  abort_all_if_any_ap_not_ready: bool = False
+  # check if the test is running in debug mode.
+  debug_mode: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
@@ -188,6 +203,9 @@ class TestParameters:
     if test_parameters.target_cuj_name == TARGET_CUJ_QUICK_START:
       test_parameters.requires_bt_multiplex = True
 
+    if test_parameters.debug_mode:
+      test_parameters.skip_bug_report = False
+
     return test_parameters
 
 
@@ -196,6 +214,17 @@ class PayloadType(enum.IntEnum):
   BYTES = 1
   FILE = 2
   STREAM = 3
+
+
+@enum.unique
+class NcBandwidthUpgradeStatus(enum.IntEnum):
+  UNKNOWN = 0
+  # The upgrade is successful.
+  SUCCESS = 1
+  # The connection is lost, attempting to reconnect.
+  SUSPENDED = 2
+  # The upgrade is timed out.
+  TIMED_OUT = 3
 
 
 @enum.unique
@@ -214,6 +243,33 @@ class NearbyMedium(enum.IntEnum):
   BLE_L2CAP_ONLY = 8
   # including WIFI_LAN, WIFI_HOTSPOT, WIFI_DIRECT or WIFI_AWARE
   UPGRADE_TO_ALL_WIFI = 9  # connect or upgrade to any wifi medium
+  USB = 10
+
+  def to_connection_medium(self) -> 'NearbyConnectionMedium':
+    """Converts to NearbyConnectionMedium."""
+    match self:
+      case NearbyMedium.BT_ONLY:
+        return NearbyConnectionMedium.BLUETOOTH
+      case NearbyMedium.BLE_ONLY:
+        return NearbyConnectionMedium.BLE
+      case NearbyMedium.WIFILAN_ONLY:
+        return NearbyConnectionMedium.WIFI_LAN
+      case NearbyMedium.WIFIAWARE_ONLY:
+        return NearbyConnectionMedium.WIFI_AWARE
+      case NearbyMedium.UPGRADE_TO_WEBRTC:
+        return NearbyConnectionMedium.WEB_RTC
+      case NearbyMedium.UPGRADE_TO_WIFIHOTSPOT:
+        return NearbyConnectionMedium.WIFI_HOTSPOT
+      case NearbyMedium.UPGRADE_TO_WIFIDIRECT:
+        return NearbyConnectionMedium.WIFI_DIRECT
+      case NearbyMedium.BLE_L2CAP_ONLY:
+        return NearbyConnectionMedium.BLE_L2CAP
+      case NearbyMedium.USB:
+        return NearbyConnectionMedium.USB
+      case NearbyMedium.UPGRADE_TO_ALL_WIFI | NearbyMedium.AUTO:
+        return NearbyConnectionMedium.UNKNOWN
+      case _:
+        return NearbyConnectionMedium.UNKNOWN
 
 
 @enum.unique
@@ -242,6 +298,7 @@ def is_high_quality_medium(medium: NearbyMedium) -> bool:
       NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
       NearbyMedium.UPGRADE_TO_WIFIDIRECT,
       NearbyMedium.UPGRADE_TO_ALL_WIFI,
+      NearbyMedium.USB,
   }
 
 
@@ -270,6 +327,8 @@ class WifiD2DType(enum.IntEnum):
   # Connect to 2G STA and allows upgrading to all WiFi mediums.
   ANY_WFD_2G_STA = 10
   LOCAL_ONLY_HOTSPOT = 11
+  # Connected to the same 2G STA and upgrading to 5G Aware.
+  SCC_5G_AWARE_DBS_2G_STA = 12
 
 
 def is_upgrading_to_wifi_of_any_freq(d2d_type: WifiD2DType) -> bool:
@@ -301,6 +360,7 @@ _WIFI_D2D_TYPES_2G_STA = (
     WifiD2DType.SCC_5G_WFD_DBS_2G_STA,
     WifiD2DType.MCC_5G_WFD_2G_STA,
     WifiD2DType.ANY_WFD_2G_STA,
+    WifiD2DType.SCC_5G_AWARE_DBS_2G_STA,
 )
 
 
@@ -375,6 +435,11 @@ COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
     ' 3) Check if other device can connect to the same AP\n'
     ' 4) Check the wifi connection related log on the device.\n'
     ' 5) Check if RSSI is too high and device is too close to the AP.\n'
+    ' 6) Check dumpsys > wifi > StaEventList in the bug report to confirm \n'
+    ' if L2 connection completes, if the STA is initially connected to AP and\n'
+    ' immediately disconnected from AP, check the firmware logs and sniffer\n'
+    ' logs with your engineering team. Check if L3 activities, for example,\n'
+    ' IP address allocation and internet validation, fail to complete.'
 )
 
 COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
@@ -495,6 +560,10 @@ MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS: dict[NearbyMedium, str] = {
         ' and HOTSPOT mediums are tried and if the failure is on the target or'
         ' source side. Check directed test results to see which medium fails.'
     ),
+    NearbyMedium.USB: (
+        ' USB NCM, check if the USB is connected and working correctly.\n'
+        f' {COMMON_WFD_UPGRADE_FAILURE_REASONS}'
+    ),
 }
 
 
@@ -613,6 +682,60 @@ class TestResultStats:
   min_val: float | None = None
   median_val: float | None = None
   max_val: float | None = None
+
+
+def _get_pids_from_ps_output(
+    ps_output: str, process_name: str
+) -> dict[str, int]:
+  """Gets uid and PID of the process from ps output."""
+  pids = {}
+  for line in ps_output.splitlines():
+    if not line.endswith(process_name):
+      continue
+    parts = line.split()
+    if len(parts) < 3:
+      continue
+    uid = parts[0]
+    pid = parts[1]
+    parsed_process_name = parts[-1]
+    if parsed_process_name == process_name and pid.isdigit():
+      pids[uid] = int(pid)
+  return pids
+
+
+@dataclasses.dataclass(frozen=False)
+class GmsInfo:
+  """The data class for GMS information.
+
+  Attributes:
+    gms_pids: The user to PID map for com.google.android.gms.
+    gms_persistent_pids: The user to PID map for
+      com.google.android.gms.persistent.
+  """
+
+  gms_pids: dict[str, int] = dataclasses.field(default_factory=dict)
+  gms_persistent_pids: dict[str, int] = dataclasses.field(default_factory=dict)
+
+  def update_pids(self, device: android_device.AndroidDevice) -> None:
+    """Updates the PIDs of GMS processes."""
+    try:
+      ps_output = device.adb.shell(['ps', '-A']).decode()
+      self.gms_pids = _get_pids_from_ps_output(
+          ps_output, 'com.google.android.gms'
+      )
+      self.gms_persistent_pids = _get_pids_from_ps_output(
+          ps_output, 'com.google.android.gms.persistent'
+      )
+    except (adb.AdbError, ValueError):
+      device.log.warning(
+          'Failed to get GMS PIDs from device %s.',
+          device.serial,
+          exc_info=True,
+      )
+
+  def has_valid_pids(self) -> bool:
+    """Whether the PIDs of GMS processes are valid."""
+    return bool(self.gms_pids) and bool(self.gms_persistent_pids)
 
 
 @dataclasses.dataclass(frozen=True)

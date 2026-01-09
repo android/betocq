@@ -29,7 +29,6 @@ import collections
 import datetime
 import logging
 import time
-from typing import Tuple
 
 from mobly import asserts
 from mobly import test_runner
@@ -39,12 +38,14 @@ from mobly.controllers import android_device
 
 from betocq import base_test
 from betocq import nc_constants
-from betocq import nc_utils
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 _COUNTRY_CODE = 'US'
+# The number of decimal places of precision for reporting the speed (MB/s).
+_SPEED_MBPS_DECIMAL_PLACES = 3
 _BT_BLE_FILE_TRANSFER_FAILURE_TIP = (
     'The Bluetooth performance is really bad or unknown reason.'
 )
@@ -75,7 +76,7 @@ _WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP = (
 
 def _get_wifi_ssid_password(
     test_parameters: nc_constants.TestParameters,
-) -> Tuple[str, str]:
+) -> tuple[str, str]:
   """Returns an available wifi SSID and password from test parameters."""
   if test_parameters.wifi_ssid:
     return (
@@ -107,10 +108,16 @@ def _start_nearby_connection_and_transfer_file(
     upgrade_medium_under_test: nc_constants.NearbyMedium,
     file_transfer_failure_tip: str,
     payload_type: nc_constants.PayloadType,
+    test_parameters: nc_constants.TestParameters,
     payload_size_kb: int = nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-    payload_transfer_timeout: datetime.timedelta = nc_constants.TRANSFER_TIMEOUT_FUNC_TEST,
+    payload_transfer_timeout: datetime.timedelta = (
+        nc_constants.TRANSFER_TIMEOUT_FUNC_TEST
+    ),
     payload_num: int = nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
-    connect_timeout: nc_constants.ConnectionSetupTimeouts = nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+    connect_timeout: nc_constants.ConnectionSetupTimeouts = (
+        nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS
+    ),
+    do_file_transfer: bool = True,
 ):
   """Starts a nearby connection and transfers files on it."""
   # Test Step: Set up a NC connection for file transfer.
@@ -123,24 +130,36 @@ def _start_nearby_connection_and_transfer_file(
       connect_timeout=connect_timeout,
       keep_alive_timeout_ms=0,
       keep_alive_interval_ms=0,
+      test_parameters=test_parameters,
   )
 
   # Test Step: Transfer file on the established NC.
-  try:
-    test_result.file_transfer_throughput_kbps = nearby_snippet.transfer_file(
-        file_size_kb=payload_size_kb,
-        timeout=payload_transfer_timeout,
-        payload_type=payload_type,
-        num_files=payload_num,
-    )
-  finally:
-    nc_utils.handle_file_transfer_failure(
-        nearby_snippet.test_failure_reason,
-        test_result,
-        file_transfer_failure_tip=file_transfer_failure_tip,
-    )
+  if do_file_transfer:
+    try:
+      test_result.file_transfer_throughput_kbps = nearby_snippet.transfer_file(
+          file_size_kb=payload_size_kb,
+          timeout=payload_transfer_timeout,
+          payload_type=payload_type,
+          num_files=payload_num,
+      )
+    finally:
+      nc_utils.handle_file_transfer_failure(
+          nearby_snippet.test_failure_reason,
+          test_result,
+          file_transfer_failure_tip=file_transfer_failure_tip,
+      )
 
-    nearby_snippet.disconnect_endpoint()
+    if (
+        upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY
+        and not setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(
+            advertiser
+        )
+    ):
+      # use stop_all_endpoints() to stop endpoints from both devices as
+      # the data channel might be broken.
+      nearby_snippet.stop_all_endpoints()
+    else:
+      nearby_snippet.disconnect_endpoint()
 
 
 class BetoCqFunctionGroupTest(base_test.BaseTestClass):
@@ -148,6 +167,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
   # Result information on the test currently being executed.
   current_test_result: test_result_utils.SingleTestResult
+  is_using_gms_api = True
 
   # Store test results of all test cases.
   _test_results: collections.OrderedDict[
@@ -159,7 +179,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     self._test_results = collections.OrderedDict()
 
   def setup_class(self):
-    """Setup steps that will be performed before exucuting any test case."""
+    """Setup steps that will be performed before executing any test case."""
     super().setup_class()
     utils.concurrent_exec(
         self._setup_android_device,
@@ -179,16 +199,14 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         ad,
         snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
         country_code=_COUNTRY_CODE,
-        debug_output_dir=self.current_test_info.output_path,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
   def setup_test(self):
-    """Setup steps that will be performed before exucuting each test case."""
+    """Setup steps that will be performed before executing each test case."""
     super().setup_test()
     self.current_test_result = test_result_utils.SingleTestResult()
     self._test_results[self.current_test_info.name] = self.current_test_result
-    nc_utils.reset_nearby_connection(self.discoverer, self.advertiser)
 
   def test_bt_ble_function(self):
     """Test the NC with the BT/BLE medium only.
@@ -205,6 +223,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         upgrade_medium_under_test=nc_constants.NearbyMedium.BT_ONLY,
         file_transfer_failure_tip=_BT_BLE_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1KB,
         payload_transfer_timeout=nc_constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
         payload_num=nc_constants.TRANSFER_FILE_NUM_DEFAULT,
@@ -243,7 +262,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.current_test_result,
         is_discoverer=False,
     )
-    # Let scan, DHCP and internet validation complete before NC.
+
     time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
     # Test Step: Set up nearby connection and transfer file.
@@ -254,8 +273,10 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.WIFILAN_ONLY,
         file_transfer_failure_tip=_WIFILAN_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        test_parameters=self.test_parameters,
+        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1MB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        do_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
     )
 
   def test_d2d_hotspot_file_transfer_function(self):
@@ -278,6 +299,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
         file_transfer_failure_tip=_WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
@@ -302,6 +324,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
         file_transfer_failure_tip=_WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.STREAM,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
@@ -326,6 +349,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
         file_transfer_failure_tip=_WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
@@ -350,6 +374,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
         file_transfer_failure_tip=_WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.STREAM,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
@@ -374,6 +399,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.WIFIAWARE_ONLY,
         file_transfer_failure_tip=_WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
@@ -398,6 +424,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         nc_constants.NearbyMedium.WIFIAWARE_ONLY,
         file_transfer_failure_tip=_WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.STREAM,
+        test_parameters=self.test_parameters,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
         payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
@@ -423,7 +450,10 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
     # Test Step: Set up a prior BT connection.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
-        self.advertiser, self.discoverer, self.current_test_result
+        self.advertiser,
+        self.discoverer,
+        self.current_test_result,
+        test_parameters=self.test_parameters,
     )
 
     # Test Step: Set up 2st BT connection.
@@ -434,6 +464,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         upgrade_medium_under_test=nc_constants.NearbyMedium.BT_ONLY,
         file_transfer_failure_tip=_BT_MULTIPLEX_CONNECTIONS_FAILURE_TIP,
         payload_type=nc_constants.PayloadType.FILE,
+        test_parameters=self.test_parameters,
         payload_num=nc_constants.TRANSFER_FILE_NUM_DEFAULT,
         payload_transfer_timeout=nc_constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
         payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1KB,
@@ -466,15 +497,23 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     # If any exception is raised in `setup_class`, `on_fail` will be invoked
     # and we should not record any result because no test is executed.
     if self._test_results:
+      test_result_utils.update_result_message_with_gms_check(self)
       self._record_single_test_case_report()
     super().on_fail(record)
 
   def _record_single_test_case_report(self):
+    properties = {'result': self.current_test_result.result_message}
+    if self.current_test_result.file_transfer_throughput_kbps > 0:
+      # Convert the throughput to MB/s and record it as a property.
+      properties['speed_mbps'] = (
+          test_result_utils._float_to_str(
+              self.current_test_result.file_transfer_throughput_kbps / 1024,
+              _SPEED_MBPS_DECIMAL_PLACES,
+          )
+      )
     self.record_data({
         'Test Name': self.current_test_info.name,
-        'properties': {
-            'result': self.current_test_result.result_message,
-        },
+        'properties': properties,
     })
 
   def teardown_class(self):

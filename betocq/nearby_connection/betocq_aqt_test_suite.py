@@ -21,25 +21,19 @@ This requires 3 APs to be ready and configured in testbed.
 channels.
 """
 
+from mobly import asserts
 from mobly import base_suite
 from mobly import suite_runner
 
 from betocq import nc_constants
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
-from betocq.nearby_connection.compound_tests import mcc_5g_all_wifi_non_dbs_2g_sta_test
-from betocq.nearby_connection.compound_tests import scc_2g_all_wifi_sta_test
-from betocq.nearby_connection.compound_tests import scc_5g_all_wifi_dbs_2g_sta_test
-from betocq.nearby_connection.compound_tests import scc_5g_all_wifi_sta_test
-from betocq.nearby_connection.directed_tests import ble_performance_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import mcc_2g_wfd_indoor_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_hotspot_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_aware_sta_test
 from betocq.nearby_connection.directed_tests import scc_2g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_2g_wlan_sta_test
-from betocq.nearby_connection.directed_tests import scc_5g_aware_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test
@@ -49,30 +43,58 @@ from betocq.nearby_connection.directed_tests import scc_indoor_5g_wfd_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
 
 
-_SUITE_NAME = 'NC'
+_SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '1'
+_SUITE_VERSION = '3'
 # LINT.ThenChange()
 
 
+# Test for GTS AQT.
 # LINT.IfChange
-class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
+class BetoCqAqtTestSuite(base_suite.BaseSuite):
   """Add all BetoCQ tests to run in sequence."""
+
+  def _assert_config_parameters(self, config):
+    """Assert that the config parameters are set correctly."""
+    test_params = nc_constants.TestParameters.from_user_params(
+        config.user_params
+    )
+    asserts.abort_all_if(
+        test_params.target_cuj_name
+        != nc_constants.TARGET_CUJ_AQT,
+        'target_cuj_name is not aqt',
+    )
+    if not test_params.use_programmable_ap:
+      asserts.abort_all_if(
+          not test_params.wifi_2g_ssid, 'wifi_2g_ssid is not set'
+      )
+      asserts.abort_all_if(
+          not test_params.wifi_5g_ssid, 'wifi_5g_ssid is not set'
+      )
+      asserts.abort_all_if(
+          not test_params.wifi_dfs_5g_ssid, 'wifi_dfs_5g_ssid is not set'
+      )
+
+    asserts.abort_all_if(
+        not test_params.abort_all_if_any_ap_not_ready,
+        'do not change testbed parameters, abort_all_if_any_ap_not_ready is'
+        ' expected to be True',
+    )
+    asserts.abort_all_if(
+        test_params.skip_default_flag_override,
+        'do not change testbed parameters, skip_default_flag_override is'
+        ' expected to be False',
+    )
 
   def setup_suite(self, config):
     """Add all BetoCQ tests to the suite."""
     self.user_params['suite_name'] = _SUITE_NAME
     self.user_params['suite_version'] = _SUITE_VERSION
 
-    test_parameters = nc_constants.TestParameters.from_user_params(
-        config.user_params
-    )
-
     # Function tests cases.
     self.add_test_class(beto_cq_function_group_test.BetoCqFunctionGroupTest)
-
     # Directed test cases:
     self.add_test_class(bt_performance_test.BtPerformanceTest)
     self.add_test_class(mcc_2g_wfd_indoor_5g_sta_test.Mcc2gWfdIndoor5gStaTest)
@@ -87,27 +109,10 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     self.add_test_class(scc_dfs_5g_hotspot_sta_test.SccDfs5gHotspotStaTest)
     self.add_test_class(scc_dfs_5g_wfd_sta_test.SccDfs5gWfdStaTest)
     self.add_test_class(scc_indoor_5g_wfd_sta_test.SccIndoor5gWfdStaTest)
-    # Optional Aware test cases that will be run only when explicitly selected:
-    if test_parameters.run_aware_test:
-      self.add_test_class(scc_5g_aware_sta_test.Scc5gAwareStaTest)
-      self.add_test_class(mcc_aware_sta_test.MccAwareStaTest)
-
-    # Optional BLE test cases that will be run only when explicitly selected:
-    if test_parameters.run_ble_performance_test:
-      self.add_test_class(ble_performance_test.BlePerformanceTest)
-
     # Compound test cases:
     self.add_test_class(bt_2g_wifi_coex_test.Bt2gWifiCoexTest)
-    self.add_test_class(
-        mcc_5g_all_wifi_non_dbs_2g_sta_test.Mcc5gAllWifiNonDbs2gStaTest
-    )
-    self.add_test_class(scc_2g_all_wifi_sta_test.Scc2gAllWifiStaTest)
-    self.add_test_class(
-        scc_5g_all_wifi_dbs_2g_sta_test.Scc5gAllWifiDbs2gStaTest
-    )
-    self.add_test_class(scc_5g_all_wifi_sta_test.Scc5gAllWifiStaTest)
 
-
+    self._assert_config_parameters(config)
 # LINT.ThenChange(:suite_version)
 
 

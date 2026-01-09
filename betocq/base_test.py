@@ -17,8 +17,8 @@
 import logging
 
 import os
+import traceback
 
-from mobly import asserts
 from mobly import base_test
 from mobly import records
 from mobly import utils
@@ -81,15 +81,38 @@ class BaseTestClass(base_test.BaseTestClass):
     self.num_bug_reports: int = 0
     # Skip the device clean up steps if the test class is skipped.
     self.__skipped_test_class = True
-
-  def _get_skipped_test_class_reason(self) -> str | None:
-    return None
+    self.is_using_gms_api = True
 
   def setup_class(self) -> None:
-    self.ads = self.register_controller(android_device, min_number=2)
+    if (
+        not self.test_parameters.use_programmable_ap
+        and self.test_parameters.abort_all_if_any_ap_not_ready
+    ):
+      error_messages = ''
+      if not self.test_parameters.wifi_2g_ssid:
+        error_messages += '2G AP is not ready for this test.\n'
+        logging.warning('2G AP is not ready for this test.')
+      if not self.test_parameters.wifi_5g_ssid:
+        error_messages += '5G AP is not ready for this test.\n'
+        logging.warning('5G AP is not ready for this test.')
+      if not self.test_parameters.wifi_dfs_5g_ssid:
+        error_messages += '5G DFS AP is not ready for this test.\n'
+        logging.warning('5G DFS AP is not ready for this test.')
+      if error_messages:
+        setup_utils.abort_all_and_report_error_on_setup(self, error_messages)
+    try:
+      self.ads = self.register_controller(android_device, min_number=2)
+    except errors.Error as e:
+      setup_utils.abort_all_and_report_error_on_setup(
+          self,
+          'Failed to get Android devices with error: %s,'
+          f' {traceback.format_exception(e)}',
+      )
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
+      if self.is_using_gms_api:
+        ad.gms_info = nc_constants.GmsInfo()
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'
@@ -121,39 +144,66 @@ class BaseTestClass(base_test.BaseTestClass):
     )
 
     self._assert_general_nc_test_conditions()
+    self._assert_test_conditions()
+    self.__skipped_test_class = False
+
+    if setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(self.advertiser):
+      self.test_parameters.do_nc_wlan_file_transfer_test = True
+      logging.info(
+          'Overriding do_nc_wlan_file_transfer_test to True because the'
+          ' WLAN file transfer flaky issue is fixed.'
+      )
 
   def _assert_general_nc_test_conditions(self):
-    asserts.abort_all_if(
-        not self.advertiser.is_adb_root or not self.discoverer.is_adb_root,
-        'The test only can run on rooted device.',
-    )
-    asserts.abort_all_if(
-        not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset,
-        'wifi_chipset is empty in the config file',
-    )
+    if not self.test_parameters.allow_unrooted_device:
+      logging.info('The test is not allowed to run on unrooted device.')
+      if not self.advertiser.is_adb_root or not self.discoverer.is_adb_root:
+        logging.warning('The test is aborted because the device is unrooted.')
+        setup_utils.abort_all_and_report_error_on_setup(
+            self, 'The test only can run on rooted device.'
+        )
+    if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
+      setup_utils.abort_all_and_report_error_on_setup(
+          self, 'wifi_chipset is empty in the config file'
+      )
+
+  def _assert_test_conditions(self) -> None:
+    """Asserts the test conditions for all devices."""
+
+  def _get_snippet_apk_path(self, snippet_name: str) -> str | None:
+    """Gets the APK path for the given snippet name from user params.
+
+    Args:
+      snippet_name: The snippet name used to find the snippet
+      APK in user_params (e.g., 'nearby_snippet').
+
+    Returns:
+      The path to the snippet APK, or None if not provided.
+    """
+    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
+    apk_paths = self.user_params.get(file_tag, {}).get(snippet_name, [''])
+    if not apk_paths or not apk_paths[0]:
+      # allow the apk_path to be empty as github release does not install
+      # the apk in the script.
+      return None
+    return apk_paths[0]
 
   @property
   def nearby_snippet_config(self) -> nc_constants.SnippetConfig:
     """Snippet config for loading the first nearby snippet instance."""
-    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
-    apk_path = self.user_params.get(file_tag, {}).get('nearby_snippet', [''])[0]
     return nc_constants.SnippetConfig(
         snippet_name='nearby',
         package_name=nc_constants.NEARBY_SNIPPET_PACKAGE_NAME,
-        apk_path=apk_path,
+        apk_path=self._get_snippet_apk_path('nearby_snippet'),
     )
 
   @property
   def nearby2_snippet_config(self) -> nc_constants.SnippetConfig:
     """Snippet config for loading the second nearby snippet instance."""
-    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
-    apk_path = self.user_params.get(file_tag, {}).get('nearby_snippet_2', [''])[
-        0
-    ]
     return nc_constants.SnippetConfig(
         snippet_name='nearby2',
         package_name=nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
-        apk_path=apk_path,
+        apk_path=self._get_snippet_apk_path('nearby_snippet_2'),
     )
 
   def setup_wifi_env(
@@ -209,7 +259,6 @@ class BaseTestClass(base_test.BaseTestClass):
     )
 
   def setup_test(self):
-    self.__skipped_test_class = False
     self.record_data({
         'Test Name': self.current_test_info.name,
         'properties': {
@@ -219,12 +268,38 @@ class BaseTestClass(base_test.BaseTestClass):
     })
     self._stop_packet_capture(ignore_packets=True)
     self._start_packet_capture()
+    self._log_test_start_on_device(self.advertiser)
+    self._log_test_start_on_device(self.discoverer)
+    if self.is_using_gms_api:
+      utils.concurrent_exec(
+          lambda ad: ad.gms_info.update_pids(ad),
+          param_list=[[ad] for ad in self.ads],
+          raise_on_exception=True,
+      )
+
+  def _log_test_start_on_device(self, ad: android_device.AndroidDevice):
+    setup_utils.log_message_to_logcat(
+        ad,
+        f'TEST START: {self.current_test_info.name}',
+    )
+
+  def _log_test_end_on_device(self, ad: android_device.AndroidDevice):
+    setup_utils.log_message_to_logcat(
+        ad,
+        f'TEST END: {self.current_test_info.name}',
+    )
 
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
+    # run it before clear_hermetic_overrides to make sure the GMS restart will
+    # not impact on the update of GMS.
     setup_utils.enable_gms_auto_updates(ad)
+    # TODO: should it give GMS some time to enable the auto updates?
+    setup_utils.clear_hermetic_overrides(ad)
 
   def teardown_test(self) -> None:
+    self._log_test_end_on_device(self.advertiser)
+    self._log_test_end_on_device(self.discoverer)
     utils.concurrent_exec(
         lambda d: d.services.create_output_excerpts_all(self.current_test_info),
         param_list=[[ad] for ad in self.ads],
@@ -246,17 +321,74 @@ class BaseTestClass(base_test.BaseTestClass):
     if self.__skipped_test_class:
       logging.info('Skipping on_fail.')
       return
+    logging.info(
+        'on_fail with result %s, termination_signal_type %s, stacktrace %s',
+        record.result,
+        record.termination_signal_type,
+        record.stacktrace,
+    )
+    # abort all test if ProtocolError or BrokenPipeError found in traceback
+    if record.result is records.TestResultEnums.TEST_RESULT_ERROR and (
+        record.termination_signal_type == 'ProtocolError'
+        or (
+            record.termination_signal_type == 'AdbError'
+            and 'not found' in record.stacktrace
+        )
+        or (
+            'Error' in record.termination_signal_type
+            and (
+                'mobly.snippet.errors.ProtocolError' in record.stacktrace
+                or 'BrokenPipeError' in record.stacktrace
+            )
+        )
+    ):
+      error_message = (
+          f'Abort all test due to the following error happened during the'
+          ' test:\n'
+          f'{record.stacktrace}\n'
+          'it could be one of the following issues:\n'
+          '1. system crashed;\n'
+          '2. GMS updating happened, check if the "com.google.android.gms" was'
+          ' killed from the logcat, disable the GMS auto update from the play'
+          ' store (Settings -> Network perferences) and retry the test;\n'
+          '3. The test snippet might be killed by a security app or service'
+          ' from the device, especially if this happens very frequently, check'
+          ' the logcat to verify if '
+          f' {nc_constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
+          f' {nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
+          f' {nc_constants.DCT_SNIPPET_PACKAGE_NAME} or'
+          f' {nc_constants.DCT_SNIPPET_2_PACKAGE_NAME} was killed; you should'
+          ' put them to the allowlist of the security app.\n'
+          '4. The USB cable or port is not stable, change the USB cable or the'
+          ' connection portal and try again;\n'
+          '5. The "Play protect" in the play store might disable the test'
+          ' snippets, disable the "Play Protect" and retry the test.\n'
+      )
+      logging.error(error_message)
+      # show the error in setup_class clearly.
+      setup_utils.abort_all_and_report_error_on_setup(self, error_message)
+
+    # Reset the Nearby Connection state to ensure the testbed is in a good
+    # state for the next test.
+    utils.concurrent_exec(
+        setup_utils.reset_nearby_connection,
+        param_list=[[ad] for ad in self.ads],
+        raise_on_exception=False,
+    )
+
     self._stop_packet_capture(ignore_packets=False)
     if self.test_parameters.skip_bug_report:
-      logging.info('Skipping bug report.')
-      return
-    self.num_bug_reports = self.num_bug_reports + 1
-    if self.num_bug_reports <= nc_constants.MAX_NUM_BUG_REPORT:
-      logging.info('take bug report for failure')
-      android_device.take_bug_reports(
-          self.ads,
-          destination=self.current_test_info.output_path,
-      )
+      logging.info('skip bug report for failure')
+    else:
+      self.num_bug_reports = self.num_bug_reports + 1
+      if self.num_bug_reports <= nc_constants.MAX_NUM_BUG_REPORT:
+        logging.info('take bug report for failure')
+        android_device.take_bug_reports(
+            self.ads,
+            destination=self.current_test_info.output_path,
+        )
+      else:
+        logging.info('reach the max number of bug reports, skip the rest')
 
   def on_pass(self, record: records.TestResultRecord) -> None:
     # Ignore captured packets when the test passes.
@@ -286,6 +418,8 @@ class BaseTestClass(base_test.BaseTestClass):
     ]
     if 'suite_name' in self.user_params:
       suite_name_items.append(self.user_params['suite_name'])
+    if 'suite_version' in self.user_params:
+      suite_name_items.append(f'v{self.user_params['suite_version']}')
     suite_name_items.append(self.test_parameters.target_cuj_name)
     suite_name = '-'.join(suite_name_items)
     run_identifier_items = [
