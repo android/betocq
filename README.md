@@ -226,15 +226,20 @@ BetoCQ takes three steps to address this issue:
 
 *   **Wi-Fi Access Point (AP) and network.**
 
-    - The test AP must be a dual-band capable Wi-Fi AP with two SSIDs (one at
-    2&nbsp;GHz and one at 5&nbsp;GHz) with support for DFS channels. There are 
-    three Wi-Fi channels to be tested: 2437, 5180, and 5260.
-      - 5260 is a [DFS channel](https://en.wikipedia.org/wiki/List_of_WLAN_channels).
-    - Examples of routers that meet the testing requirements include NETGEAR 
-    RAX50 AX5400, NETGEAR RAX120 AX6000, and NETGEAR R8000b AC3200. It's ideal
-    to use two APs to support all test cases.
-    - The test AP must have the access to google.com. Note that in China, this
-    test requires an office VPN network or installing a VPN app in devices.
+    *  **AP selection and topology:** To support the full test suite, select an AP that supports DFS channels.
+        - **Preferred setup:** Use a single tri-band or quad-band AP that can support 2G, 5G non-DFS, and 5G DFS channels.
+        - **Alternative setup:** If using dual-band AP, we recommend setting up
+        two APs simultaneously to cover all test cases: one AP for 2G and 5G
+        non-DFS channels, and another AP for 5G DFS channels.
+
+    *  **Reference hardware:** The following models meet these specifications:
+        - **Tri-band:** ASUS ROG GT-AX11000 Pro, NETGEAR RAX70
+        - **Dual-band:** NETGEAR RAX120 (AX6000), RAX50 (AX5400), R8000b (AC3200)
+
+    *   **Connectivity and VPN:** The test AP must have access to google.com.
+
+         Note: For testing locations in China or other restricted regions, you
+         must use an office VPN or install a VPN app on the test devices.
 
 *   **Test host.**
     
@@ -333,7 +338,19 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
 
 #### Configure Wi-Fi AP and test
 
-1. Modify the test config file `cuj_and_test_config.yml` as follows:
+1. Configure Wi-Fi AP channel frequency:
+
+  -   There are three Wi-Fi channels to be tested: 2G (for example,
+      channel 6 - freq 2437), 5G non-DFS or indoor in JP (for example,
+      channel 36 - freq 5180), and 5G DFS
+      (for example, channel 52 - freq 5260 or channel 112 - freq 5560). Refer to
+      [List of WLAN channels]
+      (https://en.wikipedia.org/wiki/List_of_WLAN_channels) for complete channel
+      lists.
+
+  -   To support all three Wi-Fi channels, it requires one tri-band (2G + 5G non-DFS + 5G DFS) AP or two dual-band APs.
+
+2. Modify the test config file `cuj_and_test_config.yml` as follows:
     -  Find device serial numbers:
 
         ```
@@ -369,20 +386,26 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
           wifi_dfs_5g_password: "yourpassword"
         ```
 
-        Where `wifi_2g_ssid` is for the channel of 2437, `wifi_2g_ssid` is for
-        the channel of 5180 and `wifi_dfs_5g_ssid` is for the channel of 5260.
+        Where `wifi_2g_ssid` is for the channel of 2G (for example,
+        channel 6 - freq 2437),
+        `wifi_5g_ssid` is for the channel of 5G non-DFS or indoor in JP (for
+        example, channel 36 -
+        freq 5180) and `wifi_dfs_5g_ssid` is for the channel of 5G DFS (for
+        example, channel 52 - freq 5260 or channel 112 - freq 5560).
 
         Leave `wifi_password` as an empty string `""` if it's an open network.
 
     - Split the test into two runs if the required channels can't be supported
       at the same time:
+      
+          Note: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available.
 
       1. In the first run, define 2G and 5G SSID but leave the 5G DFS SSID to an empty
          string `""` so that the 5G DFS test cases are skipped.
       2. In the second run, define the 5G DFS SSID but leave the 2G and 5G SSID as empty
          strings to cover the 5G DFS test case.
 
-2. Configure device capabilities for both source and target devices.
+3. Configure device capabilities for both source and target devices.
 
       For example, the following configuration means the device uses Wi-Fi
       chipset WCN6710, and supports two spatial streams with the maximum PHY rate of
