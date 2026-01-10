@@ -238,7 +238,7 @@ BetoCQ takes three steps to address this issue:
 
     *   **Connectivity and VPN:** The test AP must have access to google.com.
 
-         Note: For testing locations in China or other restricted regions, you
+         **Note**: For testing locations in China or other restricted regions, you
          must use an office VPN or install a VPN app on the test devices.
 
 *   **Test host.**
@@ -344,9 +344,7 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
       channel 6 - freq 2437), 5G non-DFS or indoor in JP (for example,
       channel 36 - freq 5180), and 5G DFS
       (for example, channel 52 - freq 5260 or channel 112 - freq 5560). Refer to
-      [List of WLAN channels]
-      (https://en.wikipedia.org/wiki/List_of_WLAN_channels) for complete channel
-      lists.
+      [List of WLAN channels](https://en.wikipedia.org/wiki/List_of_WLAN_channels) for complete channel lists.
 
   -   To support all three Wi-Fi channels, it requires one tri-band (2G + 5G non-DFS + 5G DFS) AP or two dual-band APs.
 
@@ -386,11 +384,12 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
           wifi_dfs_5g_password: "yourpassword"
         ```
 
-        Where `wifi_2g_ssid` is for the channel of 2G (for example,
-        channel 6 - freq 2437),
-        `wifi_5g_ssid` is for the channel of 5G non-DFS or indoor in JP (for
-        example, channel 36 -
-        freq 5180) and `wifi_dfs_5g_ssid` is for the channel of 5G DFS (for
+        Where:
+        - `wifi_2g_ssid` is for the channel of 2G (for example,
+        channel 6 - freq 2437).
+        - `wifi_5g_ssid` is for the channel of 5G non-DFS or indoor in JP (for
+        example, channel 36 - freq 5180).
+        - `wifi_dfs_5g_ssid` is for the channel of 5G DFS (for
         example, channel 52 - freq 5260 or channel 112 - freq 5560).
 
         Leave `wifi_password` as an empty string `""` if it's an open network.
@@ -398,7 +397,7 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
     - Split the test into two runs if the required channels can't be supported
       at the same time:
       
-          Note: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available.
+      **Note**: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available.
 
       1. In the first run, define 2G and 5G SSID but leave the 5G DFS SSID to an empty
          string `""` so that the 5G DFS test cases are skipped.
@@ -436,7 +435,7 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
 
       For the last two parameters, review `config_wifiEnableStaDfsChannelForPeerNetwork`
       and `config_wifiEnableStaIndoorChannelForPeerNetwork` in the Wi-Fi device
-      overlay file [`config.xml`] (https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/ServiceWifiResources/res/values/config.xml).
+      overlay file [`config.xml`](https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/ServiceWifiResources/res/values/config.xml).
 
       Check with the Wi-Fi engineering team about device capabilities details.
 
