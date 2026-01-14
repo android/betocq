@@ -505,7 +505,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     properties = {'result': self.current_test_result.result_message}
     if self.current_test_result.file_transfer_throughput_kbps > 0:
       # Convert the throughput to MB/s and record it as a property.
-      properties['speed_mbps'] = (
+      properties['speed_MBps'] = (
           test_result_utils._float_to_str(
               self.current_test_result.file_transfer_throughput_kbps / 1024,
               _SPEED_MBPS_DECIMAL_PLACES,

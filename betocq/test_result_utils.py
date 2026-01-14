@@ -701,7 +701,7 @@ def _summarize_transfer_quality_info(
       ),
       'upgrade_medium': result.quality_info.get_medium_name(),
       'medium_frequency': str(result.quality_info.medium_frequency),
-      'speed_mbps': _float_to_str(
+      'speed_MBps': _float_to_str(
           result.file_transfer_throughput_kbps / 1024, speed_mbps_fraction_bits
       ),
   }
