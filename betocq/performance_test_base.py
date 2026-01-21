@@ -91,8 +91,13 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
     test_summary = self.test_results.gen_test_summary()
     self.record_data({'Test Class': self.TAG, 'properties': test_summary})
+    final_result_message = self.test_results.get_test_class_result_message()
+    self.record_data({
+        'properties': {
+            self.TAG: final_result_message,
+        },
+    })
 
     passed = self.test_results.is_test_class_passed()
-    final_result_message = self.test_results.get_test_class_result_message()
     asserts.assert_true(passed, final_result_message)
     super().teardown_class()
