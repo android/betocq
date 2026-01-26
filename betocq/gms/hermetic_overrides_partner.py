@@ -18,6 +18,7 @@ import io
 import os
 
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import apk_utils
 
 
@@ -25,6 +26,7 @@ _GMS_PACKAGE = 'com.google.android.gms'
 
 OVERRIDES_PATH = '/sdcard/overrides.txt'
 SCRIPT_PATH = '/sdcard/setup_flags.sh'
+HERMETIC_FILE_PATH = 'app_phenotype_hermetic/overrides.txt'
 
 
 def _create_setup_script(
@@ -109,3 +111,40 @@ def install_hermetic_overrides(
   )
   result = _run_setup_script(device, setup_script, output_path)
   device.log.info('Override script result:\n%s', result)
+
+
+def clear_hermetic_overrides(
+    device: android_device.AndroidDevice,
+    package: str,
+) -> None:
+  """Clears file-based hermetic overrides on device for the given package.
+
+  This is done by deleting the overrides.txt file from the app's hermetic
+  directory in both Device Encrypted (DE) and Credential Encrypted (CE)
+  storage paths, covering all users.
+  You MUST stop the process for the given package after calling this function
+  to see the effect of clearing the overrides.
+
+  Args:
+    device: The device of interest.
+    package: The package name for the app for which flags should be cleared.
+  """
+  device.adb.root()
+  # Path for credential-encrypted storage
+  ce_path = f'/data/data/{package}/{HERMETIC_FILE_PATH}'
+  # Path for device-encrypted storage - use glob for multiple users
+  de_path_glob = f'/data/user_de/*/{package}/{HERMETIC_FILE_PATH}'
+
+  try:
+    # Use sh -c to ensure glob expansion for '*' in de_path_glob.
+    # This removes .../overrides.txt for all users (0, 10, etc.).
+    device.adb.shell(f"sh -c 'rm -f {de_path_glob}'")
+    device.log.info(f'Attempted removal of DE overrides: {de_path_glob}')
+  except adb.AdbError:
+    device.log.exception('Failed removing DE override for %s', package)
+  try:
+    # Also remove from CE path, in case setup used that instead.
+    device.adb.shell(['rm', '-f', ce_path])
+    device.log.info(f'Attempted removal of CE overrides: {ce_path}')
+  except adb.AdbError:
+    device.log.exception('Failed removing CE override for %s', package)
