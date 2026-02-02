@@ -23,7 +23,7 @@ Note: This test case is not related to the capability of
 device is connected to a sta 5G network.
 
 Test requirements:
-  The device requirements:
+  The device requirements
     support Wi-Fi Direct
   The AP requirements:
     Wi-Fi channel: 6 (2437) or other 2G channels.

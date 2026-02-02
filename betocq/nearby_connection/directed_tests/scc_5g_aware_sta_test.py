@@ -18,7 +18,7 @@ In this case, both the Aware and STA are using the same 5G channel.
 
 Test requirements:
   The device requirements:
-    supports_5g=True in config file
+    support 5G band
     support Wi-Fi Aware
   The AP requirements:
     Wi-Fi channel: 36 (5180) or other 5G Non-DFS channels.
@@ -116,6 +116,9 @@ class Scc5gAwareStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Check device capabilities.
+    setup_utils.abort_if_5g_band_not_supported(
+        [self.discoverer, self.advertiser]
+    )
     setup_utils.abort_if_wifi_aware_not_available(
         [self.discoverer, self.advertiser]
     )
@@ -132,10 +135,6 @@ class Scc5gAwareStaTest(performance_test_base.PerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_5g_ap_not_ready(self.test_parameters)
-    # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
 
   @base_test.repeat(
       count=TEST_ITERATION_NUM,

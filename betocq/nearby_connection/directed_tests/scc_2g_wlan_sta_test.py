@@ -21,7 +21,7 @@ is connected to the AP.
 
 Test requirements:
   The device requirements:
-    supports_5g=False in config file
+    support 2.4G band only
   The AP requirements:
     wifi channel: 6 (2437) or other 2G channels.
 
@@ -115,6 +115,9 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
+    # Check device capabilities.
+    setup_utils.abort_if_5g_band_supported(self.ads)
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
@@ -128,10 +131,6 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
-    # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=False
-    )
 
   @base_test.repeat(
       count=TEST_ITERATION_NUM,

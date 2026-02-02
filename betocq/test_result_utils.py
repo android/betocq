@@ -652,7 +652,6 @@ def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
       f'gms_version: {setup_utils.dump_gms_version(ad)}',
       f'wifi_chipset: {ad.wifi_chipset}',
       f'wifi_fw: {ad.adb.getprop("vendor.wlan.firmware.version")}',
-      f'support_5g: {ad.supports_5g}',
       f'support_dbs_sta_wfd: {ad.supports_dbs_sta_wfd}',
       (
           'enable_sta_dfs_channel_for_peer_network:'

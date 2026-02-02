@@ -27,7 +27,7 @@ enables STA which tries to connect to WFD GO.
 
 Test requirements:
   The device requirements:
-    supports_5g=True in config file
+    support 5G band
     support Wi-Fi Direct
     (target device only) enable_sta_dfs_channel_for_peer_network=False in config
       file
@@ -134,6 +134,8 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Check device capabilities.
+    setup_utils.abort_if_5g_band_not_supported(
+        [self.discoverer, self.advertiser])
     setup_utils.abort_if_wifi_hotspot_not_supported(
         [self.discoverer, self.advertiser]
     )
@@ -157,9 +159,6 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
     # Check WiFi AP.
     setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
     setup_utils.abort_if_device_cap_not_match(
         [self.advertiser],
         'enable_sta_dfs_channel_for_peer_network',

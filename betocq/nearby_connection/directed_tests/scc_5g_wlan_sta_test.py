@@ -18,7 +18,7 @@ In this case, both the WLAN and STA are using the 5G channel.
 
 Test requirements:
   The device requirements:
-    supports_5g=True in config file
+    support 5G band
   The AP requirements:
     wifi channel: 36 (5180) or other 5G Non-DFS channels.
 
@@ -117,6 +117,11 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
+    # Check device capabilities.
+    setup_utils.abort_if_5g_band_not_supported(
+        [self.discoverer, self.advertiser]
+    )
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
@@ -130,10 +135,6 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_5g_ap_not_ready(self.test_parameters)
-    # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
 
   @base_test.repeat(
       count=TEST_ITERATION_NUM,

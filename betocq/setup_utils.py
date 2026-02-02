@@ -617,6 +617,14 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
     return ''
 
 
+def is_5g_band_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if 5G band is supported on the given device."""
+  try:
+    return ad.nearby.wifiIs5GHzBandSupported()
+  except adb.AdbError:
+    return False
+
+
 def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if WiFi Direct is supported on the given device."""
   try:
@@ -1131,6 +1139,28 @@ def abort_if_any_5g_or_dfs_aps_not_ready(
       not test_parameters.wifi_dfs_5g_ssid,
       '5G DFS AP is not ready. This test requires both 5G and 5G DFS APs.',
   )
+
+
+def abort_if_5g_band_not_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Skips test class if any device does not support 5G band."""
+  for ad in ads:
+    asserts.abort_class_if(
+        not is_5g_band_supported(ad),
+        f'5G band is not supported on the device {ad}, skip the whole test.',
+    )
+
+
+def abort_if_5g_band_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Aborts test class if any device supports 5G band."""
+  for ad in ads:
+    asserts.abort_class_if(
+        is_5g_band_supported(ad),
+        f'5G band is supported on the device {ad}, skip the whole test.',
+    )
 
 
 def abort_if_wifi_direct_not_supported(
