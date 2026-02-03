@@ -419,7 +419,7 @@ class BaseTestClass(base_test.BaseTestClass):
     if 'suite_name' in self.user_params:
       suite_name_items.append(self.user_params['suite_name'])
     if 'suite_version' in self.user_params:
-      suite_name_items.append(f'v{self.user_params['suite_version']}')
+      suite_name_items.append(f'v{self.user_params["suite_version"]}')
     suite_name_items.append(self.test_parameters.target_cuj_name)
     suite_name = '-'.join(suite_name_items)
     run_identifier_items = [
