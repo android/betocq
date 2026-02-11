@@ -47,7 +47,7 @@ _SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '3'
+_SUITE_VERSION = '4'
 # LINT.ThenChange()
 
 
@@ -58,9 +58,13 @@ class BetoCqAqtTestSuite(base_suite.BaseSuite):
 
   def _assert_config_parameters(self, config):
     """Assert that the config parameters are set correctly."""
+    if config is None or not hasattr(config, 'user_params'):
+      return
     test_params = nc_constants.TestParameters.from_user_params(
         config.user_params
     )
+    if test_params.target_cuj_name is None:
+      return
     asserts.abort_all_if(
         test_params.target_cuj_name
         != nc_constants.TARGET_CUJ_AQT,
