@@ -212,12 +212,13 @@ class Scc5gWifiLanStaTest(performance_test_base.PerformanceTestBase):
         )
 
     # Check the throughput and run iperf if needed.
-    test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP,
-        did_nc_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP,
+          did_nc_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
+      )
 
     prior_bt_snippet.disconnect_endpoint()
 

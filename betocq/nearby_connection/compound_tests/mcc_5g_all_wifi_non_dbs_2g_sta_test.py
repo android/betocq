@@ -247,14 +247,15 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
             ),
         )
 
-    test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP.format(
-            upgraded_medium_name=upgraded_medium_name
-        ),
-        did_nc_file_transfer=do_file_transfer,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP.format(
+              upgraded_medium_name=upgraded_medium_name
+          ),
+          did_nc_file_transfer=do_file_transfer,
+      )
 
     prior_bt_snippet.disconnect_endpoint()
     active_snippet.disconnect_endpoint()

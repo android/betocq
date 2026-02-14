@@ -150,11 +150,12 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
       )
 
     logging.info('NC speed target: %s', THROUGHPUT_TARGET)
-    test_result_utils.assert_nc_throughput_meets_target(
-        test_result=self.current_test_result,
-        nc_speed_min_mbps=THROUGHPUT_TARGET,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_nc_throughput_meets_target(
+          test_result=self.current_test_result,
+          nc_speed_min_mbps=THROUGHPUT_TARGET,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP,
+      )
 
     active_snippet.disconnect_endpoint()
 

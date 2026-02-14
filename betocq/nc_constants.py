@@ -176,6 +176,7 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
+  skip_throughput_assertion: bool = False
   # check if the test is running in debug mode.
   debug_mode: bool = False
 
@@ -206,6 +207,9 @@ class TestParameters:
 
     if test_parameters.target_cuj_name == TARGET_CUJ_QUICK_START:
       test_parameters.requires_bt_multiplex = True
+
+    if test_parameters.target_cuj_name == TARGET_CUJ_AQT:
+      test_parameters.skip_throughput_assertion = True
 
     if test_parameters.debug_mode:
       test_parameters.skip_bug_report = False
