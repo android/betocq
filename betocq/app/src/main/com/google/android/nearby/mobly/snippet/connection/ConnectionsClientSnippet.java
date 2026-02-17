@@ -56,6 +56,9 @@ public class ConnectionsClientSnippet implements Snippet {
     // TODO: Utils.registerNetworkStateCallback(context);
   }
 
+  @Override
+  public void shutdown() {}
+
   @Rpc(description = "Bring the snippet service to the foreground by starting an activity.")
   public void bringToFront() {
     Intent intent = new Intent(context, MainActivity.class);
@@ -249,7 +252,7 @@ public class ConnectionsClientSnippet implements Snippet {
       case Payload.Type.STREAM:
         payload = Payload.fromStream(inputStream);
         break;
-        // Payload.Type.BYTES is unsupported type, but keep other types same as Payload.Type.FILE
+      // Payload.Type.BYTES is unsupported type, but keep other types same as Payload.Type.FILE
       case Payload.Type.FILE:
       default:
         payload = Payload.fromFile(payloadFile);

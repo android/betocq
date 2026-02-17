@@ -217,6 +217,16 @@ class TestParameters:
     return test_parameters
 
 
+# Refer to WifiManager#WifiState
+@enum.unique
+class WifiState(enum.IntEnum):
+  DISABLING = 0
+  DISABLED = 1
+  ENABLING = 2
+  ENABLED = 3
+  UNKNOWN = 4
+
+
 @enum.unique
 class PayloadType(enum.IntEnum):
   BYTES = 1
