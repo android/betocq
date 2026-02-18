@@ -35,11 +35,11 @@ import java.util.Objects;
 /** Reports Nearby Connections' payload events to the test scripts side. */
 public class PayloadEvents extends PayloadCallback {
   private final Context context;
-  private final String callbackId;
   private final Stopwatch transferStopwatch;
   private final LongSparseArray<Payload> incomingPayloadsById = new LongSparseArray<>();
   private final LongSparseArray<IncomingStreamData> incomingStreamDataByPayloadId =
       new LongSparseArray<>();
+  final String callbackId;
 
   PayloadEvents(Context context, String callbackId) {
     this.context = context;

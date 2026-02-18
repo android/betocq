@@ -15,6 +15,7 @@
 """Utils for handling Nearby Connection rpc."""
 
 import datetime
+import logging
 import random
 import time
 
@@ -642,11 +643,18 @@ class NearbyConnectionWrapper:
       return event.data['endpointId'] == self._advertiser_endpoint_id
 
     transfer_time_s = 0
+    e2e_transfer_time_s = 0
     for _ in range(num_files):
       # NC guarantees the order of payload transfer events are the same on both
       # sides.
       # Use this order to wait for events as the tx, rx transfer update event
       # may got failure and it can terminate early to avoid the timeout.
+      self._discoverer_payload_callback.waitForEvent(
+          'onSendPayloadRequested',
+          predicate=lambda e: True,
+          timeout=timeout.total_seconds(),
+      )
+      send_payload_requested_time = datetime.datetime.now()
       tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
           'onPayloadTransferUpdate',
           predicate=on_discoverer_receive,
@@ -674,6 +682,9 @@ class NearbyConnectionWrapper:
           predicate=on_advertiser_receive,
           timeout=timeout.total_seconds(),
       )
+      e2e_transfer_time_s += (
+          datetime.datetime.now() - send_payload_requested_time
+      ).total_seconds()
       tx_id = tx_transfer_event.data['update']['payloadId']
       rx_id_payload_received = rx_received_event.data['payload']['id']
       rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
@@ -697,4 +708,11 @@ class NearbyConnectionWrapper:
         ).total_seconds()
 
     asserts.assert_true(transfer_time_s > 0, 'Transfer time is 0')
-    return round(file_size_kb * num_files / transfer_time_s)
+    throughput_from_nc = round(file_size_kb * num_files / transfer_time_s)
+    throughput_from_e2e = round(file_size_kb * num_files / e2e_transfer_time_s)
+    logging.info(
+        'throughput from nc source side: %s, throughput from e2e: %s',
+        throughput_from_nc,
+        throughput_from_e2e,
+    )
+    return throughput_from_e2e

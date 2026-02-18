@@ -206,6 +206,8 @@ public class ConnectionsClientSnippet implements Snippet {
           () ->
               Tasks.await(
                   Nearby.getConnectionsClient(context).sendPayload(Arrays.asList(endpointId), p)));
+      EventCache.getInstance()
+          .postEvent(new SnippetEvent(payloadEvents.callbackId, "onSendPayloadRequested"));
     }
     return payload[numFiles - 1].getId();
   }
