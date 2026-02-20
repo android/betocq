@@ -177,6 +177,9 @@ class TestParameters:
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
   skip_throughput_assertion: bool = False
+  is_wifi_chipset_model_mandatory: bool = True
+  # The model of the wifi chipset used by both devices under test.
+  wifi_chipset_model: str = ''
   # check if the test is running in debug mode.
   debug_mode: bool = False
 
@@ -210,6 +213,7 @@ class TestParameters:
 
     if test_parameters.target_cuj_name == TARGET_CUJ_AQT:
       test_parameters.skip_throughput_assertion = True
+      test_parameters.is_wifi_chipset_model_mandatory = False
 
     if test_parameters.debug_mode:
       test_parameters.skip_bug_report = False

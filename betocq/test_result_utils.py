@@ -645,27 +645,27 @@ def assert_nc_throughput_meets_target(
 
 def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
   return '\n'.join([
-      f'serial: {ad.serial}',
-      f'model: {ad.model}',
-      f'android_version: {ad.android_version}\n'
-      f'build_info: {ad.build_info}',
+      f'serial: {getattr(ad, "serial", "NA")}',
+      f'model: {getattr(ad, "model", "NA")}',
+      f'android_version: {getattr(ad, "android_version", "NA")}\n'
+      f'build_info: {getattr(ad, "build_info", "NA")}',
       f'gms_version: {setup_utils.dump_gms_version(ad)}',
-      f'wifi_chipset: {ad.wifi_chipset}',
+      f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
       f'wifi_fw: {ad.adb.getprop("vendor.wlan.firmware.version")}',
-      f'support_dbs_sta_wfd: {ad.supports_dbs_sta_wfd}',
+      f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
+      f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
       (
           'enable_sta_dfs_channel_for_peer_network:'
-          f' {ad.enable_sta_dfs_channel_for_peer_network}'
+          f' {getattr(ad, "enable_sta_dfs_channel_for_peer_network", "NA")}'
       ),
       (
           'enable_sta_indoor_channel_for_peer_network:'
-          f' {ad.enable_sta_indoor_channel_for_peer_network}'
+          f' {getattr(ad, "enable_sta_indoor_channel_for_peer_network", "NA")}'
       ),
-      f'max_num_streams: {ad.max_num_streams}',
-      f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
-      f'max_phy_rate_5g_mbps: {ad.max_phy_rate_5g_mbps}',
-      f'max_phy_rate_2g_mbps: {ad.max_phy_rate_2g_mbps}',
-      f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
+      f'max_num_streams: {getattr(ad, "max_num_streams", "NA")}',
+      f'max_num_streams_dbs: {getattr(ad, "max_num_streams_dbs", "NA")}',
+      f'max_phy_rate_5g_mbps: {getattr(ad, "max_phy_rate_5g_mbps", "NA")}',
+      f'max_phy_rate_2g_mbps: {getattr(ad, "max_phy_rate_2g_mbps", "NA")}',
   ])
 
 

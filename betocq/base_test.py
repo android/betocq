@@ -126,6 +126,10 @@ class BaseTestClass(base_test.BaseTestClass):
           'The result may not be expected.'
       )
       self.advertiser, self.discoverer = self.ads
+    # use the wifi chipset model from the test parameters if it is not empty.
+    if self.test_parameters.wifi_chipset_model:
+      self.advertiser.wifi_chipset = self.test_parameters.wifi_chipset_model
+      self.discoverer.wifi_chipset = self.test_parameters.wifi_chipset_model
     self.advertiser.debug_tag = '{serial}({model})'.format(
         serial=self.advertiser.serial,
         model=self.advertiser.adb.getprop('ro.product.model'),
@@ -166,10 +170,12 @@ class BaseTestClass(base_test.BaseTestClass):
           'The test is running on unrooted device; most of tests may be'
           ' skipped.'
       )
-    if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
-      setup_utils.abort_all_and_report_error_on_setup(
-          self, 'wifi_chipset is empty in the config file'
-      )
+    if self.test_parameters.is_wifi_chipset_model_mandatory:
+      if not self.test_parameters.wifi_chipset_model:
+        if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
+          setup_utils.abort_all_and_report_error_on_setup(
+              self, 'wifi_chipset is empty in the config file'
+          )
 
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
