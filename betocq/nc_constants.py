@@ -121,6 +121,12 @@ TRANSFER_FILE_SIZE_1KB = 1  # kB
 TRANSFER_FILE_SIZE_20KB = 20  # kB
 TRANSFER_FILE_SIZE_10KB = 10  # kB
 TRANSFER_FILE_SIZE_100KB = 100  # kB
+NC_MCC_2G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
+NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB = 100 * 1024  # kB
+NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 100 * 1024  # kB
+NC_SCC_2G_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
+NC_SCC_5G_TRANSFER_FILE_SIZE_KB = 500 * 1024  # kB
+
 
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
@@ -353,6 +359,25 @@ class WifiD2DType(enum.IntEnum):
   SCC_5G_AWARE_DBS_2G_STA = 12
 
 
+@enum.unique
+class WifiConcurrencyMode(enum.IntEnum):
+  """The enum for WiFi concurrency mode."""
+  UNKNOWN = 0
+  SCC_2G = 1
+  SCC_5G = 2
+  MCC_2G_P2P_5G_STA = 3
+  MCC_5G_P2P_2G_STA = 4
+  MCC_5G_P2P_5G_STA = 5
+
+
+@enum.unique
+class WifiDbsWfdStatus(enum.IntEnum):
+  """The enum for WiFi DBS for WFD mode."""
+  UNKNOWN = 0
+  DBS_WFD_ENABLED = 1
+  DBS_WFD_DISABLED = 2
+
+
 def is_upgrading_to_wifi_of_any_freq(d2d_type: WifiD2DType) -> bool:
   """Returns True if this could upgrade to either 2G or 5G WiFi mediums."""
   return d2d_type in {
@@ -449,6 +474,7 @@ class SingleTestFailureReason(enum.IntEnum):
   DEVICE_CONFIG_ERROR = 14
   SUCCESS = 15
   SKIPPED = 16
+  INVALID_WIFI_CONCURRENCY_MODE = 17
 
 
 COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
@@ -519,6 +545,10 @@ COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
         'Check if device capabilities are set correctly in the config file.'
     ),
     SingleTestFailureReason.SKIPPED: 'Skipped.',
+    SingleTestFailureReason.INVALID_WIFI_CONCURRENCY_MODE: (
+        'The wifi concurrency mode is not expected. see the failure message'
+        ' for details.'
+    ),
 }
 
 COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([

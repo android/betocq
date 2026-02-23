@@ -172,6 +172,16 @@ public class ConnectionsClientSnippet implements Snippet {
     Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId);
   }
 
+  @Rpc(
+      description =
+          "Reset the payload transfer event, including reset the transfer stopwatch and clear"
+              + " cached payloads.")
+  public void resetPayloadTransfer() throws Exception {
+    if (payloadEvents != null) {
+      payloadEvents.reset();
+    }
+  }
+
   @Rpc(description = "Send a single payload.")
   public long sendPayload(String endpointId, String name, int sizeInKb) throws Exception {
     return sendPayloadWithType(endpointId, name, sizeInKb, Payload.Type.FILE);

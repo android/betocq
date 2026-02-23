@@ -1308,3 +1308,54 @@ def clear_all_accessibility_services(
     )
     return
   ad.adb.shell('settings delete secure enabled_accessibility_services')
+
+
+def get_wifi_concurrency_mode(
+    p2p_frequency: int,
+    sta_frequency: int,
+    is_dbs_mode_mattered: bool = False,
+    dbs_wfd_status: nc_constants.WifiDbsWfdStatus = nc_constants.WifiDbsWfdStatus.UNKNOWN,
+) -> nc_constants.WifiConcurrencyMode:
+  """Gets the wifi concurrency mode of the device."""
+  if (
+      p2p_frequency == nc_constants.INVALID_INT
+      or sta_frequency == nc_constants.INVALID_INT
+  ):
+    return nc_constants.WifiConcurrencyMode.UNKNOWN
+
+  is_p2p_2g = p2p_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+  is_sta_2g = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+
+  if p2p_frequency == sta_frequency:
+    if is_p2p_2g:
+      return nc_constants.WifiConcurrencyMode.SCC_2G
+    else:
+      return nc_constants.WifiConcurrencyMode.SCC_5G
+
+  if is_dbs_mode_mattered:
+    if dbs_wfd_status == nc_constants.WifiDbsWfdStatus.DBS_WFD_ENABLED:
+      if is_p2p_2g:
+        return nc_constants.WifiConcurrencyMode.SCC_2G
+      else:
+        return nc_constants.WifiConcurrencyMode.SCC_5G
+    elif dbs_wfd_status == nc_constants.WifiDbsWfdStatus.DBS_WFD_DISABLED:
+      if is_p2p_2g and not is_sta_2g:
+        return nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+      elif not is_p2p_2g and is_sta_2g:
+        return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+      elif not is_p2p_2g and not is_sta_2g:
+        return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+      else:  # both 2g but different freq
+        return nc_constants.WifiConcurrencyMode.UNKNOWN
+    else:  # UNKNOWN dbs status
+      return nc_constants.WifiConcurrencyMode.UNKNOWN
+
+  # if is_dbs_mode_mattered=False, then calculate MCC based on band
+  if is_p2p_2g and not is_sta_2g:
+    return nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+  elif not is_p2p_2g and is_sta_2g:
+    return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+  elif not is_p2p_2g and not is_sta_2g:
+    return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+  else:  # both 2g but different freq
+    return nc_constants.WifiConcurrencyMode.UNKNOWN

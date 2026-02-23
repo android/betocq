@@ -97,6 +97,34 @@ def set_and_assert_p2p_frequency(
     )
 
 
+def populate_medium_frequency(
+    target_ad: android_device.AndroidDevice,
+    test_result: SingleTestResult,
+):
+  """Sets the medium frequency for the test result."""
+  test_result.quality_info.medium_frequency = (
+      setup_utils.get_wifi_p2p_frequency(target_ad)
+  )
+
+
+def set_and_assert_concurrency_mode(
+    current_concurrency_mode: nc_constants.WifiConcurrencyMode,
+    valid_concurrency_modes: Sequence[nc_constants.WifiConcurrencyMode],
+    test_result: SingleTestResult,
+    additional_error_message: str = '',
+):
+  """Sets the concurrency mode for the test result."""
+  test_result.wifi_concurrency_mode = current_concurrency_mode
+  if current_concurrency_mode not in valid_concurrency_modes:
+    test_result.set_active_nc_fail_reason(
+        nc_constants.SingleTestFailureReason.INVALID_WIFI_CONCURRENCY_MODE
+    )
+    asserts.fail(
+        f'Concurrency mode: {current_concurrency_mode} is not expected.'
+        f' {additional_error_message}'
+    )
+
+
 # Add back temporarily, will be removed after refractoring refactor DCT tests.
 def collect_nc_test_metrics(
     test_result: SingleTestResult,

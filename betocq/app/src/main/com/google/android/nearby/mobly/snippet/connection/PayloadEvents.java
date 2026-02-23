@@ -71,6 +71,16 @@ public class PayloadEvents extends PayloadCallback {
     };
   }
 
+  /**
+   * Resets the payload events by clearing all incoming payloads and resetting the transfer
+   * stopwatch.
+   */
+  public void reset() {
+    incomingPayloadsById.clear();
+    incomingStreamDataByPayloadId.clear();
+    transferStopwatch.reset();
+  }
+
   @Override
   public void onPayloadReceived(String endpointId, Payload payload) {
     incomingPayloadsById.put(payload.getId(), payload);
@@ -78,7 +88,7 @@ public class PayloadEvents extends PayloadCallback {
     Bundle eventData = snippetEvent.getData();
     eventData.putString("endpointId", endpointId);
 
-    Log.d("PayloadReceived type:" + getPayloadType(payload) + " id:" + payload.getId());
+    Log.d("betocq: PayloadReceived type:" + getPayloadType(payload) + " id:" + payload.getId());
     if (payload.getType() == Payload.Type.STREAM) {
       incomingStreamDataByPayloadId.put(
           payload.getId(), new IncomingStreamData(payload.asStream().asInputStream()));
@@ -98,6 +108,11 @@ public class PayloadEvents extends PayloadCallback {
     Bundle eventData = snippetEvent.getData();
     eventData.putString("endpointId", endpointId);
     long payloadId = update.getPayloadId();
+    Log.d(
+        "PayloadTransferUpdate ID:"
+            + payloadId
+            + ", bytesTransferred:"
+            + update.getBytesTransferred());
 
     Payload incomingPayload = incomingPayloadsById.get(payloadId);
     if (incomingPayload == null && update.getStatus() == Status.IN_PROGRESS) {
