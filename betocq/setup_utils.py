@@ -14,7 +14,7 @@
 
 """Android Nearby device setup."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 import datetime
 import pprint
 import re
@@ -65,6 +65,23 @@ NEARBY_LOG_TAGS = [
     'NearbyMediums',
     'NearbySetup',
 ]
+
+_WIFI_SCAN_PATTERN = re.compile(
+    r"""
+        ([0-9a-f:]{17})  # Captures BSSID
+        \s+
+        (\d+)            # Captures Frequency
+        \s+
+        [-\d.]+          # Matches RSSI (skipped)
+        \s+
+        [\d.]+           # Matches Age (skipped)
+        \s*
+        (.*?)            # Captures SSID (non-greedy)
+        \s+
+        (\[.*\])         # Captures Flags starting with '['
+    """,
+    re.VERBOSE,
+)
 
 
 def get_betocq_device_specific_info(
@@ -649,11 +666,43 @@ def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
     return False
 
 
-def check_wifi_env(ad: android_device.AndroidDevice) -> None:
+def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
+  """Parses the output of 'cmd wifi list-scan-results'.
+
+  Args:
+    scan_results: A list of strings, where each string is a line from the 'cmd
+      wifi list-scan-results' output.
+
+  Returns:
+    A list of dictionaries, where each dictionary contains the 'SSID' and
+    'Frequency' of a scanned Wi-Fi network.
+  """
+  results = []
+
+  for line in scan_results:
+    match = _WIFI_SCAN_PATTERN.search(line)
+    if match:
+      _, freq, raw_ssid, _ = match.groups()
+      # If SSID is just whitespace, it means it's hidden/empty
+      ssid = raw_ssid.strip() or nc_constants.WIFI_UNKNOWN_SSID
+      results.append({
+          'SSID': ssid,
+          'Frequency': int(freq),
+      })
+  return results
+
+
+def check_wifi_env(
+    ad: android_device.AndroidDevice,
+) -> Sequence[dict[str, Any]] | None:
   """Let WI-FI scan and get scan results. Check if the environment is clean.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    Wi-Fi scan results as a list of SSID and Frequency or None if it fails to
+    get scan results.
   """
   # Initialize the number of SSIDs found in the wifi scan.
   ad.wifi_env_ssid_count = 0
@@ -662,20 +711,25 @@ def check_wifi_env(ad: android_device.AndroidDevice) -> None:
     ad.adb.shell('cmd wifi start-scan')
     time.sleep(WIFI_SCAN_WAIT_TIME_SEC)
   except adb.AdbError:
-    ad.log.warning('Failed to start wifi scan.')
-    return
+    ad.log.warning('Failed to start wifi scan.', exc_info=True)
+    return None
 
   # List scanned result.
   try:
     wifi_scan_results = (
-        ad.adb.shell('cmd wifi list-scan-results').decode('utf-8').strip()
+        ad.adb.shell('cmd wifi list-scan-results')
+        .decode('utf-8')
+        .strip()
+        .splitlines()
     )
+    # Exclude the header from the scan results.
+    wifi_simple_results = _parse_wifi_scan(wifi_scan_results[1:])
+    ad.log.info('wifi scan results: %s', pprint.pformat(wifi_simple_results))
   except (adb.AdbError, ValueError):
-    ad.log.warning('Failed to retrieve wifi scan results.')
-    return
+    ad.log.warning('Failed to retrieve wifi scan results.', exc_info=True)
+    return None
 
-  # Subtract 1st line of results(header line) to get actual number of SSIDs.
-  num_of_ssid = len(wifi_scan_results.splitlines()) - 1
+  num_of_ssid = len(wifi_simple_results)
   # Check the number of results against the threshold.
   if num_of_ssid > MAX_SSID_THRESHOLD:
     ad.log.warning(
@@ -687,7 +741,29 @@ def check_wifi_env(ad: android_device.AndroidDevice) -> None:
 
   # Update the number of SSIDs found in the wifi scan.
   ad.wifi_env_ssid_count = num_of_ssid
-  return
+  return wifi_simple_results
+
+
+def is_valid_wifi_2g_freq(freq: int) -> bool:
+  """Checks if the frequency is a valid 2G frequency."""
+  return freq <= nc_constants.MAX_FREQ_2G_MHZ
+
+
+def is_valid_wifi_5g_freq(freq: int) -> bool:
+  """Checks if the frequency is a valid 5G frequency."""
+  return (
+      nc_constants.MAX_FREQ_2G_MHZ < freq < nc_constants.MIN_FREQ_5G_DFS_MHZ
+      or freq > nc_constants.MAX_FREQ_5G_DFS_MHZ
+  )
+
+
+def is_valid_wifi_5g_dfs_freq(freq: int) -> bool:
+  """Checks if the frequency is a valid 5G DFS frequency."""
+  return (
+      nc_constants.MIN_FREQ_5G_DFS_MHZ
+      <= freq
+      <= nc_constants.MAX_FREQ_5G_DFS_MHZ
+  )
 
 
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:

@@ -164,17 +164,11 @@ def assert_sta_frequency(
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
     case nc_constants.WifiType.FREQ_2G:
-      is_valid_freq = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+      is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
     case nc_constants.WifiType.FREQ_5G:
-      is_valid_freq = sta_frequency > nc_constants.MAX_FREQ_2G_MHZ and (
-          sta_frequency < nc_constants.MIN_FREQ_5G_DFS_MHZ
-          or sta_frequency > nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
     case nc_constants.WifiType.FREQ_5G_DFS:
-      is_valid_freq = (
-          sta_frequency >= nc_constants.MIN_FREQ_5G_DFS_MHZ
-          and sta_frequency <= nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
 
   if is_valid_freq:
     return
@@ -229,25 +223,19 @@ def set_and_assert_sta_frequency(
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
     case nc_constants.WifiType.FREQ_2G:
-      is_valid_freq = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+      is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 2G channel.'
         )
     case nc_constants.WifiType.FREQ_5G:
-      is_valid_freq = sta_frequency > nc_constants.MAX_FREQ_2G_MHZ and (
-          sta_frequency < nc_constants.MIN_FREQ_5G_DFS_MHZ
-          or sta_frequency > nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 5G channel.'
         )
     case nc_constants.WifiType.FREQ_5G_DFS:
-      is_valid_freq = (
-          sta_frequency >= nc_constants.MIN_FREQ_5G_DFS_MHZ
-          and sta_frequency <= nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 5G DFS channel.'
@@ -945,9 +933,7 @@ def update_result_message_with_gms_check(test_instance: typing.Any) -> None:
   if pids_changed_error:
     message = getattr(current_test_result, 'result_message', '')
     current_test_result.result_message = (
-        f'{pids_changed_error}\n{message}'
-        if message
-        else pids_changed_error
+        f'{pids_changed_error}\n{message}' if message else pids_changed_error
     )
 
 
