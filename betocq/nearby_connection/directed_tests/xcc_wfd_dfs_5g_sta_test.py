@@ -12,35 +12,38 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""This test is to test the Wifi throughput with indoor 5G STA.
+"""This test is to test the Wifi throughput with DFS 5G STA for WFD.
 
-This is about the feature - using indoor channels for WFD, for details, refer to
+This is about the feature - using DFS channels for WFD, for details, refer to
 https://drive.google.com/file/d/1Aj77Euao8XkvE6uWF15WMK1XCwmYhdxW/view?resourcekey=0-a69XQup8McOcUnzYN9eh0Q
-(confidential) and config_wifiEnableStaIndoorChannelForPeerNetwork -
-https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/ServiceWifiResources/res/values/config.xml;l=1147
-If the feature is disabled for the device, the WFD will be started in
-a 2G channel, but the STA is using the 5G channel.
-If the feature is enabled for the device, the WFD will be started in
-a 5G channel same as the STA.
+(confidential) and config_wifiEnableStaDfsChannelForPeerNetwork -
+https://cs.android.com/android/platform/superproject/main/+/main:packages/modules/Wifi/service/ServiceWifiResources/res/values/config.xml;l=1151
+If the feature is disabled for the device, the STA is using the DFS
+5G channel, but the WFD will be started in another 5G channel and this will be
+a MCC case.
+If the feature is enabled for the device, the STA and WFD will use the same
+DFS 5G channel and this will be a SCC case.
 
 Test requirements:
   The device requirements:
     support 5G band
     support Wi-Fi Direct
   The AP requirements:
-    Wi-Fi channel: 36 (5180) or other 5G indoor channels in JP.
+    wifi channel: 52 (5260) or 112 (5560) or other DFS channels.
 
 Test preparations:
-  Set country code to JP on Android devices.
+  Set country code to GB on Android devices.
 
 Test steps:
   1. Disconnect discoverer from the current connected Wi-Fi network.
   2. Set up a prior Nearby Connection through Bluetooth medium.
-  3. Connect advertiser to the 5G Wi-Fi network.
+  3. Connect advertiser to a 5G DFS Wi-Fi network.
   4. Set up a connection with Wi-Fi Direct as upgrade medium.
-      * Wi-Fi Direct will be set up by Nearby Connection in a 2G channel.
+      * Wi-Fi Direct will be set up by Nearby Connection in a 5G channel that is
+        different from the STA channel for MCC case, or same as STA for SCC
+        case.
   5. Transfer file on the connection established in step 4.
-  6. Disconnect all Nearby Connections.
+  6. Tear down all Nearby Connections.
 
 Expected results:
   1. The file transfer completes successfully.
@@ -61,7 +64,6 @@ from betocq import setup_utils
 from betocq import test_result_utils
 from betocq.nearby_connection import utils as nc_utils
 
-
 # Use MCC strategy for iteration number and max consecutive error,
 # as most devices do not support SCC_5G mode in this case.
 TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
@@ -69,32 +71,33 @@ SUCCESS_RATE_TARGET = nc_constants.SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
 _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
-_COUNTRY_CODE = 'JP'
+_COUNTRY_CODE = 'GB'
+
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Direct connection might be broken, check related logs.'
 )
 
 
-class XccWfdIndoor5gStaTest(performance_test_base.PerformanceTestBase):
-  """Test class for wifi XCC with 2G WFD and indoor 5G STA.
+class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
+  """Test class for XCC with 5G WFD and DFS 5G STA.
 
-  This test covers both SCC (if enable_sta_indoor_channel_for_peer_network is
-  supported) and MCC (otherwise) scenarios.
+  This test covers both SCC and MCC scenarios, depending on whether the device
+  supports using DFS channels for peer networks when STA is on a DFS channel.
   """
 
   test_runtime: nc_constants.NcTestRuntime
   wifi_info: nc_constants.WifiInfo
 
-  def setup_class(self):
+  def setup_class(self) -> None:
     super().setup_class()
 
     self.setup_wifi_env(
-        d2d_type=nc_constants.WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
+        d2d_type=nc_constants.WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
         country_code=_COUNTRY_CODE,
     )
     self.wifi_info = nc_constants.WifiInfo.from_test_parameters(
-        d2d_type=nc_constants.WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
+        d2d_type=nc_constants.WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
         params=self.test_parameters,
     )
     self.test_runtime = nc_constants.NcTestRuntime(
@@ -135,7 +138,7 @@ class XccWfdIndoor5gStaTest(performance_test_base.PerformanceTestBase):
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
-  def _assert_test_conditions(self):
+  def _assert_test_conditions(self) -> None:
     """Aborts the test class if any test condition is not met."""
     # Check rooted devices.
     setup_utils.abort_if_on_unrooted_device(
@@ -143,19 +146,19 @@ class XccWfdIndoor5gStaTest(performance_test_base.PerformanceTestBase):
         'the country code can not be set.'
     )
     # Check WiFi AP.
-    setup_utils.abort_if_5g_ap_not_ready(self.test_parameters)
+    setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
 
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
   )
-  def test_xcc_wfd_indoor_5g_sta(self):
-    """Test the performance for wifi XCC with 2G WFD and indoor 5G STA.
+  def test_xcc_wfd_dfs_5g_sta(self) -> None:
+    """Test the performance for wifi XCC with 5G WFD and DFS 5G STA.
 
-    This test covers both SCC (if enable_sta_indoor_channel_for_peer_network is
+    This test covers both SCC (if enable_sta_dfs_channel_for_peer_network is
     supported) and MCC (otherwise) scenarios.
     """
-    # Test Step: Connect discoverer to wifi sta.
+    # Test Step: Disconnect discoverer from the current connected wifi sta.
     discoverer_sta_op = setup_utils.remove_current_connected_wifi_network(
         self.discoverer
     )
@@ -198,7 +201,8 @@ class XccWfdIndoor5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     test_result_utils.populate_medium_frequency(
-        self.advertiser, self.current_test_result)
+        self.advertiser, self.current_test_result
+    )
     wifi_concurrency_mode = setup_utils.get_wifi_concurrency_mode(
         p2p_frequency=self.current_test_result.quality_info.medium_frequency,
         sta_frequency=self.current_test_result.sta_frequency,
@@ -207,19 +211,16 @@ class XccWfdIndoor5gStaTest(performance_test_base.PerformanceTestBase):
         current_concurrency_mode=wifi_concurrency_mode,
         valid_concurrency_modes=[
             nc_constants.WifiConcurrencyMode.SCC_5G,
-            nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA,
+            nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA,
             nc_constants.WifiConcurrencyMode.UNKNOWN,
         ],
         test_result=self.current_test_result,
         additional_error_message=(
-            'If the enable_sta_indoor_channel_for_peer_network feature is not'
-            ' supported by the device, the p2p frequency should be 2G'
-            ' concurrency mode will be'
-            ' {WifiConcurrencyMode.MCC_2G_P2P_5G_STA.name}; otherwise, the'
-            ' p2p frequency should be 5G and be the same as the STA, the'
-            ' concurrency mode will be {WifiConcurrencyMode.SCC_5G.name}.'
-            ' Your device might vialate the Japan regulatory about the indoor'
-            ' 5G channels.'
+            'If enable_sta_dfs_channel_for_peer_network=False, concurrency'
+            ' should be'
+            f' {nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA.name},'
+            f' otherwise {nc_constants.WifiConcurrencyMode.SCC_5G.name}. If'
+            ' not, something is wrong with the firmware of the device.'
         ),
     )
     self.advertiser.log.info(
@@ -230,33 +231,31 @@ class XccWfdIndoor5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     file_transfer_size_kb = (
-        nc_constants.NC_MCC_2G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
+        nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
     )
-    file_transfer_timeout = nc_constants.WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT
+    file_transfer_timeout = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
     if wifi_concurrency_mode == nc_constants.WifiConcurrencyMode.SCC_5G:
-      file_transfer_size_kb = nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB
+      file_transfer_size_kb = nc_constants.TRANSFER_FILE_SIZE_500MB
       file_transfer_timeout = nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
 
     # Test Step: Transfer file on the established NC.
     try:
       if wifi_concurrency_mode is not nc_constants.WifiConcurrencyMode.UNKNOWN:
-        single_file_transfer_throughput_kbps = (
-            active_snippet.transfer_file(
-                file_size_kb=file_transfer_size_kb,
-                timeout=file_transfer_timeout,
-                payload_type=_PAYLOAD_TYPE,
-                num_files=_FILE_TRANSFER_NUM,
-            )
+        single_file_transfer_throughput_kbps = active_snippet.transfer_file(
+            file_size_kb=file_transfer_size_kb,
+            timeout=file_transfer_timeout,
+            payload_type=_PAYLOAD_TYPE,
+            num_files=_FILE_TRANSFER_NUM,
         )
       else:
-        self.advertiser.log.warning(
-            'The concurrency mode is unknown, this should not happen, '
-            'workaround to get the throughput in the unknown concurrency mode.'
-        )
+        # Workaround to get the throughput in the unknown concurrency mode,
+        # although this is not expected to happen (P2P freq is not gotten?).
         single_file_transfer_throughput_kbps = (
             active_snippet.transfer_file_for_unknown_concurrency_mode(
-                mcc_file_size_kb=nc_constants.NC_MCC_2G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB,
-                mcc_timeout=nc_constants.WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT,
+                mcc_file_size_kb=(
+                    nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
+                ),
+                mcc_timeout=nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
                 scc_file_size_kb=nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
                 scc_timeout=nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
                 payload_type=_PAYLOAD_TYPE,
