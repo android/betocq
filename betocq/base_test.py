@@ -240,7 +240,7 @@ class BaseTestClass(base_test.BaseTestClass):
       )
       return
 
-    wifi_channel = nc_constants.get_wifi_channel(d2d_type)
+    wifi_channel = nc_constants.get_wifi_channel_for_programmable_ap(d2d_type)
     if self.test_parameters.use_programmable_ap:
       self._setup_programmable_ap(wifi_channel, country_code)
 

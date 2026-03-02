@@ -45,9 +45,9 @@ LOHS_PERFORMANCE_TEST_COUNT = 100
 LOHS_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 WIFI_AWARE_SCC_PERFORMANCE_TEST_COUNT = 10
 
-CHANNEL_2G = 6
-CHANNEL_5G = 36
-CHANNEL_5G_DFS = 52
+PROGRAMMABLE_AP_CHANNEL_2G = 6
+PROGRAMMABLE_AP_CHANNEL_5G = 36
+PROGRAMMABLE_AP_CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
 WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=6)
@@ -425,14 +425,14 @@ _WIFI_D2D_TYPES_DFS_5G_STA = (
 )
 
 
-def get_wifi_channel(d2d_type: WifiD2DType) -> int:
+def get_wifi_channel_for_programmable_ap(d2d_type: WifiD2DType) -> int:
   """Gets the WiFi channel for the given D2D type."""
   if d2d_type in _WIFI_D2D_TYPES_2G_STA:
-    return CHANNEL_2G
+    return PROGRAMMABLE_AP_CHANNEL_2G
   elif d2d_type in _WIFI_D2D_TYPES_5G_STA:
-    return CHANNEL_5G
+    return PROGRAMMABLE_AP_CHANNEL_5G
   elif d2d_type in _WIFI_D2D_TYPES_DFS_5G_STA:
-    return CHANNEL_5G_DFS
+    return PROGRAMMABLE_AP_CHANNEL_5G_DFS
   else:
     raise ValueError(f'Unsupported WifiD2DType: {d2d_type}')
 
