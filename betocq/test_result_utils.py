@@ -809,6 +809,9 @@ class SingleTestResult:
   debug_reference_info: dict[str, Any] = dataclasses.field(default_factory=dict)
   speed_target: nc_constants.SpeedTarget = nc_constants.SpeedTarget(
       nc_constants.INVALID_INT, nc_constants.INVALID_INT)
+  wifi_concurrency_mode: nc_constants.WifiConcurrencyMode = (
+      nc_constants.WifiConcurrencyMode.UNKNOWN
+  )
 
   def __post_init__(self):
     self.start_time = datetime.datetime.now()
@@ -874,7 +877,7 @@ def gen_basic_test_summary(
       'target_build_id': f'{advertiser.build_info["build_id"]}',
       'target_model': f'{advertiser.model}',
       'target_gms_version': f'{setup_utils.dump_gms_version(advertiser)}',
-      'target_wifi_chipset': f'{advertiser.wifi_chipset}',
+      'target_wifi_chipset': f'{getattr(advertiser, "wifi_chipset", "NA")}',
   })
   if hasattr(advertiser, 'wifi_env_ssid_count'):
     basic_test_summary['wifi_ap_number'] = f'{advertiser.wifi_env_ssid_count}'
@@ -990,6 +993,29 @@ class PerformanceTestResults:
     )
     return actual_success_count >= min_success_iterations_required
 
+  def get_wifi_concurrency_mode(self) -> nc_constants.WifiConcurrencyMode:
+    """Returns the wifi concurrency mode of the test class."""
+    if (
+        self.nc_test_runtime is None
+        or self.nc_test_runtime.wifi_info is None
+    ):
+      return nc_constants.WifiConcurrencyMode.UNKNOWN
+    nc_test_runtime = typing.cast(
+        nc_constants.NcTestRuntime, self.nc_test_runtime
+    )
+    if nc_constants.is_xcc_test(nc_test_runtime.wifi_info.d2d_type):
+      for result in self._results:
+        if (
+            result.wifi_concurrency_mode
+            != nc_constants.WifiConcurrencyMode.UNKNOWN
+        ):
+          return result.wifi_concurrency_mode
+    else:
+      return nc_constants.get_wifi_concurrency_mode_from_d2d_type(
+          nc_test_runtime.wifi_info.d2d_type
+      )
+    return nc_constants.WifiConcurrencyMode.UNKNOWN
+
   def get_test_class_result_message(self) -> str:
     """Gets the test result message for the test class based on result enum."""
     finished_iteration_count = len(self._results)
@@ -1041,6 +1067,7 @@ class PerformanceTestResults:
         ),
         'wifi_upgrade_stats': self._summary_upgraded_wifi_transfer_mediums(),
         'prior_bt_connection_stats': self._get_prior_bt_connection_stats(),
+        'wifi_concurrency_mode': self.get_wifi_concurrency_mode().name,
     })
     test_summary_with_index = {}
     for index, (k, v) in enumerate(test_summary.items()):
@@ -1167,7 +1194,8 @@ class PerformanceTestResults:
     if (wifi_info := nc_test_runtime.wifi_info) is not None:
       # If the test could upgrade to either 2G or 5G WiFi mediums, do not show
       # below info in test summary.
-      if nc_constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type):
+      if (nc_constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type)
+          or nc_constants.is_xcc_test(wifi_info.d2d_type)):
         info.update(
             {'is_2g_only': 'NA', 'is_dbs_mode': 'NA', 'is_mcc_mode': 'NA'}
         )

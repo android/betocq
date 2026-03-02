@@ -87,11 +87,11 @@ class XccWfdDbs2gStaTest(performance_test_base.PerformanceTestBase):
     super().setup_class()
 
     self.setup_wifi_env(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_WFD_2G_STA,
+        d2d_type=nc_constants.WifiD2DType.XCC_2G_STA,
         country_code=_COUNTRY_CODE,
     )
     self.wifi_info = nc_constants.WifiInfo.from_test_parameters(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_WFD_2G_STA,
+        d2d_type=nc_constants.WifiD2DType.XCC_2G_STA,
         params=self.test_parameters,
     )
     self.test_runtime = nc_constants.NcTestRuntime(
