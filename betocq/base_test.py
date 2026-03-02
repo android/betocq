@@ -15,6 +15,7 @@
 """Mobly base test class of all BeToCQ tests."""
 
 import logging
+import sys
 
 import os
 import traceback
@@ -32,12 +33,6 @@ import yaml
 from betocq import ap_utils
 from betocq import nc_constants
 from betocq import setup_utils
-
-NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
-NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
-NEARBY_SNIPPET_3P_PACKAGE_NAME = (
-    'com.google.android.nearby.mobly.snippet.thirdparty'
-)
 
 # TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
@@ -84,6 +79,10 @@ class BaseTestClass(base_test.BaseTestClass):
     self.is_using_gms_api = True
 
   def setup_class(self) -> None:
+    if sys.version_info < (3, 12):
+      setup_utils.abort_all_and_report_error_on_setup(
+          self, 'Python 3.12 or higher is required for this test.'
+      )
     if (
         not self.test_parameters.use_programmable_ap
         and self.test_parameters.abort_all_if_any_ap_not_ready
