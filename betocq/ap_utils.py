@@ -49,13 +49,13 @@ def start_wifi(
       'Started WiFi network with ssid "%s" password "%s"', ssid, password
   )
 
-  if wifi_channel == nc_constants.CHANNEL_2G:
+  if wifi_channel == nc_constants.PROGRAMMABLE_AP_CHANNEL_2G:
     test_parameters.wifi_2g_ssid = ssid
     test_parameters.wifi_2g_password = password
-  elif wifi_channel == nc_constants.CHANNEL_5G:
+  elif wifi_channel == nc_constants.PROGRAMMABLE_AP_CHANNEL_5G:
     test_parameters.wifi_5g_ssid = ssid
     test_parameters.wifi_5g_password = password
-  elif wifi_channel == nc_constants.CHANNEL_5G_DFS:
+  elif wifi_channel == nc_constants.PROGRAMMABLE_AP_CHANNEL_5G_DFS:
     test_parameters.wifi_dfs_5g_ssid = ssid
     test_parameters.wifi_dfs_5g_password = password
   else:

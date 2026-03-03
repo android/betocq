@@ -192,6 +192,55 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         d2d_type=nc_constants.WifiD2DType.SCC_5G, country_code=_COUNTRY_CODE
     )
 
+    wifi_scan_results_list = setup_utils.check_wifi_env(self.advertiser)
+    if self.test_parameters.use_programmable_ap:
+      return
+    if not self.test_parameters.abort_all_if_any_ap_not_ready:
+      return
+    if wifi_scan_results_list is None:
+      self.advertiser.log.warning(
+          'WiFi scan results are not available, skipt the ssid and frequency'
+          ' check, the tests might be failed.'
+      )
+      return
+
+    freq_by_ssids = {
+        result['SSID']: result['Frequency'] for result in wifi_scan_results_list
+    }
+    wifi_2g_ssid = self.test_parameters.wifi_2g_ssid
+    wifi_5g_ssid = self.test_parameters.wifi_5g_ssid
+    wifi_dfs_5g_ssid = self.test_parameters.wifi_dfs_5g_ssid
+    freq_2g = freq_by_ssids.get(wifi_2g_ssid)
+    freq_5g = freq_by_ssids.get(wifi_5g_ssid)
+    freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid)
+    if freq_2g is None or freq_5g is None or freq_5g_dfs is None:
+      setup_utils.abort_all_and_report_error_on_setup(
+          self,
+          f'WiFi APs are not detected in the environment, they are: 2G:'
+          f' {wifi_2g_ssid} {"OK" if freq_2g else "Not Detected"}, 5G:'
+          f' {wifi_5g_ssid} {"OK" if freq_5g else "Not Detected"}, DFS:'
+          f' {wifi_dfs_5g_ssid} {"OK" if freq_5g_dfs else "Not Detected"}.'
+          f' Check your AP status, may reboot the AP if needed.'
+      )
+    if not setup_utils.is_valid_wifi_2g_freq(freq_2g):
+      setup_utils.abort_all_and_report_error_on_setup(
+          self,
+          f'2G AP - {wifi_2g_ssid}, frequency - {freq_2g} is not valid. Set'
+          f' the AP channel, reboot the AP and try again.',
+      )
+    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
+      setup_utils.abort_all_and_report_error_on_setup(
+          self,
+          f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
+          f' the AP channel, reboot the AP and try again.',
+      )
+    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
+      setup_utils.abort_all_and_report_error_on_setup(
+          self,
+          f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
+          ' valid. Set the AP channel, reboot the AP and try again.',
+      )
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for test cases that need to
     # set up 2 nearby connections.
@@ -505,7 +554,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     properties = {'result': self.current_test_result.result_message}
     if self.current_test_result.file_transfer_throughput_kbps > 0:
       # Convert the throughput to MB/s and record it as a property.
-      properties['speed_mbps'] = (
+      properties['speed_MBps'] = (
           test_result_utils._float_to_str(
               self.current_test_result.file_transfer_throughput_kbps / 1024,
               _SPEED_MBPS_DECIMAL_PLACES,

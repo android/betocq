@@ -15,6 +15,7 @@
 """Utils for handling Nearby Connection rpc."""
 
 import datetime
+import logging
 import random
 import time
 
@@ -31,6 +32,13 @@ from betocq import nc_constants
 # scheduling timing interval and user action delay
 ADV_TO_DISCOVERY_MAX_DELAY_SEC = 4
 ADV_TO_DISCOVERY_MIN_DELAY_SEC = 3
+
+# 3 seconds make sure the file (100MB for MCC) can be finished for 5G SCC,
+# if the SCC speed is very low, 3 seconds is good enough
+# to get a valid throughput.
+_MIN_MCC_TRANSFER_TIME_SEC = (
+    datetime.timedelta(seconds=3).total_seconds()
+)
 
 
 class NearbyConnectionWrapper:
@@ -563,6 +571,43 @@ class NearbyConnectionWrapper:
     self.stop_advertising()
     self.test_failure_reason = nc_constants.SingleTestFailureReason.SUCCESS
 
+  def transfer_file_for_unknown_concurrency_mode(
+      self,
+      mcc_file_size_kb: int,
+      mcc_timeout: datetime.timedelta,
+      scc_file_size_kb: int,
+      scc_timeout: datetime.timedelta,
+      payload_type: nc_constants.PayloadType,
+  ) -> float:
+    """Sends payloads and returns the transfer speed in kilo byte per second."""
+    mcc_transfer_speed_kbps, mcc_transfer_time_s = self._transfer_file(
+        mcc_file_size_kb, mcc_timeout, payload_type
+    )
+    self.discoverer.log.info(
+        'mcc_transfer_speed_kbps: %s, mcc_transfer_time_s: %s',
+        mcc_transfer_speed_kbps,
+        mcc_transfer_time_s,
+    )
+    should_transition_to_scc = (
+        mcc_transfer_time_s < _MIN_MCC_TRANSFER_TIME_SEC
+    )
+    if should_transition_to_scc:
+      self.discoverer.log.info(
+          f'mcc_transfer_time_s: {mcc_transfer_time_s} is less than the'
+          f' threshold, do scc transfer'
+      )
+      self.discoverer_nearby.resetPayloadTransfer()
+      scc_transfer_speed_kbps, scc_transfer_time_s = self._transfer_file(
+          scc_file_size_kb, scc_timeout, payload_type
+      )
+      self.discoverer.log.info(
+          'scc_transfer_speed_kbps: %s, scc_transfer_time_s: %s',
+          scc_transfer_speed_kbps,
+          scc_transfer_time_s,
+      )
+      return scc_transfer_speed_kbps
+    return mcc_transfer_speed_kbps
+
   def transfer_file(
       self,
       file_size_kb: int,
@@ -594,7 +639,7 @@ class NearbyConnectionWrapper:
       self.discoverer.log.info(
           f'sending {num_files} payloads with type: {payload_type.name}'
       )
-      transfer_speed_kbps = self._transfer_file(
+      (transfer_speed_kbps, _) = self._transfer_file(
           file_size_kb, timeout, payload_type, num_files
       )
       self.advertiser.log.info(f'{num_files} payloads received')
@@ -614,8 +659,8 @@ class NearbyConnectionWrapper:
       timeout: datetime.timedelta,
       payload_type: nc_constants.PayloadType,
       num_files: int = nc_constants.TRANSFER_FILE_NUM_DEFAULT,
-  ) -> float:
-    """Sends payloads and returns the transfer speed in kBS."""
+  ) -> tuple[float, float]:
+    """Sends payloads and returns the transfer speed in kBS and transfer time in seconds."""
     # Creates a file and send it to the advertiser.
     file_name = utils.rand_ascii_str(8)
 
@@ -642,11 +687,18 @@ class NearbyConnectionWrapper:
       return event.data['endpointId'] == self._advertiser_endpoint_id
 
     transfer_time_s = 0
+    e2e_transfer_time_s = 0
     for _ in range(num_files):
       # NC guarantees the order of payload transfer events are the same on both
       # sides.
       # Use this order to wait for events as the tx, rx transfer update event
       # may got failure and it can terminate early to avoid the timeout.
+      self._discoverer_payload_callback.waitForEvent(
+          'onSendPayloadRequested',
+          predicate=lambda e: True,
+          timeout=timeout.total_seconds(),
+      )
+      send_payload_requested_time = datetime.datetime.now()
       tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
           'onPayloadTransferUpdate',
           predicate=on_discoverer_receive,
@@ -674,6 +726,9 @@ class NearbyConnectionWrapper:
           predicate=on_advertiser_receive,
           timeout=timeout.total_seconds(),
       )
+      e2e_transfer_time_s += (
+          datetime.datetime.now() - send_payload_requested_time
+      ).total_seconds()
       tx_id = tx_transfer_event.data['update']['payloadId']
       rx_id_payload_received = rx_received_event.data['payload']['id']
       rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
@@ -697,4 +752,14 @@ class NearbyConnectionWrapper:
         ).total_seconds()
 
     asserts.assert_true(transfer_time_s > 0, 'Transfer time is 0')
-    return round(file_size_kb * num_files / transfer_time_s)
+    throughput_from_nc = round(file_size_kb * num_files / transfer_time_s)
+    throughput_from_e2e = round(file_size_kb * num_files / e2e_transfer_time_s)
+    logging.info(
+        'throughput from nc source side: %s, throughput from e2e: %s'
+        ' transfer time: %s, e2e transfer time: %s',
+        throughput_from_nc,
+        throughput_from_e2e,
+        transfer_time_s,
+        e2e_transfer_time_s,
+    )
+    return throughput_from_e2e, e2e_transfer_time_s

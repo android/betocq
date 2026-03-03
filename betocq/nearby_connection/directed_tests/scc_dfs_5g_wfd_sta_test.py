@@ -23,7 +23,7 @@ both are operating in the same DFS 5G channel.
 
 Test requirements:
   The device requirements:
-    supports_5g=True in config file
+    supports 5G band
     enable_sta_dfs_channel_for_peer_network=True in config file
     support Wi-Fi Direct
   The AP requirements:
@@ -129,6 +129,9 @@ class SccDfs5gWfdStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Check device capabilities.
+    setup_utils.abort_if_5g_band_not_supported(
+        [self.discoverer, self.advertiser]
+    )
     setup_utils.abort_if_wifi_direct_not_supported(
         [self.advertiser, self.discoverer]
     )
@@ -152,9 +155,6 @@ class SccDfs5gWfdStaTest(performance_test_base.PerformanceTestBase):
     # Check WiFi AP.
     setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
     setup_utils.abort_if_device_cap_not_match(
         [self.discoverer, self.advertiser],
         'enable_sta_dfs_channel_for_peer_network',
@@ -240,11 +240,12 @@ class SccDfs5gWfdStaTest(performance_test_base.PerformanceTestBase):
       )
 
     # Check the throughput and run iperf if needed.
-    test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP,
+      )
 
     prior_bt_snippet.disconnect_endpoint()
     active_snippet.disconnect_endpoint()

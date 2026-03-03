@@ -56,6 +56,9 @@ public class ConnectionsClientSnippet implements Snippet {
     // TODO: Utils.registerNetworkStateCallback(context);
   }
 
+  @Override
+  public void shutdown() {}
+
   @Rpc(description = "Bring the snippet service to the foreground by starting an activity.")
   public void bringToFront() {
     Intent intent = new Intent(context, MainActivity.class);
@@ -169,6 +172,16 @@ public class ConnectionsClientSnippet implements Snippet {
     Nearby.getConnectionsClient(context).disconnectFromEndpoint(endpointId);
   }
 
+  @Rpc(
+      description =
+          "Reset the payload transfer event, including reset the transfer stopwatch and clear"
+              + " cached payloads.")
+  public void resetPayloadTransfer() throws Exception {
+    if (payloadEvents != null) {
+      payloadEvents.reset();
+    }
+  }
+
   @Rpc(description = "Send a single payload.")
   public long sendPayload(String endpointId, String name, int sizeInKb) throws Exception {
     return sendPayloadWithType(endpointId, name, sizeInKb, Payload.Type.FILE);
@@ -203,6 +216,8 @@ public class ConnectionsClientSnippet implements Snippet {
           () ->
               Tasks.await(
                   Nearby.getConnectionsClient(context).sendPayload(Arrays.asList(endpointId), p)));
+      EventCache.getInstance()
+          .postEvent(new SnippetEvent(payloadEvents.callbackId, "onSendPayloadRequested"));
     }
     return payload[numFiles - 1].getId();
   }
@@ -249,7 +264,7 @@ public class ConnectionsClientSnippet implements Snippet {
       case Payload.Type.STREAM:
         payload = Payload.fromStream(inputStream);
         break;
-        // Payload.Type.BYTES is unsupported type, but keep other types same as Payload.Type.FILE
+      // Payload.Type.BYTES is unsupported type, but keep other types same as Payload.Type.FILE
       case Payload.Type.FILE:
       default:
         payload = Payload.fromFile(payloadFile);

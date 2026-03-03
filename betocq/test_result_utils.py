@@ -97,6 +97,34 @@ def set_and_assert_p2p_frequency(
     )
 
 
+def populate_medium_frequency(
+    target_ad: android_device.AndroidDevice,
+    test_result: SingleTestResult,
+):
+  """Sets the medium frequency for the test result."""
+  test_result.quality_info.medium_frequency = (
+      setup_utils.get_wifi_p2p_frequency(target_ad)
+  )
+
+
+def set_and_assert_concurrency_mode(
+    current_concurrency_mode: nc_constants.WifiConcurrencyMode,
+    valid_concurrency_modes: Sequence[nc_constants.WifiConcurrencyMode],
+    test_result: SingleTestResult,
+    additional_error_message: str = '',
+):
+  """Sets the concurrency mode for the test result."""
+  test_result.wifi_concurrency_mode = current_concurrency_mode
+  if current_concurrency_mode not in valid_concurrency_modes:
+    test_result.set_active_nc_fail_reason(
+        nc_constants.SingleTestFailureReason.INVALID_WIFI_CONCURRENCY_MODE
+    )
+    asserts.fail(
+        f'Concurrency mode: {current_concurrency_mode} is not expected.'
+        f' {additional_error_message}'
+    )
+
+
 # Add back temporarily, will be removed after refractoring refactor DCT tests.
 def collect_nc_test_metrics(
     test_result: SingleTestResult,
@@ -136,17 +164,11 @@ def assert_sta_frequency(
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
     case nc_constants.WifiType.FREQ_2G:
-      is_valid_freq = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+      is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
     case nc_constants.WifiType.FREQ_5G:
-      is_valid_freq = sta_frequency > nc_constants.MAX_FREQ_2G_MHZ and (
-          sta_frequency < nc_constants.MIN_FREQ_5G_DFS_MHZ
-          or sta_frequency > nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
     case nc_constants.WifiType.FREQ_5G_DFS:
-      is_valid_freq = (
-          sta_frequency >= nc_constants.MIN_FREQ_5G_DFS_MHZ
-          and sta_frequency <= nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
 
   if is_valid_freq:
     return
@@ -201,25 +223,19 @@ def set_and_assert_sta_frequency(
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
     case nc_constants.WifiType.FREQ_2G:
-      is_valid_freq = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+      is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 2G channel.'
         )
     case nc_constants.WifiType.FREQ_5G:
-      is_valid_freq = sta_frequency > nc_constants.MAX_FREQ_2G_MHZ and (
-          sta_frequency < nc_constants.MIN_FREQ_5G_DFS_MHZ
-          or sta_frequency > nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 5G channel.'
         )
     case nc_constants.WifiType.FREQ_5G_DFS:
-      is_valid_freq = (
-          sta_frequency >= nc_constants.MIN_FREQ_5G_DFS_MHZ
-          and sta_frequency <= nc_constants.MAX_FREQ_5G_DFS_MHZ
-      )
+      is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 5G DFS channel.'
@@ -245,6 +261,7 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
     nc_test_runtime: nc_constants.NcTestRuntime,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
+    is_dct: bool = False,
 ):
   """Checks the throughput for 2G WiFi medium and runs iperf test if needed."""
   speed_target = _get_2g_wifi_throughput_benchmark(
@@ -258,6 +275,7 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
       speed_target,
       low_throughput_tip,
       did_nc_file_transfer,
+      is_discoverer_network_owner=is_dct,
   )
 
 
@@ -329,11 +347,15 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
     nc_test_runtime: nc_constants.NcTestRuntime,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
+    is_dct: bool = False,
+    is_tdls_enabled: bool = True,
 ):
   """Checks the throughput for 5G WiFi medium and runs iperf test if needed."""
   speed_target = _get_5g_wifi_throughput_benchmark(
       test_result=test_result,
       nc_test_runtime=nc_test_runtime,
+      is_dct=is_dct,
+      is_tdls_enabled=is_tdls_enabled,
   )
   logging.info('speed target: %s', speed_target)
   assert_throughput_and_run_iperf_if_needed(
@@ -342,6 +364,7 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
       speed_target,
       low_throughput_tip,
       did_nc_file_transfer,
+      is_discoverer_network_owner=is_dct,
   )
 
 
@@ -526,6 +549,7 @@ def assert_throughput_and_run_iperf_if_needed(
     speed_target: nc_constants.SpeedTarget,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
+    is_discoverer_network_owner: bool = False,
 ):
   """Checks the file transfer throughput and runs iperf test if needed."""
   advertiser = nc_test_runtime.advertiser
@@ -541,6 +565,7 @@ def assert_throughput_and_run_iperf_if_needed(
   if any([
       nc_speed_mbps < nc_speed_min_mbps,
       upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY,
+      # upgrade_medium_under_test == nc_constants.NearbyMedium.WIFIAWARE_ONLY,
   ]):
     iperf_speed_mbps = _run_iperf_test(
         test_result,
@@ -548,6 +573,7 @@ def assert_throughput_and_run_iperf_if_needed(
         discoverer,
         upgrade_medium_under_test,
         nc_test_runtime.wifi_info,
+        is_discoverer_network_owner,
     )
 
   low_throughput_info = None
@@ -582,6 +608,7 @@ def _run_iperf_test(
     discoverer: android_device.AndroidDevice,
     upgrade_medium_under_test: nc_constants.NearbyMedium,
     wifi_info: nc_constants.WifiInfo | None,
+    is_discoverer_network_owner: bool = False,
 ) -> float:
   """Runs iperf test and returns the throughput. Returns 0 if not needed."""
   if wifi_info is None or wifi_info.is_mcc:
@@ -594,11 +621,15 @@ def _run_iperf_test(
   ]:
     return 0
   test_result.iperf_throughput_kbps = iperf_utils.run_iperf_test(
-      discoverer,
-      advertiser,
-      test_result.quality_info.upgrade_medium,
+      ad_network_client=(
+          advertiser if is_discoverer_network_owner else discoverer
+      ),
+      ad_network_owner=(
+          discoverer if is_discoverer_network_owner else advertiser
+      ),
+      medium=test_result.quality_info.upgrade_medium,
   )
-  logging.debug(
+  logging.info(
       'iperf throughput: %d (KB/s)', test_result.iperf_throughput_kbps
   )
   return round(test_result.iperf_throughput_kbps / 1024, 1)
@@ -629,29 +660,38 @@ def assert_nc_throughput_meets_target(
 
 
 def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
+  """Gets device attributes for debugging."""
+  if hasattr(ad, 'wifi_fw'):
+    wifi_fw = ad.wifi_fw
+  else:
+    wifi_fw = setup_utils.get_wifi_firmware_version(ad)
+  if hasattr(ad, 'bt_fw'):
+    bt_fw = ad.bt_fw
+  else:
+    bt_fw = setup_utils.get_bt_firmware_version(ad)
   return '\n'.join([
-      f'serial: {ad.serial}',
-      f'model: {ad.model}',
-      f'android_version: {ad.android_version}\n'
-      f'build_info: {ad.build_info}',
+      f'serial: {getattr(ad, "serial", "NA")}',
+      f'model: {getattr(ad, "model", "NA")}',
+      f'android_version: {getattr(ad, "android_version", "NA")}\n'
+      f'build_info: {getattr(ad, "build_info", "NA")}',
       f'gms_version: {setup_utils.dump_gms_version(ad)}',
-      f'wifi_chipset: {ad.wifi_chipset}',
-      f'wifi_fw: {ad.adb.getprop("vendor.wlan.firmware.version")}',
-      f'support_5g: {ad.supports_5g}',
-      f'support_dbs_sta_wfd: {ad.supports_dbs_sta_wfd}',
+      f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
+      f'wifi_fw: {wifi_fw}',
+      f'bt_fw: {bt_fw}',
+      f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
+      f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
       (
           'enable_sta_dfs_channel_for_peer_network:'
-          f' {ad.enable_sta_dfs_channel_for_peer_network}'
+          f' {getattr(ad, "enable_sta_dfs_channel_for_peer_network", "NA")}'
       ),
       (
           'enable_sta_indoor_channel_for_peer_network:'
-          f' {ad.enable_sta_indoor_channel_for_peer_network}'
+          f' {getattr(ad, "enable_sta_indoor_channel_for_peer_network", "NA")}'
       ),
-      f'max_num_streams: {ad.max_num_streams}',
-      f'max_num_streams_dbs: {ad.max_num_streams_dbs}',
-      f'max_phy_rate_5g_mbps: {ad.max_phy_rate_5g_mbps}',
-      f'max_phy_rate_2g_mbps: {ad.max_phy_rate_2g_mbps}',
-      f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
+      f'max_num_streams: {getattr(ad, "max_num_streams", "NA")}',
+      f'max_num_streams_dbs: {getattr(ad, "max_num_streams_dbs", "NA")}',
+      f'max_phy_rate_5g_mbps: {getattr(ad, "max_phy_rate_5g_mbps", "NA")}',
+      f'max_phy_rate_2g_mbps: {getattr(ad, "max_phy_rate_2g_mbps", "NA")}',
   ])
 
 
@@ -701,7 +741,7 @@ def _summarize_transfer_quality_info(
       ),
       'upgrade_medium': result.quality_info.get_medium_name(),
       'medium_frequency': str(result.quality_info.medium_frequency),
-      'speed_mbps': _float_to_str(
+      'speed_MBps': _float_to_str(
           result.file_transfer_throughput_kbps / 1024, speed_mbps_fraction_bits
       ),
   }
@@ -779,6 +819,9 @@ class SingleTestResult:
   debug_reference_info: dict[str, Any] = dataclasses.field(default_factory=dict)
   speed_target: nc_constants.SpeedTarget = nc_constants.SpeedTarget(
       nc_constants.INVALID_INT, nc_constants.INVALID_INT)
+  wifi_concurrency_mode: nc_constants.WifiConcurrencyMode = (
+      nc_constants.WifiConcurrencyMode.UNKNOWN
+  )
 
   def __post_init__(self):
     self.start_time = datetime.datetime.now()
@@ -844,7 +887,7 @@ def gen_basic_test_summary(
       'target_build_id': f'{advertiser.build_info["build_id"]}',
       'target_model': f'{advertiser.model}',
       'target_gms_version': f'{setup_utils.dump_gms_version(advertiser)}',
-      'target_wifi_chipset': f'{advertiser.wifi_chipset}',
+      'target_wifi_chipset': f'{getattr(advertiser, "wifi_chipset", "NA")}',
   })
   if hasattr(advertiser, 'wifi_env_ssid_count'):
     basic_test_summary['wifi_ap_number'] = f'{advertiser.wifi_env_ssid_count}'
@@ -903,9 +946,7 @@ def update_result_message_with_gms_check(test_instance: typing.Any) -> None:
   if pids_changed_error:
     message = getattr(current_test_result, 'result_message', '')
     current_test_result.result_message = (
-        f'{pids_changed_error}\n{message}'
-        if message
-        else pids_changed_error
+        f'{pids_changed_error}\n{message}' if message else pids_changed_error
     )
 
 
@@ -962,6 +1003,29 @@ class PerformanceTestResults:
     )
     return actual_success_count >= min_success_iterations_required
 
+  def get_wifi_concurrency_mode(self) -> nc_constants.WifiConcurrencyMode:
+    """Returns the wifi concurrency mode of the test class."""
+    if (
+        self.nc_test_runtime is None
+        or self.nc_test_runtime.wifi_info is None
+    ):
+      return nc_constants.WifiConcurrencyMode.UNKNOWN
+    nc_test_runtime = typing.cast(
+        nc_constants.NcTestRuntime, self.nc_test_runtime
+    )
+    if nc_constants.is_xcc_test(nc_test_runtime.wifi_info.d2d_type):
+      for result in self._results:
+        if (
+            result.wifi_concurrency_mode
+            != nc_constants.WifiConcurrencyMode.UNKNOWN
+        ):
+          return result.wifi_concurrency_mode
+    else:
+      return nc_constants.get_wifi_concurrency_mode_from_d2d_type(
+          nc_test_runtime.wifi_info.d2d_type
+      )
+    return nc_constants.WifiConcurrencyMode.UNKNOWN
+
   def get_test_class_result_message(self) -> str:
     """Gets the test result message for the test class based on result enum."""
     finished_iteration_count = len(self._results)
@@ -1013,6 +1077,7 @@ class PerformanceTestResults:
         ),
         'wifi_upgrade_stats': self._summary_upgraded_wifi_transfer_mediums(),
         'prior_bt_connection_stats': self._get_prior_bt_connection_stats(),
+        'wifi_concurrency_mode': self.get_wifi_concurrency_mode().name,
     })
     test_summary_with_index = {}
     for index, (k, v) in enumerate(test_summary.items()):
@@ -1139,7 +1204,8 @@ class PerformanceTestResults:
     if (wifi_info := nc_test_runtime.wifi_info) is not None:
       # If the test could upgrade to either 2G or 5G WiFi mediums, do not show
       # below info in test summary.
-      if nc_constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type):
+      if (nc_constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type)
+          or nc_constants.is_xcc_test(wifi_info.d2d_type)):
         info.update(
             {'is_2g_only': 'NA', 'is_dbs_mode': 'NA', 'is_mcc_mode': 'NA'}
         )

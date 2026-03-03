@@ -23,7 +23,7 @@ In this case, the feature is disabled for the device; The STA is using the DFS
 
 Test requirements:
   The device requirements:
-    supports_5g=True in config file
+    support 5G band
     support Wi-Fi Direct
     (target device only) enable_sta_dfs_channel_for_peer_network=False in config
       file
@@ -70,11 +70,13 @@ TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
 SUCCESS_RATE_TARGET = nc_constants.SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
-_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_100MB
+_FILE_TRANSFER_SIZE_KB = (
+    nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
+)
 _FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
 
-_COUNTRY_CODE = 'GB'
+_COUNTRY_CODE = 'US'
 
 _THROUGHPUT_LOW_TIP = (
     'This is a MCC test case where WFD uses a 5G non-DFS channel and STA uses a'
@@ -127,6 +129,8 @@ class Mcc5gWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     # Check device capabilities.
+    setup_utils.abort_if_5g_band_not_supported(
+        [self.discoverer, self.advertiser])
     setup_utils.abort_if_wifi_direct_not_supported(
         [self.discoverer, self.advertiser]
     )
@@ -150,9 +154,6 @@ class Mcc5gWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
     # Check WiFi AP.
     setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
     # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
-    )
     setup_utils.abort_if_device_cap_not_match(
         [self.advertiser],
         'enable_sta_dfs_channel_for_peer_network',
@@ -238,11 +239,12 @@ class Mcc5gWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
       )
 
     # Check the throughput and run iperf if needed.
-    test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP,
+      )
 
     prior_bt_snippet.disconnect_endpoint()
     active_snippet.disconnect_endpoint()

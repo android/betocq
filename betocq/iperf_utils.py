@@ -16,11 +16,11 @@
 
 
 import logging
+import re
 import time
 from mobly import utils
 from mobly.controllers import android_device
 from betocq import nc_constants
-from betocq import setup_utils
 
 # IPv4, 10 sec, 1 stream
 DEFAULT_IPV4_CLIENT_ARGS = '-t 10 -P1'
@@ -74,11 +74,14 @@ def run_iperf_test(
   try:
     owner_addr = get_owner_ip_addr(ad_network_client, ad_network_owner, medium)
     if not owner_addr:
+      log_owner_ifconfig_after_fail_to_get_owner_ip_addr(
+          ad_network_client, ad_network_owner
+      )
       return nc_constants.INVALID_INT
   except android_device.adb.Error:
-    ad_network_client.log.info('get_owner_ip_addr() failed')
-    owner_ifconfig = get_ifconfig(ad_network_owner)
-    ad_network_owner.log.info(owner_ifconfig)
+    log_owner_ifconfig_after_fail_to_get_owner_ip_addr(
+        ad_network_client, ad_network_owner
+    )
     return nc_constants.INVALID_INT
 
   client_arg = DEFAULT_IPV4_CLIENT_ARGS
@@ -118,6 +121,15 @@ def run_iperf_test(
   else:
     server.stop()
   return speed_kbyte_sec
+
+
+def log_owner_ifconfig_after_fail_to_get_owner_ip_addr(
+    ad_network_client: android_device.AndroidDevice,
+    ad_network_owner: android_device.AndroidDevice,
+):
+  ad_network_client.log.info('get_owner_ip_addr() failed')
+  owner_ifconfig = get_ifconfig(ad_network_owner)
+  ad_network_owner.log.info(owner_ifconfig)
 
 
 def get_owner_ip_addr(
@@ -242,26 +254,18 @@ def get_ifconfig_aware(
 ) -> str:
   """Get aware network info from adb shell ifconfig."""
   logging.info(ad)
-  ifconfig = ad.adb.shell('ifconfig | grep aware').decode('utf-8')
-
-  iface_list = ifconfig.split()
-
-  for iface in iface_list:
-    str_list = iface.strip().split()
-    if not str_list:
-      continue
-    if_name = str_list[0].strip()
-    info = ad.adb.shell(f'ifconfig | grep -A7 {if_name}').decode('utf-8')
-
-    prefix = 'Tx packets'
-    postfix = 'errors'
-    tx_packets = setup_utils.get_int_between_prefix_postfix(
-        info, prefix, postfix
-    )
-    if tx_packets > 0:
-      return info
-
-  return (ifconfig)
+  ifconfig = ad.adb.shell('ifconfig').decode('utf-8')
+  for interface in ifconfig.strip().split('\n\n'):
+    if 'aware' in interface and 'TX packets:' in interface:
+      try:
+        match = re.search(r'TX packets:(\d+)', interface)
+        if match:
+          tx_packets = int(match.group(1))
+          if tx_packets > 0:
+            return interface
+      except (AttributeError, ValueError):
+        continue
+  return ifconfig
 
 
 def get_ifconfig_wlan(

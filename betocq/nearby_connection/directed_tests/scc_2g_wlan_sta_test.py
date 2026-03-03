@@ -21,7 +21,7 @@ is connected to the AP.
 
 Test requirements:
   The device requirements:
-    supports_5g=False in config file
+    support 2.4G band only
   The AP requirements:
     wifi channel: 6 (2437) or other 2G channels.
 
@@ -115,6 +115,9 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
+    # Check device capabilities.
+    setup_utils.abort_if_5g_band_supported(self.ads)
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
@@ -128,10 +131,6 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
-    # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=False
-    )
 
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
@@ -209,12 +208,13 @@ class Scc2gWlanStaTest(performance_test_base.PerformanceTestBase):
         )
 
     # Check the throughput and run iperf if needed.
-    test_result_utils.assert_2g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP,
-        did_nc_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_2g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP,
+          did_nc_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
+      )
 
     prior_bt_snippet.disconnect_endpoint()
 

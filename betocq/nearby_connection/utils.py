@@ -52,16 +52,18 @@ def setup_android_device_for_nc_tests(
     setup_utils.enable_logs(ad)
 
     setup_utils.enable_airplane_mode(ad)
-    if ad.nearby.wifiIsEnabled():
+    if setup_utils.wifi_is_enabled(ad):
       ad.nearby.wifiDisable()
     # Put it here to work around the WifiManager#getConfiguredNetworks() issue
     # before Android 15
     ad.log.info('Forgetting all wifi networks')
     android_wifi_utils.forget_all_wifi(ad)
     setup_utils.disable_airplane_mode(ad)
-    if not ad.nearby.wifiIsEnabled():
+    if not setup_utils.wifi_is_enabled(ad):
       ad.nearby.wifiEnable()
     setup_utils.reset_nearby_connection(ad)
+    ad.wifi_fw = setup_utils.get_wifi_firmware_version(ad)
+    ad.bt_fw = setup_utils.get_bt_firmware_version(ad)
     device_specific_dict['one_time_setup_done'] = True
 
   if country_code != device_specific_dict.get('wifi_country_code', ''):
@@ -69,6 +71,10 @@ def setup_android_device_for_nc_tests(
     device_specific_dict['wifi_country_code'] = country_code
 
   setup_utils.disable_gms_auto_updates(ad)
+
+  # Acquire the UiAutomation instance for the device.
+  setup_utils.clear_all_accessibility_services(ad)
+  ad.nearby.acquireUiAutomation()
 
 
 def connect_ad_to_wifi_sta(
@@ -111,8 +117,10 @@ def connect_ad_to_wifi_sta(
         ad.log.info(f'disconnecting from {current_wifi_ssid})')
         ad.nearby.wifiRemoveNetwork(network_id)
       else:
-        ad.log.warning(f'No valid network id for {current_wifi_ssid}, try'
-                       f' to remove all networks.')
+        ad.log.warning(
+            f'No valid network id for {current_wifi_ssid}, try'
+            ' to remove all networks.'
+        )
         setup_utils.remove_disconnect_wifi_network(ad)
 
     latency = setup_utils.connect_to_wifi_sta_till_success(
@@ -153,8 +161,7 @@ def connect_ad_to_wifi_sta(
   new_wifi_info = ad.nearby.wifiGetConnectionInfo()
   ad.log.info(
       'sta frequency: %s, rssi: %s for new wifi connection',
-      setup_utils.get_sta_frequency_from_wifi_info(
-          new_wifi_info),
+      setup_utils.get_sta_frequency_from_wifi_info(new_wifi_info),
       setup_utils.get_sta_rssi_from_wifi_info(new_wifi_info),
   )
 

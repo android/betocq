@@ -30,5 +30,8 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 # '2.4.2': 'fix wifi direct capability check issue.'
 # '2.5.0': ('refactor tests for improved readability; '
 #          'split 3 functional cases into 6.')
-# '2.6.0': ('optimize the test steps to reduce the test time.')
+# '2.6.0': ('optimize the test steps to reduce the test time.'
 #          'improve the test stability and fix some bugs.')
+# '2.6.1': ('Add XCC test cases for AQT.'
+#          'Update the snippet SDK version to 35 and other bug fixes.')
+

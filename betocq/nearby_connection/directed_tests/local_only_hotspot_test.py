@@ -16,7 +16,7 @@
 
 Test requirements:
   The device requirements:
-    supports_5g=True in config file
+    supports 5G band
 
 Test preparations:
   1. Set country code to US on Android devices.
@@ -106,6 +106,12 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=True,
     )
+
+    # check device capabilities.
+    setup_utils.abort_if_5g_band_not_supported(
+        [self.discoverer, self.advertiser]
+    )
+
     setup_utils.set_flag_wifi_direct_hotspot_off(
         self.advertiser, self.current_test_info.output_path
     )
@@ -123,13 +129,6 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
         snippet_confs=[self.nearby_snippet_config],
         country_code=self.test_runtime.country_code,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
-    )
-
-  def _assert_test_conditions(self):
-    """Aborts the test class if any test condition is not met."""
-    # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=True
     )
 
   @base_test.repeat(
@@ -166,11 +165,12 @@ class LocalOnlyHotspotTest(performance_test_base.PerformanceTestBase):
       )
 
     # Check the throughput and run iperf if needed.
-    test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP,
+      )
 
     active_snippet.disconnect_endpoint()
 

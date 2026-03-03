@@ -14,8 +14,9 @@
 
 """Android Nearby device setup."""
 
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Sequence
 import datetime
+import pprint
 import re
 import time
 from typing import Any, Literal
@@ -49,7 +50,7 @@ _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
 
 WIFI_SCAN_WAIT_TIME_SEC = 5
-_WIFI_CONNECT_INTERVAL_SEC = 2
+_WIFI_CONNECT_INTERVAL_SEC = 5
 _WIFI_CONNECT_RETRY_TIMES = 3
 
 MAX_SSID_THRESHOLD = 10
@@ -64,6 +65,25 @@ NEARBY_LOG_TAGS = [
     'NearbyMediums',
     'NearbySetup',
 ]
+
+_UNKNOWN_BT_FIRMWARE_VERSION = 'unknown'
+
+_WIFI_SCAN_PATTERN = re.compile(
+    r"""
+        ([0-9a-f:]{17})  # Captures BSSID
+        \s+
+        (\d+)            # Captures Frequency
+        \s+
+        [-\d.]+          # Matches RSSI (skipped)
+        \s+
+        [\d.]+           # Matches Age (skipped)
+        \s*
+        (.*?)            # Captures SSID (non-greedy)
+        \s+
+        (\[.*\])         # Captures Flags starting with '['
+    """,
+    re.VERBOSE,
+)
 
 
 def get_betocq_device_specific_info(
@@ -102,15 +122,16 @@ def set_country_code(
   """
   if not ad.is_adb_root:
     ad.log.info(
-        f'Skipped setting wifi country code on device "{ad.serial}" '
-        'because we do not set country code on unrooted phone.'
+        'Skipped setting wifi country code on device %r '
+        'because we do not set country code on unrooted phone.',
+        ad.serial,
     )
     return
   try:
     _do_set_country_code(ad, country_code, force_telephony_cc)
   except adb.AdbError:
     ad.log.exception(
-        f'Failed to set country code on device "{ad.serial}, try again.'
+        'Failed to set country code on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
     _do_set_country_code(ad, country_code)
@@ -122,11 +143,11 @@ def _do_set_country_code(
     force_telephony_cc: bool = False,
 ) -> None:
   """Sets Wi-Fi and Telephony country code."""
-  ad.log.info(f'Set Wi-Fi country code to {country_code}.')
+  ad.log.info('Set Wi-Fi country code to %s.', country_code)
   ad.adb.shell('cmd wifi set-wifi-enabled disabled')
   time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
   if force_telephony_cc:
-    ad.log.info(f'Set Telephony country code to {country_code}.')
+    ad.log.info('Set Telephony country code to %s.', country_code)
     ad.adb.shell(
         'am broadcast -a com.android.internal.telephony.action.COUNTRY_OVERRIDE'
         f' --es country {country_code}'
@@ -140,7 +161,7 @@ def _do_set_country_code(
         .decode('utf-8')
         .strip()
     )
-    ad.log.info(f'Telephony country code: {telephony_country_code}')
+    ad.log.info('Telephony country code: %s', telephony_country_code)
 
 
 def enable_logs(ad: android_device.AndroidDevice) -> None:
@@ -182,8 +203,9 @@ def grant_manage_external_storage_permission(
     _do_grant_manage_external_storage_permission(ad, package_name)
   except adb.AdbError:
     ad.log.exception(
-        'Failed to grant MANAGE_EXTERNAL_STORAGE permission on device'
-        f' "{ad.serial}", try again.'
+        'Failed to grant MANAGE_EXTERNAL_STORAGE permission on device %r,'
+        ' try again.',
+        ad.serial,
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
     _do_grant_manage_external_storage_permission(ad, package_name)
@@ -197,7 +219,7 @@ def _do_grant_manage_external_storage_permission(
   if build_version_sdk < 30:
     return
   ad.log.info(
-      f'Grant MANAGE_EXTERNAL_STORAGE permission on device "{ad.serial}".'
+      'Grant MANAGE_EXTERNAL_STORAGE permission on device %r.', ad.serial
   )
   _grant_manage_external_storage_permission(ad, package_name)
 
@@ -231,7 +253,7 @@ def dump_gms_version(ad: android_device.AndroidDevice) -> int:
     gms_version = _do_dump_gms_version(ad)
   except adb.AdbError:
     ad.log.exception(
-        f'Failed to dump GMS version on device "{ad.serial}", try again.'
+        'Failed to dump GMS version on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
     gms_version = _do_dump_gms_version(ad)
@@ -247,7 +269,7 @@ def _do_dump_gms_version(ad: android_device.AndroidDevice) -> int:
       .decode('utf-8')
       .strip()
   )
-  ad.log.info(f'GMS version: {out}')
+  ad.log.info('GMS version: %s', out)
   prefix = 'versionCode='
   postfix = 'minSdk'
   search_last = False
@@ -276,6 +298,11 @@ def connect_to_wifi_sta_till_success(
   return datetime.datetime.now() - wifi_connect_start
 
 
+def wifi_is_enabled(ad: android_device.AndroidDevice) -> bool:
+  """Checks if wifi is enabled on the given device."""
+  return ad.nearby.wifiCheckState(nc_constants.WifiState.ENABLED)
+
+
 def connect_to_wifi(
     ad: android_device.AndroidDevice,
     ssid: str,
@@ -283,25 +310,30 @@ def connect_to_wifi(
     num_retries: int = 1,
 ) -> None:
   """Connects to the specified wifi AP and raise exception if failed."""
-  if not ad.nearby.wifiIsEnabled():
+  if not wifi_is_enabled(ad):
     ad.nearby.wifiEnable()
   # return until the wifi is connected.
-  password = password or None
-  ad.log.info('Connect to wifi: ssid: %s, password: %s', ssid, password)
+  wifi_password = password or None
+  ad.log.info('Connect to wifi: ssid: %r, password: %r', ssid, wifi_password)
   for i in range(num_retries):
     try:
-      ad.nearby.wifiConnectSimple(ssid, password)
+      ad.nearby.wifiConnectSimple(ssid, wifi_password)
       return
     except errors.ApiError:
       ad.log.warning(
-          f'Failed to connect to wifi {ssid}, retry attempt {i + 1}'
+          'Failed to connect to wifi %r, retry attempt %d', ssid, i + 1
       )
       if i < num_retries - 1:
+        # Reset wifi to make sure the wifi state is clean.
+        ad.nearby.wifiDisable()
+        ad.nearby.wifiEnable()
         time.sleep(_WIFI_CONNECT_INTERVAL_SEC)
       else:
         ad.log.error(
-            f'Still failed to connect to wifi {ssid} after'
-            f' {num_retries} attempts.', exc_info=True
+            'Still failed to connect to wifi %r after %d attempts.',
+            ssid,
+            num_retries,
+            exc_info=True,
         )
         raise
 
@@ -321,12 +353,12 @@ def remove_current_connected_wifi_network(
 
   network_id = get_sta_network_id_from_wifi_info(wifi_info)
   if network_id != nc_constants.INVALID_NETWORK_ID:
-    ad.log.info(f'disconnecting from {wifi_info.get("SSID", "")}')
+    ad.log.info('disconnecting from %r', wifi_info.get('SSID', ''))
     ad.nearby.wifiRemoveNetwork(network_id)
   else:
     ad.log.warning(
-        f'No valid network id for {wifi_info.get("SSID", "")}, try'
-        ' to remove all networks.'
+        'No valid network id for %r, try to remove all networks.',
+        wifi_info.get('SSID', ''),
     )
     remove_disconnect_wifi_network(ad)
 
@@ -358,17 +390,19 @@ def wait_for_wifi_auto_join(
   """Waits for the wifi connection after disruptive test."""
   initial_max_wait_time_sec = 6
   max_wait_time_sec = initial_max_wait_time_sec
-  wifi_is_connected = ad.nearby.isWifiConnected()
+  wifi_is_connected = ad.nearby.wifiIsConnected(wifi_ssid)
   while not wifi_is_connected and max_wait_time_sec > 0:
     time.sleep(1)
-    wifi_is_connected = ad.nearby.isWifiConnected()
+    wifi_is_connected = ad.nearby.wifiIsConnected(wifi_ssid)
     if not wifi_is_connected:
       ad.nearby.wifiConnectSimple(wifi_ssid, wifi_password)
     max_wait_time_sec -= 1
   ad.log.info(
-      f'Waiting {initial_max_wait_time_sec - max_wait_time_sec} seconds for'
+      'Waiting %d seconds for'
       ' wifi connection after disruptive test, is the wifi sta connected:'
-      f' {wifi_is_connected}'
+      ' %s',
+      initial_max_wait_time_sec - max_wait_time_sec,
+      wifi_is_connected,
   )
 
 
@@ -407,7 +441,7 @@ def enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
     _do_enable_airplane_mode(ad)
   except adb.AdbError:
     ad.log.exception(
-        f'Failed to enable airplane mode on device "{ad.serial}", try again.'
+        'Failed to enable airplane mode on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
     _do_enable_airplane_mode(ad)
@@ -437,7 +471,7 @@ def disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
     _do_disable_airplane_mode(ad)
   except adb.AdbError:
     ad.log.exception(
-        f'Failed to disable airplane mode on device "{ad.serial}", try again.'
+        'Failed to disable airplane mode on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
     _do_disable_airplane_mode(ad)
@@ -617,6 +651,14 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
     return ''
 
 
+def is_5g_band_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if 5G band is supported on the given device."""
+  try:
+    return ad.nearby.wifiIs5GHzBandSupported()
+  except adb.AdbError:
+    return False
+
+
 def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if WiFi Direct is supported on the given device."""
   try:
@@ -626,11 +668,43 @@ def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
     return False
 
 
-def check_wifi_env(ad: android_device.AndroidDevice) -> None:
+def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
+  """Parses the output of 'cmd wifi list-scan-results'.
+
+  Args:
+    scan_results: A list of strings, where each string is a line from the 'cmd
+      wifi list-scan-results' output.
+
+  Returns:
+    A list of dictionaries, where each dictionary contains the 'SSID' and
+    'Frequency' of a scanned Wi-Fi network.
+  """
+  results = []
+
+  for line in scan_results:
+    match = _WIFI_SCAN_PATTERN.search(line)
+    if match:
+      _, freq, raw_ssid, _ = match.groups()
+      # If SSID is just whitespace, it means it's hidden/empty
+      ssid = raw_ssid.strip() or nc_constants.WIFI_UNKNOWN_SSID
+      results.append({
+          'SSID': ssid,
+          'Frequency': int(freq),
+      })
+  return results
+
+
+def check_wifi_env(
+    ad: android_device.AndroidDevice,
+) -> Sequence[dict[str, Any]] | None:
   """Let WI-FI scan and get scan results. Check if the environment is clean.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    Wi-Fi scan results as a list of SSID and Frequency or None if it fails to
+    get scan results.
   """
   # Initialize the number of SSIDs found in the wifi scan.
   ad.wifi_env_ssid_count = 0
@@ -639,20 +713,25 @@ def check_wifi_env(ad: android_device.AndroidDevice) -> None:
     ad.adb.shell('cmd wifi start-scan')
     time.sleep(WIFI_SCAN_WAIT_TIME_SEC)
   except adb.AdbError:
-    ad.log.warning('Failed to start wifi scan.')
-    return
+    ad.log.warning('Failed to start wifi scan.', exc_info=True)
+    return None
 
   # List scanned result.
   try:
     wifi_scan_results = (
-        ad.adb.shell('cmd wifi list-scan-results').decode('utf-8').strip()
+        ad.adb.shell('cmd wifi list-scan-results')
+        .decode('utf-8')
+        .strip()
+        .splitlines()
     )
+    # Exclude the header from the scan results.
+    wifi_simple_results = _parse_wifi_scan(wifi_scan_results[1:])
+    ad.log.info('wifi scan results: %s', pprint.pformat(wifi_simple_results))
   except (adb.AdbError, ValueError):
-    ad.log.warning('Failed to retrieve wifi scan results.')
-    return
+    ad.log.warning('Failed to retrieve wifi scan results.', exc_info=True)
+    return None
 
-  # Subtract 1st line of results(header line) to get actual number of SSIDs.
-  num_of_ssid = len(wifi_scan_results.splitlines()) - 1
+  num_of_ssid = len(wifi_simple_results)
   # Check the number of results against the threshold.
   if num_of_ssid > MAX_SSID_THRESHOLD:
     ad.log.warning(
@@ -664,7 +743,29 @@ def check_wifi_env(ad: android_device.AndroidDevice) -> None:
 
   # Update the number of SSIDs found in the wifi scan.
   ad.wifi_env_ssid_count = num_of_ssid
-  return
+  return wifi_simple_results
+
+
+def is_valid_wifi_2g_freq(freq: int) -> bool:
+  """Checks if the frequency is a valid 2G frequency."""
+  return freq <= nc_constants.MAX_FREQ_2G_MHZ
+
+
+def is_valid_wifi_5g_freq(freq: int) -> bool:
+  """Checks if the frequency is a valid 5G frequency."""
+  return (
+      nc_constants.MAX_FREQ_2G_MHZ < freq < nc_constants.MIN_FREQ_5G_DFS_MHZ
+      or freq > nc_constants.MAX_FREQ_5G_DFS_MHZ
+  )
+
+
+def is_valid_wifi_5g_dfs_freq(freq: int) -> bool:
+  """Checks if the frequency is a valid 5G DFS frequency."""
+  return (
+      nc_constants.MIN_FREQ_5G_DFS_MHZ
+      <= freq
+      <= nc_constants.MAX_FREQ_5G_DFS_MHZ
+  )
 
 
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
@@ -794,10 +895,10 @@ def set_wifi_tdls_mode_by_adb_wl_command(
     else:
       ad.adb.shell('wl tdls_enable 0')
       ad.log.info('Stop wifi tdls through adb wl command')
-  except adb.AdbError as e:
+  except adb.AdbError:
     if not catch_exception:
       raise
-    ad.log.warning(f'Failed to set wifi tdls mode: {e}')
+    ad.log.warning('Failed to set wifi tdls mode.', exc_info=True)
     return
 
 
@@ -824,7 +925,7 @@ def set_wifi_tdls_mode_by_wifi_manager_api(
     if remote_ip_address is None:
       remote_ad.log.warning('Cannot find IP address in "cmd wifi status".')
       return
-  except (ValueError):
+  except ValueError:
     if not catch_exception:
       raise
     remote_ad.log.warning('Failed to get IP address from remote device.')
@@ -832,7 +933,7 @@ def set_wifi_tdls_mode_by_wifi_manager_api(
 
   # ad.log.info(f'Remote device IP address: {remote_ip_address}')
   ad.nearby.wifiSetTdlsEnable(remote_ip_address, enable_tdls)
-  ad.log.info(f'Set wifi tdls mode to {enable_tdls}')
+  ad.log.info('Set wifi tdls mode to %s', enable_tdls)
 
 
 def set_flags(
@@ -1018,8 +1119,8 @@ def get_thermal_zone_data(
         .decode('utf-8')
         .splitlines()
     )
-  except adb.AdbError as e:
-    ad.log.error(f'Failed to list thermal zones: {e}')
+  except adb.AdbError:
+    ad.log.exception('Failed to list thermal zones.')
     return {}
 
   for zone_name in thermal_zones:
@@ -1034,16 +1135,16 @@ def get_thermal_zone_data(
           thermal_data.append((zone_type, temp))
         else:
           ad.log.debug(
-              f'Ignoring thermal zone {zone_path} with temp {temp_str} <= 0'
+              'Ignoring thermal zone %s with temp %s <= 0', zone_path, temp_str
           )
       except ValueError:
         ad.log.debug(
-            f"Failed to parse temperature '{temp_str}' from {zone_path}"
+            'Failed to parse temperature %r from %s', temp_str, zone_path
         )
-    except adb.AdbError as e:
-      ad.log.debug(f'Failed to read thermal zone {zone_path}: {e}')
+    except adb.AdbError:
+      ad.log.debug('Failed to read thermal zone %s.', zone_path, exc_info=True)
       continue
-  ad.log.info(f'Thermal zone data: {thermal_data}')
+  ad.log.info('Thermal zone data: %s', pprint.pformat(thermal_data))
   # Return the thermal data in a dict for easier access.
   return {zone_type: temp for zone_type, temp in thermal_data}
 
@@ -1062,9 +1163,18 @@ def abort_if_on_unrooted_device(
 
 
 def abort_all_and_report_error_on_setup(
-    test: base_test.BaseTestClass,
-    error_message: str):
-  """Aborts all tests and reports as class error (asserts.abort_all in the set up is taken as 'PASS/SKIP' by default in test summary)."""
+    test: base_test.BaseTestClass, error_message: str
+):
+  """Aborts all tests and reports a class error.
+
+  This function is used in setup to ensure that test failures result in a
+  class error rather than a PASS/SKIP, which is the default behavior for
+  `asserts.abort_all` in the setup stage.
+
+  Args:
+    test: The Mobly base test class instance.
+    error_message: The message to include in the abort signal.
+  """
   test_result_record = records.TestResultRecord(
       base_test.STAGE_NAME_SETUP_CLASS,
       test.TAG,
@@ -1131,6 +1241,28 @@ def abort_if_any_5g_or_dfs_aps_not_ready(
       not test_parameters.wifi_dfs_5g_ssid,
       '5G DFS AP is not ready. This test requires both 5G and 5G DFS APs.',
   )
+
+
+def abort_if_5g_band_not_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Skips test class if any device does not support 5G band."""
+  for ad in ads:
+    asserts.abort_class_if(
+        not is_5g_band_supported(ad),
+        f'5G band is not supported on the device {ad}, skip the whole test.',
+    )
+
+
+def abort_if_5g_band_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Aborts test class if any device supports 5G band."""
+  for ad in ads:
+    asserts.abort_class_if(
+        is_5g_band_supported(ad),
+        f'5G band is supported on the device {ad}, skip the whole test.',
+    )
 
 
 def abort_if_wifi_direct_not_supported(
@@ -1236,8 +1368,9 @@ def is_gms_version_above_required_version(
   gms_version = dump_gms_version(ad)
   if gms_version is None:
     ad.log.warning(
-        'Failed to get GMS version on device "%s", assuming it is below the'
-        ' required version.', ad.serial
+        'Failed to get GMS version on device %r, assuming it is below the'
+        ' required version.',
+        ad.serial,
     )
     return False
   return int(gms_version) >= required_version
@@ -1247,6 +1380,192 @@ def is_nc_wlan_file_transfer_flaky_issue_fixed(
     advertiser: android_device.AndroidDevice,
 ) -> bool:
   """Checks if the nearby connection WLAN file transfer flaky issue is fixed, see (internal)."""
-  return is_gms_version_above_required_version(
-      advertiser, 260200000
-  )
+  return is_gms_version_above_required_version(advertiser, 260200000)
+
+
+def clear_all_accessibility_services(
+    ad: android_device.AndroidDevice,
+) -> None:
+  """Clears accessibility services on the given device."""
+  if not ad.is_adb_root:
+    ad.log.warning(
+        'Skipped clearing accessibility services on unrooted device. Your'
+        ' test might fail because accessibility services were enabled by'
+        ' others.'
+    )
+    return
+  try:
+    ad.adb.shell('settings delete secure enabled_accessibility_services')
+  except adb.AdbError:
+    ad.log.warning(
+        'Failed to clear accessibility services on device %r.',
+        ad.serial,
+    )
+
+
+def get_wifi_concurrency_mode(
+    p2p_frequency: int,
+    sta_frequency: int,
+    is_dbs_mode_mattered: bool = False,
+    dbs_wfd_status: nc_constants.WifiDbsWfdStatus = nc_constants.WifiDbsWfdStatus.UNKNOWN,
+) -> nc_constants.WifiConcurrencyMode:
+  """Gets the wifi concurrency mode of the device."""
+  if (
+      p2p_frequency == nc_constants.INVALID_INT
+      or sta_frequency == nc_constants.INVALID_INT
+  ):
+    return nc_constants.WifiConcurrencyMode.UNKNOWN
+
+  is_p2p_2g = p2p_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+  is_sta_2g = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+
+  if p2p_frequency == sta_frequency:
+    if is_p2p_2g:
+      return nc_constants.WifiConcurrencyMode.SCC_2G
+    else:
+      return nc_constants.WifiConcurrencyMode.SCC_5G
+
+  if is_dbs_mode_mattered:
+    if dbs_wfd_status == nc_constants.WifiDbsWfdStatus.DBS_WFD_ENABLED:
+      if is_p2p_2g:
+        return nc_constants.WifiConcurrencyMode.SCC_2G
+      else:
+        return nc_constants.WifiConcurrencyMode.SCC_5G
+    elif dbs_wfd_status == nc_constants.WifiDbsWfdStatus.DBS_WFD_DISABLED:
+      if is_p2p_2g and not is_sta_2g:
+        return nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+      elif not is_p2p_2g and is_sta_2g:
+        return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+      elif not is_p2p_2g and not is_sta_2g:
+        return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+      else:  # both 2g but different freq
+        return nc_constants.WifiConcurrencyMode.UNKNOWN
+    else:  # UNKNOWN dbs status
+      return nc_constants.WifiConcurrencyMode.UNKNOWN
+
+  # if is_dbs_mode_mattered=False, then calculate MCC based on band
+  if is_p2p_2g and not is_sta_2g:
+    return nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+  elif not is_p2p_2g and is_sta_2g:
+    return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+  elif not is_p2p_2g and not is_sta_2g:
+    return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+  else:  # both 2g but different freq
+    return nc_constants.WifiConcurrencyMode.UNKNOWN
+
+
+def get_wifi_firmware_version(
+    ad: android_device.AndroidDevice,
+) -> str:
+  """Gets the Wi-Fi firmware version on the given device."""
+  try:
+    version = ad.adb.getprop('vendor.wlan.firmware.version')
+  except (adb.AdbError):
+    ad.log.warning(
+        'Failed to get Wi-Fi firmware version on device %r.',
+        ad.serial,
+        exc_info=True,
+    )
+    return 'adb error'
+  return version
+
+
+def get_bt_firmware_version(
+    ad: android_device.AndroidDevice,
+) -> str:
+  """Gets the BT firmware version on the given device."""
+  try:
+    bt_dumpsys_output = (
+        ad.adb.shell(
+            'dumpsys android.hardware.bluetooth.IBluetoothHci/default'
+        )
+        .strip()
+        .decode('utf-8')
+    )
+  except (adb.AdbError, ValueError):
+    ad.log.warning(
+        'Failed to get BT firmware version on device %r.',
+        ad.serial,
+        exc_info=True,
+    )
+    return _UNKNOWN_BT_FIRMWARE_VERSION
+
+  if not bt_dumpsys_output:
+    ad.log.warning(
+        'BT IBluetoothHci dumpsys output is empty on device %r.',
+        ad.serial,
+    )
+    return _UNKNOWN_BT_FIRMWARE_VERSION
+
+  try:
+    version = _extract_bt_firmware_version(ad, bt_dumpsys_output)
+  except (TypeError, ValueError):
+    ad.log.warning(
+        'Failed to extract BT firmware version on device %r.',
+        ad.serial,
+        exc_info=True,
+    )
+    return _UNKNOWN_BT_FIRMWARE_VERSION
+  return version
+
+
+def _extract_bt_firmware_version(
+    ad: android_device.AndroidDevice,
+    bt_dumpsys_output: str) -> str:
+  """Extracts Bluetooth controller firmware version from dumpsys output.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+    bt_dumpsys_output: A string containing the output from the dumpsys
+      BT command.
+
+  Returns:
+      A string containing the firmware version, or None if not found.
+  """
+  lines = bt_dumpsys_output.splitlines()
+  header_keywords = [
+      'Firmware Version',
+      'Firmware Information',
+      'Firmware Info',
+      'Firmware Ver',
+      'FW Version',
+      'FW Information',
+      'FW Info',
+      'FW Ver',
+  ]
+
+  for i, line in enumerate(lines):
+    line_lower = line.lower()
+    for lower_keyword in [keyword.lower() for keyword in header_keywords]:
+      if lower_keyword in line_lower:
+        # The firmware version is expected on the next non-empty line
+        # after the header and its separator line.
+        for j in range(i + 1, len(lines)):
+          next_line = lines[j].strip()
+          if not next_line:  # Skip empty lines
+            continue
+
+          # Skip separator lines
+          if (
+              '====' in next_line
+              or '----' in next_line
+              or '****' in next_line
+              or '════' in next_line
+              or next_line.startswith('╠══')
+          ):
+            ad.log.info('Skip separator line: %s', next_line)
+            continue
+
+          # Attempt to extract the version string
+          # Remove potential leading characters like '║' and extra spaces
+          match = re.search(r'^(?:║\s*)?(?P<version>.+)$', next_line)
+          if match:
+            version = match.group('version').strip()
+            ad.log.info('version: %s', version)
+            # Basic check to ensure it looks like a version string
+            if ('FW' in version or 'Firmware' in version or
+                re.search(r'[0-9a-fA-F]{6,}', version)):
+              return version
+          break  # Stop searching after checking the line(s) below the header
+        break  # Move to the next line in the dumpsys output
+  return _UNKNOWN_BT_FIRMWARE_VERSION

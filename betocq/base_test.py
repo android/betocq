@@ -15,6 +15,7 @@
 """Mobly base test class of all BeToCQ tests."""
 
 import logging
+import sys
 
 import os
 import traceback
@@ -32,12 +33,6 @@ import yaml
 from betocq import ap_utils
 from betocq import nc_constants
 from betocq import setup_utils
-
-NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
-NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
-NEARBY_SNIPPET_3P_PACKAGE_NAME = (
-    'com.google.android.nearby.mobly.snippet.thirdparty'
-)
 
 # TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
@@ -84,6 +79,10 @@ class BaseTestClass(base_test.BaseTestClass):
     self.is_using_gms_api = True
 
   def setup_class(self) -> None:
+    if sys.version_info < (3, 12):
+      setup_utils.abort_all_and_report_error_on_setup(
+          self, 'Python 3.12 or higher is required for this test.'
+      )
     if (
         not self.test_parameters.use_programmable_ap
         and self.test_parameters.abort_all_if_any_ap_not_ready
@@ -126,6 +125,10 @@ class BaseTestClass(base_test.BaseTestClass):
           'The result may not be expected.'
       )
       self.advertiser, self.discoverer = self.ads
+    # use the wifi chipset model from the test parameters if it is not empty.
+    if self.test_parameters.wifi_chipset_model:
+      self.advertiser.wifi_chipset = self.test_parameters.wifi_chipset_model
+      self.discoverer.wifi_chipset = self.test_parameters.wifi_chipset_model
     self.advertiser.debug_tag = '{serial}({model})'.format(
         serial=self.advertiser.serial,
         model=self.advertiser.adb.getprop('ro.product.model'),
@@ -156,16 +159,22 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def _assert_general_nc_test_conditions(self):
     if not self.test_parameters.allow_unrooted_device:
-      logging.info('The test is not allowed to run on unrooted device.')
       if not self.advertiser.is_adb_root or not self.discoverer.is_adb_root:
         logging.warning('The test is aborted because the device is unrooted.')
         setup_utils.abort_all_and_report_error_on_setup(
             self, 'The test only can run on rooted device.'
         )
-    if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
-      setup_utils.abort_all_and_report_error_on_setup(
-          self, 'wifi_chipset is empty in the config file'
+    else:
+      logging.warning(
+          'The test is running on unrooted device; most of tests may be'
+          ' skipped.'
       )
+    if self.test_parameters.is_wifi_chipset_model_mandatory:
+      if not self.test_parameters.wifi_chipset_model:
+        if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
+          setup_utils.abort_all_and_report_error_on_setup(
+              self, 'wifi_chipset is empty in the config file'
+          )
 
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
@@ -231,7 +240,7 @@ class BaseTestClass(base_test.BaseTestClass):
       )
       return
 
-    wifi_channel = nc_constants.get_wifi_channel(d2d_type)
+    wifi_channel = nc_constants.get_wifi_channel_for_programmable_ap(d2d_type)
     if self.test_parameters.use_programmable_ap:
       self._setup_programmable_ap(wifi_channel, country_code)
 
@@ -419,7 +428,7 @@ class BaseTestClass(base_test.BaseTestClass):
     if 'suite_name' in self.user_params:
       suite_name_items.append(self.user_params['suite_name'])
     if 'suite_version' in self.user_params:
-      suite_name_items.append(f'v{self.user_params['suite_version']}')
+      suite_name_items.append(f'v{self.user_params["suite_version"]}')
     suite_name_items.append(self.test_parameters.target_cuj_name)
     suite_name = '-'.join(suite_name_items)
     run_identifier_items = [

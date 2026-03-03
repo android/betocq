@@ -21,7 +21,7 @@ channel.
 
 Test requirements:
   The device requirements:
-    supports_5g=False in config file
+    support 2G band only
     support Wi-Fi Direct
   The AP requirements:
     wifi channel: 6 (2437)
@@ -124,6 +124,9 @@ class Scc2gAllWifiStaTest(performance_test_base.PerformanceTestBase):
         raise_on_exception=True,
     )
 
+    # Check device capabilities.
+    setup_utils.abort_if_5g_band_supported([self.discoverer, self.advertiser])
+
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
@@ -137,10 +140,6 @@ class Scc2gAllWifiStaTest(performance_test_base.PerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_2g_ap_not_ready(self.test_parameters)
-    # Check device capabilities.
-    setup_utils.abort_if_device_cap_not_match(
-        [self.discoverer, self.advertiser], 'supports_5g', expected_value=False
-    )
 
   @base_test.repeat(
       count=TEST_ITERATION_NUM,
@@ -240,15 +239,15 @@ class Scc2gAllWifiStaTest(performance_test_base.PerformanceTestBase):
                 upgraded_medium_name=upgraded_medium_name
             ),
         )
-
-    test_result_utils.assert_2g_wifi_throughput_and_run_iperf_if_needed(
-        test_result=self.current_test_result,
-        nc_test_runtime=self.test_runtime,
-        low_throughput_tip=_THROUGHPUT_LOW_TIP.format(
-            upgraded_medium_name=upgraded_medium_name
-        ),
-        did_nc_file_transfer=do_file_transfer,
-    )
+    if not self.test_parameters.skip_throughput_assertion:
+      test_result_utils.assert_2g_wifi_throughput_and_run_iperf_if_needed(
+          test_result=self.current_test_result,
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=_THROUGHPUT_LOW_TIP.format(
+              upgraded_medium_name=upgraded_medium_name
+          ),
+          did_nc_file_transfer=do_file_transfer,
+      )
 
     prior_bt_snippet.disconnect_endpoint()
     active_snippet.disconnect_endpoint()

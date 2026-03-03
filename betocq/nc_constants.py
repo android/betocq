@@ -43,21 +43,25 @@ BT_COEX_PERFORMANCE_TEST_COUNT = 100
 BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 LOHS_PERFORMANCE_TEST_COUNT = 100
 LOHS_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
+WIFI_AWARE_SCC_PERFORMANCE_TEST_COUNT = 10
 
-CHANNEL_2G = 6
-CHANNEL_5G = 36
-CHANNEL_5G_DFS = 52
+PROGRAMMABLE_AP_CHANNEL_2G = 6
+PROGRAMMABLE_AP_CHANNEL_5G = 36
+PROGRAMMABLE_AP_CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
 WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=6)
 TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC = 10
 WIFI_AWARE_AVAILABLE_WAIT_TIME = datetime.timedelta(seconds=10)
+WIFI_AWARE_AFTER_CONNECTION_START_THROUGHPUT_WAIT_TIME_SEC = datetime.timedelta(
+    seconds=60
+)
 
 FIRST_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=35)
 BT_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
-BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
+BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=35)
 BLE_20K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 BLE_100K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 SECOND_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=35)
@@ -65,7 +69,7 @@ SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
 WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
-WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=40)
+WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=60)
 WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=250)
@@ -117,6 +121,12 @@ TRANSFER_FILE_SIZE_1KB = 1  # kB
 TRANSFER_FILE_SIZE_20KB = 20  # kB
 TRANSFER_FILE_SIZE_10KB = 10  # kB
 TRANSFER_FILE_SIZE_100KB = 100  # kB
+NC_MCC_2G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
+NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB = 120 * 1024  # kB
+NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 120 * 1024  # kB
+NC_SCC_2G_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
+NC_SCC_5G_TRANSFER_FILE_SIZE_KB = 500 * 1024  # kB
+
 
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
@@ -172,6 +182,10 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
+  skip_throughput_assertion: bool = False
+  is_wifi_chipset_model_mandatory: bool = True
+  # The model of the wifi chipset used by both devices under test.
+  wifi_chipset_model: str = ''
   # check if the test is running in debug mode.
   debug_mode: bool = False
 
@@ -203,10 +217,24 @@ class TestParameters:
     if test_parameters.target_cuj_name == TARGET_CUJ_QUICK_START:
       test_parameters.requires_bt_multiplex = True
 
+    if test_parameters.target_cuj_name == TARGET_CUJ_AQT:
+      test_parameters.skip_throughput_assertion = True
+      test_parameters.is_wifi_chipset_model_mandatory = False
+
     if test_parameters.debug_mode:
       test_parameters.skip_bug_report = False
 
     return test_parameters
+
+
+# Refer to WifiManager#WifiState
+@enum.unique
+class WifiState(enum.IntEnum):
+  DISABLING = 0
+  DISABLED = 1
+  ENABLING = 2
+  ENABLED = 3
+  UNKNOWN = 4
 
 
 @enum.unique
@@ -329,6 +357,30 @@ class WifiD2DType(enum.IntEnum):
   LOCAL_ONLY_HOTSPOT = 11
   # Connected to the same 2G STA and upgrading to 5G Aware.
   SCC_5G_AWARE_DBS_2G_STA = 12
+  # concurrency mode is not decided; detected on run time, see the
+  # WifiConcurrencyMode enum for details.
+  XCC_2G_STA = 13
+  XCC_5G_STA = 14
+  XCC_5G_DFS_STA = 15
+
+
+@enum.unique
+class WifiConcurrencyMode(enum.IntEnum):
+  """The enum for WiFi concurrency mode."""
+  UNKNOWN = 0
+  SCC_2G = 1
+  SCC_5G = 2
+  MCC_2G_P2P_5G_STA = 3
+  MCC_5G_P2P_2G_STA = 4
+  MCC_5G_P2P_5G_STA = 5
+
+
+@enum.unique
+class WifiDbsWfdStatus(enum.IntEnum):
+  """The enum for WiFi DBS for WFD mode."""
+  UNKNOWN = 0
+  DBS_WFD_ENABLED = 1
+  DBS_WFD_DISABLED = 2
 
 
 def is_upgrading_to_wifi_of_any_freq(d2d_type: WifiD2DType) -> bool:
@@ -336,6 +388,46 @@ def is_upgrading_to_wifi_of_any_freq(d2d_type: WifiD2DType) -> bool:
   return d2d_type in {
       WifiD2DType.ANY_WFD_2G_STA,
   }
+
+
+def is_xcc_test(d2d_type: WifiD2DType) -> bool:
+  """Returns True if this is an XCC test."""
+  return d2d_type in _WIFI_D2D_TYPES_XCC
+
+
+_WIFI_D2D_TYPES_XCC = (
+    WifiD2DType.XCC_2G_STA,
+    WifiD2DType.XCC_5G_STA,
+    WifiD2DType.XCC_5G_DFS_STA,
+)
+
+
+def get_wifi_concurrency_mode_from_d2d_type(
+    d2d_type: WifiD2DType,
+) -> WifiConcurrencyMode:
+  """Returns the wifi concurrency mode from the D2D type."""
+  match d2d_type:
+    case WifiD2DType.SCC_2G:
+      return WifiConcurrencyMode.SCC_2G
+    case (
+        WifiD2DType.SCC_5G
+        | WifiD2DType.SCC_5G_DFS
+        | WifiD2DType.SCC_5G_WFD_DBS_2G_STA
+        | WifiD2DType.SCC_5G_AWARE_DBS_2G_STA
+    ):
+      return WifiConcurrencyMode.SCC_5G
+    case WifiD2DType.MCC_2G_WFD_5G_STA | WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA:
+      return WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+    case WifiD2DType.MCC_5G_WFD_2G_STA:
+      return WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+    case (
+        WifiD2DType.MCC_5G_WFD_5G_DFS_STA
+        | WifiD2DType.MCC_5G_HS_5G_DFS_STA
+        | WifiD2DType.MCC_5G_AND_5G_DFS_STA
+    ):
+      return WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+    case _:
+      return WifiConcurrencyMode.UNKNOWN
 
 
 _WIFI_D2D_TYPES_MCC = (
@@ -361,6 +453,7 @@ _WIFI_D2D_TYPES_2G_STA = (
     WifiD2DType.MCC_5G_WFD_2G_STA,
     WifiD2DType.ANY_WFD_2G_STA,
     WifiD2DType.SCC_5G_AWARE_DBS_2G_STA,
+    WifiD2DType.XCC_2G_STA,
 )
 
 
@@ -368,6 +461,7 @@ _WIFI_D2D_TYPES_5G_STA = (
     WifiD2DType.SCC_5G,
     WifiD2DType.MCC_2G_WFD_5G_STA,
     WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
+    WifiD2DType.XCC_5G_STA,
 )
 
 
@@ -375,17 +469,18 @@ _WIFI_D2D_TYPES_DFS_5G_STA = (
     WifiD2DType.SCC_5G_DFS,
     WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
     WifiD2DType.MCC_5G_HS_5G_DFS_STA,
+    WifiD2DType.XCC_5G_DFS_STA,
 )
 
 
-def get_wifi_channel(d2d_type: WifiD2DType) -> int:
+def get_wifi_channel_for_programmable_ap(d2d_type: WifiD2DType) -> int:
   """Gets the WiFi channel for the given D2D type."""
   if d2d_type in _WIFI_D2D_TYPES_2G_STA:
-    return CHANNEL_2G
+    return PROGRAMMABLE_AP_CHANNEL_2G
   elif d2d_type in _WIFI_D2D_TYPES_5G_STA:
-    return CHANNEL_5G
+    return PROGRAMMABLE_AP_CHANNEL_5G
   elif d2d_type in _WIFI_D2D_TYPES_DFS_5G_STA:
-    return CHANNEL_5G_DFS
+    return PROGRAMMABLE_AP_CHANNEL_5G_DFS
   else:
     raise ValueError(f'Unsupported WifiD2DType: {d2d_type}')
 
@@ -427,6 +522,7 @@ class SingleTestFailureReason(enum.IntEnum):
   DEVICE_CONFIG_ERROR = 14
   SUCCESS = 15
   SKIPPED = 16
+  INVALID_WIFI_CONCURRENCY_MODE = 17
 
 
 COMMON_WIFI_CONNECTION_FAILURE_REASONS = (
@@ -497,6 +593,10 @@ COMMON_TRIAGE_TIP: dict[SingleTestFailureReason, str] = {
         'Check if device capabilities are set correctly in the config file.'
     ),
     SingleTestFailureReason.SKIPPED: 'Skipped.',
+    SingleTestFailureReason.INVALID_WIFI_CONCURRENCY_MODE: (
+        'The wifi concurrency mode is not expected. see the failure message'
+        ' for details.'
+    ),
 }
 
 COMMON_WFD_UPGRADE_FAILURE_REASONS = '\n'.join([
