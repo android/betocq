@@ -1,4 +1,10 @@
 # BetoCQ test suite release history
+## 2.6.1 (03/03/2026)
+## New
+* Add XCC test cases for AQT which have no dependency on the  hardware
+  capabilitiy.
+* Update the snippet SDK target version to 35.
+* Use internal WifiManagerSnippet to access WifiManager APIs
 
 ## 2.6.0 (01/08/2026)
 

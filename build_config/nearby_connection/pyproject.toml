@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "betocq"
-version = "2.6.0"
+version = "2.6.1"
 description = "Better Together Connectivity Quality test suite."
 readme = "README.md"
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 dependencies = [
   "mobly==1.13",
   "mobly-android-partner-tools",
