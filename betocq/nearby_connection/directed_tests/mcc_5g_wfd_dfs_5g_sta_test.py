@@ -76,7 +76,7 @@ _FILE_TRANSFER_SIZE_KB = (
 _FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = nc_constants.PayloadType.FILE
 
-_COUNTRY_CODE = 'GB'
+_COUNTRY_CODE = 'US'
 
 _THROUGHPUT_LOW_TIP = (
     'This is a MCC test case where WFD uses a 5G non-DFS channel and STA uses a'
