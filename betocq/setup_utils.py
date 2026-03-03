@@ -66,6 +66,8 @@ NEARBY_LOG_TAGS = [
     'NearbySetup',
 ]
 
+_UNKNOWN_BT_FIRMWARE_VERSION = 'unknown'
+
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
         ([0-9a-f:]{17})  # Captures BSSID
@@ -1163,7 +1165,16 @@ def abort_if_on_unrooted_device(
 def abort_all_and_report_error_on_setup(
     test: base_test.BaseTestClass, error_message: str
 ):
-  """Aborts all tests and reports as class error (asserts.abort_all in the set up is taken as 'PASS/SKIP' by default in test summary)."""
+  """Aborts all tests and reports a class error.
+
+  This function is used in setup to ensure that test failures result in a
+  class error rather than a PASS/SKIP, which is the default behavior for
+  `asserts.abort_all` in the setup stage.
+
+  Args:
+    test: The Mobly base test class instance.
+    error_message: The message to include in the abort signal.
+  """
   test_result_record = records.TestResultRecord(
       base_test.STAGE_NAME_SETUP_CLASS,
       test.TAG,
@@ -1383,7 +1394,13 @@ def clear_all_accessibility_services(
         ' others.'
     )
     return
-  ad.adb.shell('settings delete secure enabled_accessibility_services')
+  try:
+    ad.adb.shell('settings delete secure enabled_accessibility_services')
+  except adb.AdbError:
+    ad.log.warning(
+        'Failed to clear accessibility services on device %r.',
+        ad.serial,
+    )
 
 
 def get_wifi_concurrency_mode(
@@ -1435,3 +1452,120 @@ def get_wifi_concurrency_mode(
     return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
   else:  # both 2g but different freq
     return nc_constants.WifiConcurrencyMode.UNKNOWN
+
+
+def get_wifi_firmware_version(
+    ad: android_device.AndroidDevice,
+) -> str:
+  """Gets the Wi-Fi firmware version on the given device."""
+  try:
+    version = ad.adb.getprop('vendor.wlan.firmware.version')
+  except (adb.AdbError):
+    ad.log.warning(
+        'Failed to get Wi-Fi firmware version on device %r.',
+        ad.serial,
+        exc_info=True,
+    )
+    return 'adb error'
+  return version
+
+
+def get_bt_firmware_version(
+    ad: android_device.AndroidDevice,
+) -> str:
+  """Gets the BT firmware version on the given device."""
+  try:
+    bt_dumpsys_output = (
+        ad.adb.shell(
+            'dumpsys android.hardware.bluetooth.IBluetoothHci/default'
+        )
+        .strip()
+        .decode('utf-8')
+    )
+  except (adb.AdbError, ValueError):
+    ad.log.warning(
+        'Failed to get BT firmware version on device %r.',
+        ad.serial,
+        exc_info=True,
+    )
+    return _UNKNOWN_BT_FIRMWARE_VERSION
+
+  if not bt_dumpsys_output:
+    ad.log.warning(
+        'BT IBluetoothHci dumpsys output is empty on device %r.',
+        ad.serial,
+    )
+    return _UNKNOWN_BT_FIRMWARE_VERSION
+
+  try:
+    version = _extract_bt_firmware_version(ad, bt_dumpsys_output)
+  except (TypeError, ValueError):
+    ad.log.warning(
+        'Failed to extract BT firmware version on device %r.',
+        ad.serial,
+        exc_info=True,
+    )
+    return _UNKNOWN_BT_FIRMWARE_VERSION
+  return version
+
+
+def _extract_bt_firmware_version(
+    ad: android_device.AndroidDevice,
+    bt_dumpsys_output: str) -> str:
+  """Extracts Bluetooth controller firmware version from dumpsys output.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+    bt_dumpsys_output: A string containing the output from the dumpsys
+      BT command.
+
+  Returns:
+      A string containing the firmware version, or None if not found.
+  """
+  lines = bt_dumpsys_output.splitlines()
+  header_keywords = [
+      'Firmware Version',
+      'Firmware Information',
+      'Firmware Info',
+      'Firmware Ver',
+      'FW Version',
+      'FW Information',
+      'FW Info',
+      'FW Ver',
+  ]
+
+  for i, line in enumerate(lines):
+    line_lower = line.lower()
+    for lower_keyword in [keyword.lower() for keyword in header_keywords]:
+      if lower_keyword in line_lower:
+        # The firmware version is expected on the next non-empty line
+        # after the header and its separator line.
+        for j in range(i + 1, len(lines)):
+          next_line = lines[j].strip()
+          if not next_line:  # Skip empty lines
+            continue
+
+          # Skip separator lines
+          if (
+              '====' in next_line
+              or '----' in next_line
+              or '****' in next_line
+              or '════' in next_line
+              or next_line.startswith('╠══')
+          ):
+            ad.log.info('Skip separator line: %s', next_line)
+            continue
+
+          # Attempt to extract the version string
+          # Remove potential leading characters like '║' and extra spaces
+          match = re.search(r'^(?:║\s*)?(?P<version>.+)$', next_line)
+          if match:
+            version = match.group('version').strip()
+            ad.log.info('version: %s', version)
+            # Basic check to ensure it looks like a version string
+            if ('FW' in version or 'Firmware' in version or
+                re.search(r'[0-9a-fA-F]{6,}', version)):
+              return version
+          break  # Stop searching after checking the line(s) below the header
+        break  # Move to the next line in the dumpsys output
+  return _UNKNOWN_BT_FIRMWARE_VERSION

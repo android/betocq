@@ -660,6 +660,15 @@ def assert_nc_throughput_meets_target(
 
 
 def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
+  """Gets device attributes for debugging."""
+  if hasattr(ad, 'wifi_fw'):
+    wifi_fw = ad.wifi_fw
+  else:
+    wifi_fw = setup_utils.get_wifi_firmware_version(ad)
+  if hasattr(ad, 'bt_fw'):
+    bt_fw = ad.bt_fw
+  else:
+    bt_fw = setup_utils.get_bt_firmware_version(ad)
   return '\n'.join([
       f'serial: {getattr(ad, "serial", "NA")}',
       f'model: {getattr(ad, "model", "NA")}',
@@ -667,7 +676,8 @@ def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
       f'build_info: {getattr(ad, "build_info", "NA")}',
       f'gms_version: {setup_utils.dump_gms_version(ad)}',
       f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
-      f'wifi_fw: {ad.adb.getprop("vendor.wlan.firmware.version")}',
+      f'wifi_fw: {wifi_fw}',
+      f'bt_fw: {bt_fw}',
       f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
       f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
       (
