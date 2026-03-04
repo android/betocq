@@ -661,14 +661,14 @@ def assert_nc_throughput_meets_target(
 
 def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
   """Gets device attributes for debugging."""
-  if hasattr(ad, 'wifi_fw'):
-    wifi_fw = ad.wifi_fw
-  else:
+  device_specific_info = setup_utils.get_betocq_device_specific_info(ad)
+  wifi_fw = device_specific_info.get('wifi_fw', '')
+  if not wifi_fw:
     wifi_fw = setup_utils.get_wifi_firmware_version(ad)
-  if hasattr(ad, 'bt_fw'):
-    bt_fw = ad.bt_fw
-  else:
+  bt_fw = device_specific_info.get('bt_fw', '')
+  if not bt_fw:
     bt_fw = setup_utils.get_bt_firmware_version(ad)
+
   return '\n'.join([
       f'serial: {getattr(ad, "serial", "NA")}',
       f'model: {getattr(ad, "model", "NA")}',
