@@ -1,17 +1,23 @@
 x-test-params: &test-params
   # for 2G wifi SSID - e.g. channel 6 (frequency 2437), comment out if it is not available.
-  wifi_2g_ssid: "AP2437"
-  wifi_2g_password: "AP2437"
+  wifi_2g_ssid: "betocq-2g-ap"
+  wifi_2g_password: "betocq-2g-ap"
   # for 5G wifi SSID - e.g. channel 36 (frequency 5180), comment out if it is not available.
-  wifi_5g_ssid: "AP5180"
-  wifi_5g_password: "AP5180"
+  wifi_5g_ssid: "betocq-5g-ap"
+  wifi_5g_password: "betocq-5g-ap"
   # for DFS 5G wifi SSID - e.g. channel 52 (frequency 5260) or channel 112 (frequency 5560),
   # comment out if it is not available.
-  wifi_dfs_5g_ssid: "AP5260"
-  wifi_dfs_5g_password: "AP5260"
+  wifi_dfs_5g_ssid: "betocq-5g-dfs-ap"
+  wifi_dfs_5g_password: "betocq-5g-dfs-ap"
   allow_unrooted_device: False
   skip_bug_report: False
   debug_mode: False
+x-any-device-controllers: &non_specified_controllers
+# Use this controller carefully, it is only for the case of 'Aqt' testbed.
+# It supposes the devices are with the same models.
+# For other test beds, please use the specified controllers.
+  Controllers:
+    AndroidDevice: '*'
 x-controllers: &controllers
   Controllers:
     AndroidDevice:
@@ -25,14 +31,12 @@ x-controllers: &controllers
         max_phy_rate_5g_mbps: 2402
         # The max PHY rate at 2G, in Mbps
         max_phy_rate_2g_mbps: 287
-        # if the device supports 5G Wifi
-        supports_5g: True
         # if the device supports DBS (Dual Band Simultaneous) in STA + WiFi-Direct concurrency mode
         supports_dbs_sta_wfd: True
         # The max number of spatial streams in DBS mode.
         max_num_streams_dbs: 2
         # if the device supports to start WFD group owner at a STA-associated DFS channel
-        enable_sta_dfs_channel_for_peer_network: False
+        enable_sta_dfs_channel_for_peer_network: True
         # if the device supports to start WFD group owner at a STA-associated indoor channel
         enable_sta_indoor_channel_for_peer_network: False
       - serial: "35081FDJG000FC"
@@ -45,14 +49,12 @@ x-controllers: &controllers
         max_phy_rate_5g_mbps: 2402
         # The max PHY rate at 2G, in Mbps
         max_phy_rate_2g_mbps: 287
-        # if the device supports 5G Wifi
-        supports_5g: True
         # if the device supports DBS (Dual Band Simultaneous) in STA + WiFi-Direct concurrency mode
         supports_dbs_sta_wfd: True
         # The max number of spatial streams in DBS mode.
         max_num_streams_dbs: 2
         # if the device supports to start WFD group owner at a STA-associated DFS channel
-        enable_sta_dfs_channel_for_peer_network: False
+        enable_sta_dfs_channel_for_peer_network: True
         # if the device supports to start WFD group owner at a STA-associated indoor channel
         enable_sta_indoor_channel_for_peer_network: False
 TestBeds:
@@ -62,7 +64,7 @@ TestBeds:
       <<: *test-params
 - Name: Aqt
   # Don't change the following parameters, otherwise the test may fail.
-  <<: *controllers
+  <<: *non_specified_controllers
   TestParams:
       <<: *test-params
       target_cuj_name: "aqt"
@@ -73,7 +75,7 @@ TestBeds:
 - Name: AqtDebug
   # Don't change the following parameters, otherwise the test may fail.
   # This testbed is for debugging purpose only.
-  <<: *controllers
+  <<: *non_specified_controllers
   TestParams:
       <<: *test-params
       target_cuj_name: "aqt"
