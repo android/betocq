@@ -889,8 +889,9 @@ def gen_basic_test_summary(
       'target_gms_version': f'{setup_utils.dump_gms_version(advertiser)}',
       'target_wifi_chipset': f'{getattr(advertiser, "wifi_chipset", "NA")}',
   })
-  if hasattr(advertiser, 'wifi_env_ssid_count'):
-    basic_test_summary['wifi_ap_number'] = f'{advertiser.wifi_env_ssid_count}'
+  device_specific_info = setup_utils.get_betocq_device_specific_info(advertiser)
+  if wifi_env_bssid_count := device_specific_info.get('wifi_env_bssid_count'):
+    basic_test_summary['wifi_ap_number'] = f'{wifi_env_bssid_count}'
   return basic_test_summary
 
 

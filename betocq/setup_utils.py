@@ -53,7 +53,7 @@ WIFI_SCAN_WAIT_TIME_SEC = 5
 _WIFI_CONNECT_INTERVAL_SEC = 5
 _WIFI_CONNECT_RETRY_TIMES = 3
 
-MAX_SSID_THRESHOLD = 10
+_CLEAN_WIFI_ENV_CHECK_BSSID_THRESHOLD = 5
 
 read_ph_flag_failed = False
 
@@ -684,10 +684,11 @@ def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
   for line in scan_results:
     match = _WIFI_SCAN_PATTERN.search(line)
     if match:
-      _, freq, raw_ssid, _ = match.groups()
+      bssid, freq, raw_ssid, _ = match.groups()
       # If SSID is just whitespace, it means it's hidden/empty
       ssid = raw_ssid.strip() or nc_constants.WIFI_UNKNOWN_SSID
       results.append({
+          'BSSID': bssid,
           'SSID': ssid,
           'Frequency': int(freq),
       })
@@ -706,8 +707,9 @@ def check_wifi_env(
     Wi-Fi scan results as a list of SSID and Frequency or None if it fails to
     get scan results.
   """
-  # Initialize the number of SSIDs found in the wifi scan.
-  ad.wifi_env_ssid_count = 0
+  # Initialize the number of BSSIDs found in the wifi scan.
+  device_specific_info = get_betocq_device_specific_info(ad)
+  device_specific_info['wifi_env_bssid_count'] = 0
   # Start wifi scan.
   try:
     ad.adb.shell('cmd wifi start-scan')
@@ -726,23 +728,28 @@ def check_wifi_env(
     )
     # Exclude the header from the scan results.
     wifi_simple_results = _parse_wifi_scan(wifi_scan_results[1:])
-    ad.log.info('wifi scan results: %s', pprint.pformat(wifi_simple_results))
+    ad.log.info(
+        'wifi scan results:\n%s',
+        pprint.pformat(wifi_simple_results, sort_dicts=False),
+    )
   except (adb.AdbError, ValueError):
     ad.log.warning('Failed to retrieve wifi scan results.', exc_info=True)
     return None
 
-  num_of_ssid = len(wifi_simple_results)
+  num_of_bssid = len(wifi_simple_results)
   # Check the number of results against the threshold.
-  if num_of_ssid > MAX_SSID_THRESHOLD:
+  if num_of_bssid > _CLEAN_WIFI_ENV_CHECK_BSSID_THRESHOLD:
     ad.log.warning(
-        'Please clean up the Wi-Fi test environment: more than %d SSIDs found.',
-        MAX_SSID_THRESHOLD,
+        'Please clean up the Wi-Fi test environment: %d BSSIDs found, which is'
+        ' more than the threshold of %d.',
+        num_of_bssid,
+        _CLEAN_WIFI_ENV_CHECK_BSSID_THRESHOLD,
     )
   else:
     ad.log.info('Wi-Fi test environment is clean.')
 
-  # Update the number of SSIDs found in the wifi scan.
-  ad.wifi_env_ssid_count = num_of_ssid
+  # Update the number of BSSIDs found in the wifi scan.
+  device_specific_info['wifi_env_bssid_count'] = num_of_bssid
   return wifi_simple_results
 
 
