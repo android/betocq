@@ -37,7 +37,7 @@ from mobly import utils
 from mobly.controllers import android_device
 
 from betocq import base_test
-from betocq import nc_constants
+from betocq import constants
 from betocq import setup_utils
 from betocq import test_result_utils
 from betocq.nearby_connection import utils as nc_utils
@@ -57,25 +57,25 @@ _WIFI_TRANSFER_FAILURE_TIP = (
     ' device logs for more details.'
 )
 _WIFILAN_FILE_TRANSFER_FAILURE_TIP = (
-    f'{nc_constants.NearbyMedium.WIFILAN_ONLY.name}:'
+    f'{constants.NearbyMedium.WIFILAN_ONLY.name}:'
     f' {_WIFI_TRANSFER_FAILURE_TIP}'
 )
 _WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP = (
-    f'{nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT.name}:'
+    f'{constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT.name}:'
     f' {_WIFI_TRANSFER_FAILURE_TIP}'
 )
 _WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP = (
-    f'{nc_constants.NearbyMedium.WIFIAWARE_ONLY.name}:'
+    f'{constants.NearbyMedium.WIFIAWARE_ONLY.name}:'
     f' {_WIFI_TRANSFER_FAILURE_TIP}'
 )
 _WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP = (
-    f'{nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT.name}:'
+    f'{constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT.name}:'
     f' {_WIFI_TRANSFER_FAILURE_TIP}'
 )
 
 
 def _get_wifi_ssid_password(
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: constants.TestParameters,
 ) -> tuple[str, str]:
   """Returns an available wifi SSID and password from test parameters."""
   if test_parameters.wifi_ssid:
@@ -105,17 +105,17 @@ def _start_nearby_connection_and_transfer_file(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
-    upgrade_medium_under_test: nc_constants.NearbyMedium,
+    upgrade_medium_under_test: constants.NearbyMedium,
     file_transfer_failure_tip: str,
-    payload_type: nc_constants.PayloadType,
-    test_parameters: nc_constants.TestParameters,
-    payload_size_kb: int = nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+    payload_type: constants.PayloadType,
+    test_parameters: constants.TestParameters,
+    payload_size_kb: int = constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
     payload_transfer_timeout: datetime.timedelta = (
-        nc_constants.TRANSFER_TIMEOUT_FUNC_TEST
+        constants.TRANSFER_TIMEOUT_FUNC_TEST
     ),
-    payload_num: int = nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
-    connect_timeout: nc_constants.ConnectionSetupTimeouts = (
-        nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS
+    payload_num: int = constants.TRANSFER_FILE_NUM_FUNC_TEST,
+    connect_timeout: constants.ConnectionSetupTimeouts = (
+        constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS
     ),
     do_file_transfer: bool = True,
 ):
@@ -126,7 +126,7 @@ def _start_nearby_connection_and_transfer_file(
       discoverer,
       test_result,
       upgrade_medium_under_test=upgrade_medium_under_test,
-      medium_upgrade_type=nc_constants.MediumUpgradeType.NON_DISRUPTIVE,
+      medium_upgrade_type=constants.MediumUpgradeType.NON_DISRUPTIVE,
       connect_timeout=connect_timeout,
       keep_alive_timeout_ms=0,
       keep_alive_interval_ms=0,
@@ -150,7 +150,7 @@ def _start_nearby_connection_and_transfer_file(
       )
 
     if (
-        upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY
+        upgrade_medium_under_test == constants.NearbyMedium.WIFILAN_ONLY
         and not setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(
             advertiser
         )
@@ -189,7 +189,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
     # Use 5G WiFi for function tests.
     self.setup_wifi_env(
-        d2d_type=nc_constants.WifiD2DType.SCC_5G, country_code=_COUNTRY_CODE
+        d2d_type=constants.WifiD2DType.SCC_5G, country_code=_COUNTRY_CODE
     )
 
     wifi_scan_results_list = setup_utils.check_wifi_env(self.advertiser)
@@ -269,13 +269,13 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        upgrade_medium_under_test=nc_constants.NearbyMedium.BT_ONLY,
+        upgrade_medium_under_test=constants.NearbyMedium.BT_ONLY,
         file_transfer_failure_tip=_BT_BLE_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.FILE,
+        payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1KB,
-        payload_transfer_timeout=nc_constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_DEFAULT,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_1KB,
+        payload_transfer_timeout=constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
+        payload_num=constants.TRANSFER_FILE_NUM_DEFAULT,
     )
 
   def test_wifilan_function(self):
@@ -290,7 +290,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     wifi_ssid, wifi_password = _get_wifi_ssid_password(self.test_parameters)
     if not wifi_ssid:
       self.current_test_result.set_active_nc_fail_reason(
-          nc_constants.SingleTestFailureReason.AP_IS_NOT_CONFIGURED
+          constants.SingleTestFailureReason.AP_IS_NOT_CONFIGURED
       )
       asserts.fail('Wifi AP must be specified.')
 
@@ -319,12 +319,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.WIFILAN_ONLY,
+        constants.NearbyMedium.WIFILAN_ONLY,
         file_transfer_failure_tip=_WIFILAN_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.FILE,
+        payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1MB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_1MB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
         do_file_transfer=self.test_parameters.do_nc_wlan_file_transfer_test,
     )
 
@@ -345,12 +345,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
+        constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
         file_transfer_failure_tip=_WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.FILE,
+        payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
 
   def test_d2d_hotspot_stream_transfer_function(self):
@@ -370,12 +370,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
+        constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
         file_transfer_failure_tip=_WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.STREAM,
+        payload_type=constants.PayloadType.STREAM,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
 
   def test_wifi_direct_file_transfer_function(self):
@@ -395,12 +395,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
+        constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
         file_transfer_failure_tip=_WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.FILE,
+        payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
 
   def test_wifi_direct_stream_transfer_function(self):
@@ -420,12 +420,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
+        constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
         file_transfer_failure_tip=_WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.STREAM,
+        payload_type=constants.PayloadType.STREAM,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
 
   def test_wifi_aware_file_transfer_function(self):
@@ -445,12 +445,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+        constants.NearbyMedium.WIFIAWARE_ONLY,
         file_transfer_failure_tip=_WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.FILE,
+        payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
 
   def test_wifi_aware_stream_transfer_function(self):
@@ -470,12 +470,12 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+        constants.NearbyMedium.WIFIAWARE_ONLY,
         file_transfer_failure_tip=_WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.STREAM,
+        payload_type=constants.PayloadType.STREAM,
         test_parameters=self.test_parameters,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_FUNC_TEST,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_FUNC_TEST_KB,
+        payload_num=constants.TRANSFER_FILE_NUM_FUNC_TEST,
     )
 
   def test_bt_multiplex_connections(self):
@@ -492,7 +492,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
           f' {self.test_parameters.target_cuj_name}'
       )
       self.current_test_result.set_active_nc_fail_reason(
-          nc_constants.SingleTestFailureReason.SKIPPED,
+          constants.SingleTestFailureReason.SKIPPED,
           result_message=message,
       )
       asserts.skip(message)
@@ -510,14 +510,14 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser,
         self.discoverer,
         self.current_test_result,
-        upgrade_medium_under_test=nc_constants.NearbyMedium.BT_ONLY,
+        upgrade_medium_under_test=constants.NearbyMedium.BT_ONLY,
         file_transfer_failure_tip=_BT_MULTIPLEX_CONNECTIONS_FAILURE_TIP,
-        payload_type=nc_constants.PayloadType.FILE,
+        payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
-        payload_num=nc_constants.TRANSFER_FILE_NUM_DEFAULT,
-        payload_transfer_timeout=nc_constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
-        payload_size_kb=nc_constants.TRANSFER_FILE_SIZE_1KB,
-        connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        payload_num=constants.TRANSFER_FILE_NUM_DEFAULT,
+        payload_transfer_timeout=constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
+        payload_size_kb=constants.TRANSFER_FILE_SIZE_1KB,
+        connect_timeout=constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
     )
 
     prior_bt_snippet.disconnect_endpoint()
@@ -536,7 +536,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
   def on_pass(self, record: records.TestResultRecord):
     """Steps that will be performed when current test case passed."""
     self.current_test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.SUCCESS
+        constants.SingleTestFailureReason.SUCCESS
     )
     self._record_single_test_case_report()
     super().on_pass(record)
@@ -594,7 +594,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
       message = 'Wifi Hotspot is not supported in the device'
       self.current_test_result.set_active_nc_fail_reason(
-          nc_constants.SingleTestFailureReason.SKIPPED,
+          constants.SingleTestFailureReason.SKIPPED,
           result_message=message,
       )
       asserts.skip(message)
@@ -605,7 +605,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
       message = 'Wifi Direct is not supported in the device'
       self.current_test_result.set_active_nc_fail_reason(
-          nc_constants.SingleTestFailureReason.SKIPPED,
+          constants.SingleTestFailureReason.SKIPPED,
           result_message=message,
       )
       asserts.skip(message)
@@ -618,7 +618,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     ):
       message = 'Aware test is disabled or aware is not available in the device'
       self.current_test_result.set_active_nc_fail_reason(
-          nc_constants.SingleTestFailureReason.SKIPPED,
+          constants.SingleTestFailureReason.SKIPPED,
           result_message=message,
       )
       asserts.skip(message)

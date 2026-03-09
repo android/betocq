@@ -20,7 +20,7 @@ from mobly import asserts
 from mobly import records
 
 from betocq import base_test
-from betocq import nc_constants
+from betocq import constants
 from betocq import setup_utils
 from betocq import test_result_utils
 
@@ -53,7 +53,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   def on_pass(self, record: records.TestResultRecord):
     self.current_test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.SUCCESS
+        constants.SingleTestFailureReason.SUCCESS
     )
     self._record_single_test_iter_report()
     super().on_pass(record)

@@ -46,7 +46,7 @@ public final class MediumSettingsFactory {
   private static final int MEDIUM_UPGRADE_TO_WIFIDIRECT = 7;
   private static final int MEDIUM_BLE_L2CAP_ONLY = 8;
   private static final int MEDIUM_UPGRADE_TO_ALL_WIFI = 9;
-  // LINT.ThenChange(//depot/google3/wireless/android/platform/testing/bettertogether/betocq/nc_constants.py)
+  // LINT.ThenChange(//depot/google3/wireless/android/platform/testing/bettertogether/betocq/constants.py)
 
   private static final int MEDIUM_UPGRADE_TYPE_DISRUPTIVE = 1;
   private static final int MEDIUM_UPGRADE_TYPE_NON_DISRUPTIVE = 2;

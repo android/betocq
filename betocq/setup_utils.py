@@ -31,8 +31,8 @@ from mobly.controllers.android_device_lib import apk_utils
 from mobly.snippet import errors
 
 from betocq.gms import hermetic_overrides_partner
+from betocq import constants
 from betocq import gms_auto_updates_util
-from betocq import nc_constants
 from betocq import resources
 
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
@@ -300,7 +300,7 @@ def connect_to_wifi_sta_till_success(
 
 def wifi_is_enabled(ad: android_device.AndroidDevice) -> bool:
   """Checks if wifi is enabled on the given device."""
-  return ad.nearby.wifiCheckState(nc_constants.WifiState.ENABLED)
+  return ad.nearby.wifiCheckState(constants.WifiState.ENABLED)
 
 
 def connect_to_wifi(
@@ -346,13 +346,13 @@ def remove_current_connected_wifi_network(
   if (
       not wifi_info
       or wifi_info.get('SupplicantState', '')
-      == nc_constants.WIFI_SUPPLICANT_STATE_DISCONNECTED
+      == constants.WIFI_SUPPLICANT_STATE_DISCONNECTED
   ):
     ad.log.info('No current connected wifi network')
     return False
 
   network_id = get_sta_network_id_from_wifi_info(wifi_info)
-  if network_id != nc_constants.INVALID_NETWORK_ID:
+  if network_id != constants.INVALID_NETWORK_ID:
     ad.log.info('disconnecting from %r', wifi_info.get('SSID', ''))
     ad.nearby.wifiRemoveNetwork(network_id)
   else:
@@ -379,7 +379,7 @@ def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   ad.nearby.wifiClearConfiguredNetworks()
   if was_wifi_enabled:
     ad.nearby.wifiEnable()
-  time.sleep(nc_constants.WIFI_DISCONNECTION_DELAY.total_seconds())
+  time.sleep(constants.WIFI_DISCONNECTION_DELAY.total_seconds())
 
 
 def wait_for_wifi_auto_join(
@@ -543,28 +543,28 @@ def enable_location_on_device(ad: android_device.AndroidDevice) -> None:
 def get_sta_network_id_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   """Get wifi STA network id on the given device."""
   # introduced for unrooted device.
-  network_id = wifi_info.get('NetworkId', nc_constants.INVALID_NETWORK_ID)
+  network_id = wifi_info.get('NetworkId', constants.INVALID_NETWORK_ID)
   # fallback for rooted device if the 'NetworkId' is not available.
-  if network_id == nc_constants.INVALID_NETWORK_ID:
-    network_id = wifi_info.get('mNetworkId', nc_constants.INVALID_NETWORK_ID)
+  if network_id == constants.INVALID_NETWORK_ID:
+    network_id = wifi_info.get('mNetworkId', constants.INVALID_NETWORK_ID)
   return network_id
 
 
 def get_sta_rssi_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   """Get wifi STA RSSI from the given wifi info."""
   # introduced for unrooted device.
-  rssi = wifi_info.get('RSSI', nc_constants.INVALID_RSSI)
-  if rssi == nc_constants.INVALID_RSSI:
-    rssi = wifi_info.get('mRssi', nc_constants.INVALID_RSSI)
+  rssi = wifi_info.get('RSSI', constants.INVALID_RSSI)
+  if rssi == constants.INVALID_RSSI:
+    rssi = wifi_info.get('mRssi', constants.INVALID_RSSI)
   return rssi
 
 
 def get_sta_frequency_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   """Get wifi STA frequency from the given wifi info."""
   # introduced for unrooted device.
-  sta_frequency = wifi_info.get('StaFrequency', nc_constants.INVALID_INT)
-  if sta_frequency == nc_constants.INVALID_INT:
-    sta_frequency = wifi_info.get('mFrequency', nc_constants.INVALID_INT)
+  sta_frequency = wifi_info.get('StaFrequency', constants.INVALID_INT)
+  if sta_frequency == constants.INVALID_INT:
+    sta_frequency = wifi_info.get('mFrequency', constants.INVALID_INT)
   return sta_frequency
 
 
@@ -572,11 +572,11 @@ def get_sta_max_link_speed_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   """Get wifi STA max supported Tx link speed from the given wifi info."""
   # introduced for unrooted device.
   max_link_speed = wifi_info.get(
-      'MaxSupportedTxLinkSpeedMbps', nc_constants.INVALID_INT
+      'MaxSupportedTxLinkSpeedMbps', constants.INVALID_INT
   )
-  if max_link_speed == nc_constants.INVALID_INT:
+  if max_link_speed == constants.INVALID_INT:
     max_link_speed = wifi_info.get(
-        'mMaxSupportedTxLinkSpeedMbps', nc_constants.INVALID_INT
+        'mMaxSupportedTxLinkSpeedMbps', constants.INVALID_INT
     )
   return max_link_speed
 
@@ -587,7 +587,7 @@ def _get_wifi_sta_frequency_from_dumpsys(
   """Get wifi STA frequency on the given device."""
   wifi_sta_status = dump_wifi_sta_status(ad)
   if not wifi_sta_status:
-    return nc_constants.INVALID_INT
+    return constants.INVALID_INT
   prefix = 'Frequency:'
   postfix = 'MHz'
   return get_int_between_prefix_postfix(wifi_sta_status, prefix, postfix)
@@ -597,7 +597,7 @@ def get_wifi_p2p_frequency(ad: android_device.AndroidDevice) -> int:
   """Get wifi p2p frequency on the given device."""
   wifi_p2p_status = dump_wifi_p2p_status(ad)
   if not wifi_p2p_status:
-    return nc_constants.INVALID_INT
+    return constants.INVALID_INT
   prefix = 'channelFrequency='
   postfix = ', groupRole=GroupOwner'
   return get_int_between_prefix_postfix(wifi_p2p_status, prefix, postfix)
@@ -609,7 +609,7 @@ def _get_wifi_sta_max_link_speed_from_dumpsys(
   """Get wifi STA max supported Tx link speed on the given device."""
   wifi_sta_status = dump_wifi_sta_status(ad)
   if not wifi_sta_status:
-    return nc_constants.INVALID_INT
+    return constants.INVALID_INT
   prefix = 'Max Supported Tx Link speed:'
   postfix = 'Mbps'
   return get_int_between_prefix_postfix(wifi_sta_status, prefix, postfix)
@@ -629,8 +629,8 @@ def get_int_between_prefix_postfix(
     try:
       return int(string[left_index + len(prefix) : right_index].strip())
     except ValueError:
-      return nc_constants.INVALID_INT
-  return nc_constants.INVALID_INT
+      return constants.INVALID_INT
+  return constants.INVALID_INT
 
 
 def dump_wifi_sta_status(ad: android_device.AndroidDevice) -> str:
@@ -686,7 +686,7 @@ def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
     if match:
       bssid, freq, raw_ssid, _ = match.groups()
       # If SSID is just whitespace, it means it's hidden/empty
-      ssid = raw_ssid.strip() or nc_constants.WIFI_UNKNOWN_SSID
+      ssid = raw_ssid.strip() or constants.WIFI_UNKNOWN_SSID
       results.append({
           'BSSID': bssid,
           'SSID': ssid,
@@ -755,23 +755,23 @@ def check_wifi_env(
 
 def is_valid_wifi_2g_freq(freq: int) -> bool:
   """Checks if the frequency is a valid 2G frequency."""
-  return freq <= nc_constants.MAX_FREQ_2G_MHZ
+  return freq <= constants.MAX_FREQ_2G_MHZ
 
 
 def is_valid_wifi_5g_freq(freq: int) -> bool:
   """Checks if the frequency is a valid 5G frequency."""
   return (
-      nc_constants.MAX_FREQ_2G_MHZ < freq < nc_constants.MIN_FREQ_5G_DFS_MHZ
-      or freq > nc_constants.MAX_FREQ_5G_DFS_MHZ
+      constants.MAX_FREQ_2G_MHZ < freq < constants.MIN_FREQ_5G_DFS_MHZ
+      or freq > constants.MAX_FREQ_5G_DFS_MHZ
   )
 
 
 def is_valid_wifi_5g_dfs_freq(freq: int) -> bool:
   """Checks if the frequency is a valid 5G DFS frequency."""
   return (
-      nc_constants.MIN_FREQ_5G_DFS_MHZ
+      constants.MIN_FREQ_5G_DFS_MHZ
       <= freq
-      <= nc_constants.MAX_FREQ_5G_DFS_MHZ
+      <= constants.MAX_FREQ_5G_DFS_MHZ
   )
 
 
@@ -786,7 +786,7 @@ def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
 
 def wait_for_aware_available(
     ad: android_device.AndroidDevice,
-    timeout: datetime.timedelta = nc_constants.WIFI_AWARE_AVAILABLE_WAIT_TIME,
+    timeout: datetime.timedelta = constants.WIFI_AWARE_AVAILABLE_WAIT_TIME,
 ) -> bool:
   """Waits for Wifi Aware to be available on the given device."""
   return wait_for_predicate(
@@ -811,10 +811,10 @@ def get_wifi_sta_rssi(ad: android_device.AndroidDevice, ssid: str) -> int:
     )
     if scan_result:
       return int(scan_result.split()[2].strip())
-    return nc_constants.INVALID_RSSI
+    return constants.INVALID_RSSI
   except (adb.AdbError, ValueError):
     ad.log.warning('Failed to get wifi sta rssi')
-    return nc_constants.INVALID_RSSI
+    return constants.INVALID_RSSI
 
 
 def log_sta_event_list(ad: android_device.AndroidDevice):
@@ -1027,7 +1027,7 @@ def get_sta_frequency_and_max_link_speed(
   )
 
   # If the info is not available, try getting them by adb wifi status command.
-  if sta_frequency == nc_constants.INVALID_INT:
+  if sta_frequency == constants.INVALID_INT:
     sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
     sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
@@ -1045,7 +1045,7 @@ def get_target_sta_frequency_and_max_link_speed(
   )
 
   # If the info is not available, try getting them by adb wifi status command.
-  if sta_frequency == nc_constants.INVALID_INT:
+  if sta_frequency == constants.INVALID_INT:
     sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
     sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
@@ -1053,7 +1053,7 @@ def get_target_sta_frequency_and_max_link_speed(
 
 def load_nearby_snippet(
     ad: android_device.AndroidDevice,
-    config: nc_constants.SnippetConfig,
+    config: constants.SnippetConfig,
 ):
   """Loads a nearby snippet with the given snippet config."""
   device_specific_dict = get_betocq_device_specific_info(ad)
@@ -1199,7 +1199,7 @@ def abort_all_and_report_error_on_setup(
 
 
 def abort_if_2g_ap_not_ready(
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: constants.TestParameters,
 ) -> None:
   """Aborts test class if 2G AP is not ready."""
   if test_parameters.use_programmable_ap:
@@ -1210,7 +1210,7 @@ def abort_if_2g_ap_not_ready(
 
 
 def abort_if_5g_ap_not_ready(
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: constants.TestParameters,
 ) -> None:
   """Aborts test class if 5G AP is not ready."""
   if test_parameters.use_programmable_ap:
@@ -1221,7 +1221,7 @@ def abort_if_5g_ap_not_ready(
 
 
 def abort_if_dfs_5g_ap_not_ready(
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: constants.TestParameters,
 ) -> None:
   """Aborts test class if DFS 5G AP is not ready."""
   if test_parameters.use_programmable_ap:
@@ -1233,7 +1233,7 @@ def abort_if_dfs_5g_ap_not_ready(
 
 
 def abort_if_any_5g_or_dfs_aps_not_ready(
-    test_parameters: nc_constants.TestParameters,
+    test_parameters: constants.TestParameters,
 ) -> None:
   """Aborts test class if any 5G or DFS 5G APs is not ready."""
   asserts.abort_class_if(
@@ -1344,7 +1344,7 @@ def reset_nearby_connection(
       nearby.stopAdvertising()
       nearby.stopDiscovery()
       nearby.stopAllEndpoints()
-  time.sleep(nc_constants.NEARBY_RESET_WAIT_TIME.total_seconds())
+  time.sleep(constants.NEARBY_RESET_WAIT_TIME.total_seconds())
 
 
 _Priority = Literal['d', 'e', 'f', 'i', 'v', 'w', 's']
@@ -1414,51 +1414,51 @@ def get_wifi_concurrency_mode(
     p2p_frequency: int,
     sta_frequency: int,
     is_dbs_mode_mattered: bool = False,
-    dbs_wfd_status: nc_constants.WifiDbsWfdStatus = nc_constants.WifiDbsWfdStatus.UNKNOWN,
-) -> nc_constants.WifiConcurrencyMode:
+    dbs_wfd_status: constants.WifiDbsWfdStatus = constants.WifiDbsWfdStatus.UNKNOWN,
+) -> constants.WifiConcurrencyMode:
   """Gets the wifi concurrency mode of the device."""
   if (
-      p2p_frequency == nc_constants.INVALID_INT
-      or sta_frequency == nc_constants.INVALID_INT
+      p2p_frequency == constants.INVALID_INT
+      or sta_frequency == constants.INVALID_INT
   ):
-    return nc_constants.WifiConcurrencyMode.UNKNOWN
+    return constants.WifiConcurrencyMode.UNKNOWN
 
-  is_p2p_2g = p2p_frequency <= nc_constants.MAX_FREQ_2G_MHZ
-  is_sta_2g = sta_frequency <= nc_constants.MAX_FREQ_2G_MHZ
+  is_p2p_2g = p2p_frequency <= constants.MAX_FREQ_2G_MHZ
+  is_sta_2g = sta_frequency <= constants.MAX_FREQ_2G_MHZ
 
   if p2p_frequency == sta_frequency:
     if is_p2p_2g:
-      return nc_constants.WifiConcurrencyMode.SCC_2G
+      return constants.WifiConcurrencyMode.SCC_2G
     else:
-      return nc_constants.WifiConcurrencyMode.SCC_5G
+      return constants.WifiConcurrencyMode.SCC_5G
 
   if is_dbs_mode_mattered:
-    if dbs_wfd_status == nc_constants.WifiDbsWfdStatus.DBS_WFD_ENABLED:
+    if dbs_wfd_status == constants.WifiDbsWfdStatus.DBS_WFD_ENABLED:
       if is_p2p_2g:
-        return nc_constants.WifiConcurrencyMode.SCC_2G
+        return constants.WifiConcurrencyMode.SCC_2G
       else:
-        return nc_constants.WifiConcurrencyMode.SCC_5G
-    elif dbs_wfd_status == nc_constants.WifiDbsWfdStatus.DBS_WFD_DISABLED:
+        return constants.WifiConcurrencyMode.SCC_5G
+    elif dbs_wfd_status == constants.WifiDbsWfdStatus.DBS_WFD_DISABLED:
       if is_p2p_2g and not is_sta_2g:
-        return nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+        return constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
       elif not is_p2p_2g and is_sta_2g:
-        return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+        return constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
       elif not is_p2p_2g and not is_sta_2g:
-        return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+        return constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
       else:  # both 2g but different freq
-        return nc_constants.WifiConcurrencyMode.UNKNOWN
+        return constants.WifiConcurrencyMode.UNKNOWN
     else:  # UNKNOWN dbs status
-      return nc_constants.WifiConcurrencyMode.UNKNOWN
+      return constants.WifiConcurrencyMode.UNKNOWN
 
   # if is_dbs_mode_mattered=False, then calculate MCC based on band
   if is_p2p_2g and not is_sta_2g:
-    return nc_constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
+    return constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA
   elif not is_p2p_2g and is_sta_2g:
-    return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+    return constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
   elif not is_p2p_2g and not is_sta_2g:
-    return nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
+    return constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA
   else:  # both 2g but different freq
-    return nc_constants.WifiConcurrencyMode.UNKNOWN
+    return constants.WifiConcurrencyMode.UNKNOWN
 
 
 def get_wifi_firmware_version(

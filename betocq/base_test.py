@@ -31,7 +31,7 @@ from mobly.controllers.wifi.lib import wifi_configs
 import yaml
 
 from betocq import ap_utils
-from betocq import nc_constants
+from betocq import constants
 from betocq import setup_utils
 
 # TODO: Need to design external path for OEM.
@@ -69,8 +69,8 @@ class BaseTestClass(base_test.BaseTestClass):
     self.ads: list[android_device.AndroidDevice] = []
     self.advertiser: android_device.AndroidDevice = None
     self.discoverer: android_device.AndroidDevice = None
-    self.test_parameters: nc_constants.TestParameters = (
-        nc_constants.TestParameters.from_user_params(self.user_params)
+    self.test_parameters: constants.TestParameters = (
+        constants.TestParameters.from_user_params(self.user_params)
     )
     logging.info('all test parameters: %s', self.test_parameters)
     self.num_bug_reports: int = 0
@@ -111,7 +111,7 @@ class BaseTestClass(base_test.BaseTestClass):
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
       if self.is_using_gms_api:
-        ad.gms_info = nc_constants.GmsInfo()
+        ad.gms_info = constants.GmsInfo()
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'
@@ -198,25 +198,25 @@ class BaseTestClass(base_test.BaseTestClass):
     return apk_paths[0]
 
   @property
-  def nearby_snippet_config(self) -> nc_constants.SnippetConfig:
+  def nearby_snippet_config(self) -> constants.SnippetConfig:
     """Snippet config for loading the first nearby snippet instance."""
-    return nc_constants.SnippetConfig(
+    return constants.SnippetConfig(
         snippet_name='nearby',
-        package_name=nc_constants.NEARBY_SNIPPET_PACKAGE_NAME,
+        package_name=constants.NEARBY_SNIPPET_PACKAGE_NAME,
         apk_path=self._get_snippet_apk_path('nearby_snippet'),
     )
 
   @property
-  def nearby2_snippet_config(self) -> nc_constants.SnippetConfig:
+  def nearby2_snippet_config(self) -> constants.SnippetConfig:
     """Snippet config for loading the second nearby snippet instance."""
-    return nc_constants.SnippetConfig(
+    return constants.SnippetConfig(
         snippet_name='nearby2',
-        package_name=nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
+        package_name=constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
         apk_path=self._get_snippet_apk_path('nearby_snippet_2'),
     )
 
   def setup_wifi_env(
-      self, d2d_type: nc_constants.WifiD2DType, country_code: str
+      self, d2d_type: constants.WifiD2DType, country_code: str
   ):
     """Sets up the WiFi environment with given d2d type and country code.
 
@@ -229,7 +229,7 @@ class BaseTestClass(base_test.BaseTestClass):
       d2d_type: The Wi-Fi D2D type.
       country_code: The country code of the test.
     """
-    if d2d_type == nc_constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA and (
+    if d2d_type == constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA and (
         self.test_parameters.use_programmable_ap
         or self.test_parameters.use_sniffer
     ):
@@ -240,7 +240,7 @@ class BaseTestClass(base_test.BaseTestClass):
       )
       return
 
-    wifi_channel = nc_constants.get_wifi_channel_for_programmable_ap(d2d_type)
+    wifi_channel = constants.get_wifi_channel_for_programmable_ap(d2d_type)
     if self.test_parameters.use_programmable_ap:
       self._setup_programmable_ap(wifi_channel, country_code)
 
@@ -363,10 +363,10 @@ class BaseTestClass(base_test.BaseTestClass):
           '3. The test snippet might be killed by a security app or service'
           ' from the device, especially if this happens very frequently, check'
           ' the logcat to verify if '
-          f' {nc_constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
-          f' {nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
-          f' {nc_constants.DCT_SNIPPET_PACKAGE_NAME} or'
-          f' {nc_constants.DCT_SNIPPET_2_PACKAGE_NAME} was killed; you should'
+          f' {constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
+          f' {constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
+          f' {constants.DCT_SNIPPET_PACKAGE_NAME} or'
+          f' {constants.DCT_SNIPPET_2_PACKAGE_NAME} was killed; you should'
           ' put them to the allowlist of the security app.\n'
           '4. The USB cable or port is not stable, change the USB cable or the'
           ' connection portal and try again;\n'
@@ -390,7 +390,7 @@ class BaseTestClass(base_test.BaseTestClass):
       logging.info('skip bug report for failure')
     else:
       self.num_bug_reports = self.num_bug_reports + 1
-      if self.num_bug_reports <= nc_constants.MAX_NUM_BUG_REPORT:
+      if self.num_bug_reports <= constants.MAX_NUM_BUG_REPORT:
         logging.info('take bug report for failure')
         android_device.take_bug_reports(
             self.ads,
@@ -423,7 +423,7 @@ class BaseTestClass(base_test.BaseTestClass):
     if BaseTestClass._run_identifier_is_set:
       return
     suite_name_items = [
-        nc_constants.BETOCQ_NAME,
+        constants.BETOCQ_NAME,
     ]
     if 'suite_name' in self.user_params:
       suite_name_items.append(self.user_params['suite_name'])

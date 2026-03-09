@@ -28,10 +28,11 @@ from mobly import asserts
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
+from betocq import constants
 from betocq import iperf_utils
-from betocq import nc_constants
 from betocq import setup_utils
 from betocq import version
+
 
 _BITS_PER_BYTE = 8
 
@@ -57,8 +58,8 @@ def set_and_assert_p2p_frequency(
   p2p_frequency = setup_utils.get_wifi_p2p_frequency(ad)
   test_result.quality_info.medium_frequency = p2p_frequency
   if (
-      p2p_frequency == nc_constants.INVALID_INT
-      or sta_frequency == nc_constants.INVALID_INT
+      p2p_frequency == constants.INVALID_INT
+      or sta_frequency == constants.INVALID_INT
   ):
     ad.log.warning(
         'The P2P frequency ({p2p_frequency}) or STA frequency ({sta_frequency})'
@@ -71,7 +72,7 @@ def set_and_assert_p2p_frequency(
     if p2p_frequency != sta_frequency:
       return
     test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.WRONG_P2P_FREQUENCY
+        constants.SingleTestFailureReason.WRONG_P2P_FREQUENCY
     )
     asserts.fail(
         f'P2P frequeny ({p2p_frequency}) is same as STA frequency'
@@ -81,7 +82,7 @@ def set_and_assert_p2p_frequency(
   # Check for SCC.
   if (not is_dbs_mode) and (p2p_frequency != sta_frequency):
     test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.WRONG_P2P_FREQUENCY
+        constants.SingleTestFailureReason.WRONG_P2P_FREQUENCY
     )
     asserts.fail(
         f'P2P frequeny ({p2p_frequency}) is different from STA frequency'
@@ -89,7 +90,7 @@ def set_and_assert_p2p_frequency(
     )
   if is_dbs_mode and p2p_frequency == sta_frequency:
     test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.WRONG_P2P_FREQUENCY
+        constants.SingleTestFailureReason.WRONG_P2P_FREQUENCY
     )
     asserts.fail(
         f'P2P frequeny ({p2p_frequency}) is the same as STA frequency'
@@ -108,8 +109,8 @@ def populate_medium_frequency(
 
 
 def set_and_assert_concurrency_mode(
-    current_concurrency_mode: nc_constants.WifiConcurrencyMode,
-    valid_concurrency_modes: Sequence[nc_constants.WifiConcurrencyMode],
+    current_concurrency_mode: constants.WifiConcurrencyMode,
+    valid_concurrency_modes: Sequence[constants.WifiConcurrencyMode],
     test_result: SingleTestResult,
     additional_error_message: str = '',
 ):
@@ -117,7 +118,7 @@ def set_and_assert_concurrency_mode(
   test_result.wifi_concurrency_mode = current_concurrency_mode
   if current_concurrency_mode not in valid_concurrency_modes:
     test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.INVALID_WIFI_CONCURRENCY_MODE
+        constants.SingleTestFailureReason.INVALID_WIFI_CONCURRENCY_MODE
     )
     asserts.fail(
         f'Concurrency mode: {current_concurrency_mode} is not expected.'
@@ -128,7 +129,7 @@ def set_and_assert_concurrency_mode(
 # Add back temporarily, will be removed after refractoring refactor DCT tests.
 def collect_nc_test_metrics(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
+    nc_test_runtime: constants.NcTestRuntime,
 ):
   """Collects general test metrics for nearby connection tests."""
   advertiser = nc_test_runtime.advertiser
@@ -139,8 +140,8 @@ def collect_nc_test_metrics(
   test_result.max_sta_link_speed_mbps = max_link_speed_mbps
 
   if test_result.quality_info.upgrade_medium in [
-      nc_constants.NearbyConnectionMedium.WIFI_DIRECT,
-      nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT,
+      constants.NearbyConnectionMedium.WIFI_DIRECT,
+      constants.NearbyConnectionMedium.WIFI_HOTSPOT,
   ]:
     test_result.quality_info.medium_frequency = (
         setup_utils.get_wifi_p2p_frequency(advertiser)
@@ -150,31 +151,31 @@ def collect_nc_test_metrics(
 # Add back temporarily, will be removed after refractoring refactor DCT tests.
 def assert_sta_frequency(
     test_result: SingleTestResult,
-    expected_wifi_type: nc_constants.WifiType,
+    expected_wifi_type: constants.WifiType,
 ):
   """Asserts the STA frequency is expected."""
   sta_frequency = test_result.sta_frequency
   # Check whether the device is still connected to the AP.
-  if sta_frequency == nc_constants.INVALID_INT:
+  if sta_frequency == constants.INVALID_INT:
     test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.DISCONNECTED_FROM_AP
+        constants.SingleTestFailureReason.DISCONNECTED_FROM_AP
     )
     asserts.fail('Target device is disconnected from AP. Check AP DHCP config.')
 
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
-    case nc_constants.WifiType.FREQ_2G:
+    case constants.WifiType.FREQ_2G:
       is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
-    case nc_constants.WifiType.FREQ_5G:
+    case constants.WifiType.FREQ_5G:
       is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
-    case nc_constants.WifiType.FREQ_5G_DFS:
+    case constants.WifiType.FREQ_5G_DFS:
       is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
 
   if is_valid_freq:
     return
 
   test_result.set_active_nc_fail_reason(
-      nc_constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
+      constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
   )
   asserts.fail(f'AP is set to a wrong frequency {sta_frequency}')
 
@@ -182,7 +183,7 @@ def assert_sta_frequency(
 def set_and_assert_sta_frequency(
     ad: android_device.AndroidDevice,
     test_result: SingleTestResult,
-    expected_wifi_type: nc_constants.WifiType,
+    expected_wifi_type: constants.WifiType,
 ):
   """Asserts the STA frequency is expected."""
 
@@ -193,25 +194,25 @@ def set_and_assert_sta_frequency(
   test_result.sta_frequency = sta_frequency
   test_result.max_sta_link_speed_mbps = max_link_speed_mbps
 
-  if sta_frequency == nc_constants.INVALID_INT:
+  if sta_frequency == constants.INVALID_INT:
     ad.log.warning(
         'The STA frequency is not available, connection_info:'
         f' {connection_info}, the test may not be expected.'
     )
     if (
         connection_info.get('SupplicantState', '')
-        != nc_constants.WIFI_SUPPLICANT_STATE_COMPLETED
+        != constants.WIFI_SUPPLICANT_STATE_COMPLETED
     ):
       if ad.role == 'target':
         test_result.test_failure_reason = (
-            nc_constants.SingleTestFailureReason.TARGET_WIFI_CONNECTION
+            constants.SingleTestFailureReason.TARGET_WIFI_CONNECTION
         )
       else:
         test_result.test_failure_reason = (
-            nc_constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
+            constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
         )
       asserts.fail(
-          nc_constants.COMMON_TRIAGE_TIP[test_result.test_failure_reason]
+          constants.COMMON_TRIAGE_TIP[test_result.test_failure_reason]
       )
     ad.log.warning(
         'The STA frequency is not available, but the STA is'
@@ -222,19 +223,19 @@ def set_and_assert_sta_frequency(
   additional_error_message = ''
   # Check whether the STA frequency is expected.
   match expected_wifi_type:
-    case nc_constants.WifiType.FREQ_2G:
+    case constants.WifiType.FREQ_2G:
       is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 2G channel.'
         )
-    case nc_constants.WifiType.FREQ_5G:
+    case constants.WifiType.FREQ_5G:
       is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
             ' The channel is expected to be a 5G channel.'
         )
-    case nc_constants.WifiType.FREQ_5G_DFS:
+    case constants.WifiType.FREQ_5G_DFS:
       is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
       if not is_valid_freq:
         additional_error_message = (
@@ -247,7 +248,7 @@ def set_and_assert_sta_frequency(
 
   if not is_valid_freq:
     test_result.set_active_nc_fail_reason(
-        nc_constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
+        constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
     )
     # The correct frequency is critical
     asserts.abort_all(
@@ -258,7 +259,7 @@ def set_and_assert_sta_frequency(
 
 def assert_2g_wifi_throughput_and_run_iperf_if_needed(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
+    nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
     is_dct: bool = False,
@@ -281,7 +282,7 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
 
 def assert_2g_wifi_throughput(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
+    nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
 ):
   """Checks the throughput for 2G WiFi medium."""
@@ -299,14 +300,14 @@ def assert_2g_wifi_throughput(
 
 def _get_2g_wifi_throughput_benchmark(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
-) -> nc_constants.SpeedTarget:
+    nc_test_runtime: constants.NcTestRuntime,
+) -> constants.SpeedTarget:
   """Gets the throughput benchmark as MBps."""
   discoverer = nc_test_runtime.discoverer
   advertiser = nc_test_runtime.advertiser
   if nc_test_runtime.wifi_info is None:
-    return nc_constants.SpeedTarget(
-        nc_constants.INVALID_INT, nc_constants.INVALID_INT
+    return constants.SpeedTarget(
+        constants.INVALID_INT, constants.INVALID_INT
     )
 
   max_num_streams = min(discoverer.max_num_streams, advertiser.max_num_streams)
@@ -317,11 +318,11 @@ def _get_2g_wifi_throughput_benchmark(
   )
   max_phy_rate_mbps = min(
       max_phy_rate_mbps,
-      max_num_streams * nc_constants.MAX_PHY_RATE_PER_STREAM_N_20_MBPS,
+      max_num_streams * constants.MAX_PHY_RATE_PER_STREAM_N_20_MBPS,
   )
   min_throughput_mbyte_per_sec = int(
       max_phy_rate_mbps
-      * nc_constants.MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G
+      * constants.MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G
       / _BITS_PER_BYTE
   )
   nc_min_throughput_mbyte_per_sec = min_throughput_mbyte_per_sec
@@ -337,14 +338,14 @@ def _get_2g_wifi_throughput_benchmark(
       nc_min_throughput_mbyte_per_sec,
   )
 
-  return nc_constants.SpeedTarget(
+  return constants.SpeedTarget(
       min_throughput_mbyte_per_sec, nc_min_throughput_mbyte_per_sec
   )
 
 
 def assert_5g_wifi_throughput_and_run_iperf_if_needed(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
+    nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
     is_dct: bool = False,
@@ -370,7 +371,7 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
 
 def assert_5g_wifi_throughput(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
+    nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
     is_dct: bool = True,
     is_tdls_enabled: bool = True,
@@ -392,7 +393,7 @@ def assert_5g_wifi_throughput(
 
 def _get_5g_wifi_throughput_benchmark(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
+    nc_test_runtime: constants.NcTestRuntime,
     is_dct: bool = False,
     is_tdls_enabled: bool = True,
 ):
@@ -400,18 +401,18 @@ def _get_5g_wifi_throughput_benchmark(
   discoverer = nc_test_runtime.discoverer
   advertiser = nc_test_runtime.advertiser
   if nc_test_runtime.wifi_info is None:
-    return nc_constants.SpeedTarget(
-        nc_constants.INVALID_INT, nc_constants.INVALID_INT
+    return constants.SpeedTarget(
+        constants.INVALID_INT, constants.INVALID_INT
     )
   is_mcc = nc_test_runtime.wifi_info.is_mcc
   is_dbs_mode = nc_test_runtime.is_dbs_mode
   is_wlan_medium = (
       nc_test_runtime.upgrade_medium_under_test
-      == nc_constants.NearbyMedium.WIFILAN_ONLY
+      == constants.NearbyMedium.WIFILAN_ONLY
   )
   is_wifi_hotspot_medium = (
       nc_test_runtime.upgrade_medium_under_test
-      == nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT
+      == constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT
   )
   is_tdls_supported = (
       nc_test_runtime.advertiser.nearby.wifiIsTdlsSupported()
@@ -428,32 +429,32 @@ def _get_5g_wifi_throughput_benchmark(
     max_phy_rate_mbps = min([
         discoverer.max_phy_rate_5g_mbps,
         advertiser.max_phy_rate_5g_mbps,
-        max_num_streams * nc_constants.MAX_PHY_RATE_PER_STREAM_AC_40_MBPS,
+        max_num_streams * constants.MAX_PHY_RATE_PER_STREAM_AC_40_MBPS,
     ])
   else:
     max_phy_rate_mbps = min([
         discoverer.max_phy_rate_5g_mbps,
         advertiser.max_phy_rate_5g_mbps,
-        max_num_streams * nc_constants.MAX_PHY_RATE_PER_STREAM_AC_80_MBPS,
+        max_num_streams * constants.MAX_PHY_RATE_PER_STREAM_AC_80_MBPS,
     ])
 
   # Step 2. Calculate min_throughput_mbyte_per_sec.
   min_throughput_mbyte_per_sec = int(
       max_phy_rate_mbps
-      * nc_constants.MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G
+      * constants.MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G
       / _BITS_PER_BYTE
   )
 
   # Step 3. Adjust min_throughput_mbyte_per_sec according to medium info.
   if is_mcc:
     min_throughput_mbyte_per_sec = int(
-        min_throughput_mbyte_per_sec * nc_constants.MCC_THROUGHPUT_MULTIPLIER
+        min_throughput_mbyte_per_sec * constants.MCC_THROUGHPUT_MULTIPLIER
     )
     # MCC hotspot has even lower throughput due to sync issue with STA.
     if is_wifi_hotspot_medium:
       min_throughput_mbyte_per_sec = (
           min_throughput_mbyte_per_sec
-          * nc_constants.MCC_HOTSPOT_THROUGHPUT_MULTIPLIER
+          * constants.MCC_HOTSPOT_THROUGHPUT_MULTIPLIER
       )
 
   # Cut the speed target by half if TDLS is not supported.
@@ -462,9 +463,9 @@ def _get_5g_wifi_throughput_benchmark(
 
   # Step 4. Calculate nc_min_throughput_mbyte_per_sec.
   iperf_to_nc_throughput_ratio = (
-      nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO_DCT
+      constants.IPERF_TO_NC_THROUGHPUT_RATIO_DCT
       if is_dct
-      else nc_constants.IPERF_TO_NC_THROUGHPUT_RATIO
+      else constants.IPERF_TO_NC_THROUGHPUT_RATIO
   )
   nc_min_throughput_mbyte_per_sec = (
       min_throughput_mbyte_per_sec * iperf_to_nc_throughput_ratio
@@ -473,7 +474,7 @@ def _get_5g_wifi_throughput_benchmark(
   if is_wlan_medium and not is_dct:
     nc_min_throughput_mbyte_per_sec = min(
         nc_min_throughput_mbyte_per_sec,
-        nc_constants.WLAN_MEDIUM_THROUGHPUT_CAP_MBPS,
+        constants.WLAN_MEDIUM_THROUGHPUT_CAP_MBPS,
     )
 
   nc_test_runtime.advertiser.log.info(
@@ -487,7 +488,7 @@ def _get_5g_wifi_throughput_benchmark(
       nc_min_throughput_mbyte_per_sec,
   )
 
-  return nc_constants.SpeedTarget(
+  return constants.SpeedTarget(
       min_throughput_mbyte_per_sec, nc_min_throughput_mbyte_per_sec
   )
 
@@ -510,7 +511,7 @@ def _is_5g_ap_bandwidth_less_than_80mhz(
 ):
   """Returns whether the 5G AP bandwidth is less than 80mhz."""
   max_phy_rate_ac80 = (
-      max_num_streams * nc_constants.MAX_PHY_RATE_PER_STREAM_AC_80_MBPS
+      max_num_streams * constants.MAX_PHY_RATE_PER_STREAM_AC_80_MBPS
   )
   return all([
       test_result.sta_frequency > 5000,
@@ -521,7 +522,7 @@ def _is_5g_ap_bandwidth_less_than_80mhz(
 
 def assert_throughput(
     test_result: SingleTestResult,
-    speed_target: nc_constants.SpeedTarget,
+    speed_target: constants.SpeedTarget,
     low_throughput_tip: str,
 ):
   """Checks the file transfer throughput."""
@@ -537,7 +538,7 @@ def assert_throughput(
   )
 
   test_result.set_active_nc_fail_reason(
-      nc_constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
+      constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
       result_message=f'{low_throughput_info}. {low_throughput_tip}',
   )
   asserts.fail(low_throughput_info)
@@ -545,8 +546,8 @@ def assert_throughput(
 
 def assert_throughput_and_run_iperf_if_needed(
     test_result: SingleTestResult,
-    nc_test_runtime: nc_constants.NcTestRuntime,
-    speed_target: nc_constants.SpeedTarget,
+    nc_test_runtime: constants.NcTestRuntime,
+    speed_target: constants.SpeedTarget,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
     is_discoverer_network_owner: bool = False,
@@ -564,8 +565,8 @@ def assert_throughput_and_run_iperf_if_needed(
 
   if any([
       nc_speed_mbps < nc_speed_min_mbps,
-      upgrade_medium_under_test == nc_constants.NearbyMedium.WIFILAN_ONLY,
-      # upgrade_medium_under_test == nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+      upgrade_medium_under_test == constants.NearbyMedium.WIFILAN_ONLY,
+      # upgrade_medium_under_test == constants.NearbyMedium.WIFIAWARE_ONLY,
   ]):
     iperf_speed_mbps = _run_iperf_test(
         test_result,
@@ -596,7 +597,7 @@ def assert_throughput_and_run_iperf_if_needed(
     return
 
   test_result.set_active_nc_fail_reason(
-      nc_constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
+      constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
       result_message=f'{low_throughput_info}. {low_throughput_tip}',
   )
   asserts.fail(low_throughput_info)
@@ -606,18 +607,18 @@ def _run_iperf_test(
     test_result: SingleTestResult,
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
-    upgrade_medium_under_test: nc_constants.NearbyMedium,
-    wifi_info: nc_constants.WifiInfo | None,
+    upgrade_medium_under_test: constants.NearbyMedium,
+    wifi_info: constants.WifiInfo | None,
     is_discoverer_network_owner: bool = False,
 ) -> float:
   """Runs iperf test and returns the throughput. Returns 0 if not needed."""
   if wifi_info is None or wifi_info.is_mcc:
     return 0
   if upgrade_medium_under_test not in [
-      nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
-      nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
-      nc_constants.NearbyMedium.WIFILAN_ONLY,
-      nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+      constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
+      constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
+      constants.NearbyMedium.WIFILAN_ONLY,
+      constants.NearbyMedium.WIFIAWARE_ONLY,
   ]:
     return 0
   test_result.iperf_throughput_kbps = iperf_utils.run_iperf_test(
@@ -641,9 +642,9 @@ def assert_nc_throughput_meets_target(
     low_throughput_tip: str,
 ):
   """Checks the Nearby connection throughput meets the target."""
-  test_result.speed_target = nc_constants.SpeedTarget(
+  test_result.speed_target = constants.SpeedTarget(
       nc_speed_mbtye_per_sec=nc_speed_min_mbps,
-      iperf_speed_mbtye_per_sec=nc_constants.INVALID_INT
+      iperf_speed_mbtye_per_sec=constants.INVALID_INT
   )
   nc_speed_mbps = round(test_result.file_transfer_throughput_kbps / 1024, 3)
   if nc_speed_mbps >= nc_speed_min_mbps:
@@ -653,7 +654,7 @@ def assert_nc_throughput_meets_target(
       f'file speed {nc_speed_mbps} < target {nc_speed_min_mbps} MB/s'
   )
   test_result.set_active_nc_fail_reason(
-      nc_constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
+      constants.SingleTestFailureReason.FILE_TRANSFER_THROUGHPUT_LOW,
       result_message=f'{low_throughput_info}. {low_throughput_tip}',
   )
   asserts.fail(low_throughput_info)
@@ -701,7 +702,7 @@ def _summarize_prior_connection_info(
   """Summarizes the prior connection info during a single test iteration."""
   if (
       result.prior_nc_fail_reason
-      == nc_constants.SingleTestFailureReason.UNINITIALIZED
+      == constants.SingleTestFailureReason.UNINITIALIZED
   ):
     return ''
 
@@ -723,9 +724,9 @@ def _summarize_transfer_quality_info(
   upgrade_medium = result.quality_info.upgrade_medium
   speed_mbps_fraction_bits = 3
   if upgrade_medium in [
-      nc_constants.NearbyConnectionMedium.BLE,
-      nc_constants.NearbyConnectionMedium.BLE_L2CAP,
-      nc_constants.NearbyConnectionMedium.BLUETOOTH,
+      constants.NearbyConnectionMedium.BLE,
+      constants.NearbyConnectionMedium.BLE_L2CAP,
+      constants.NearbyConnectionMedium.BLUETOOTH,
   ]:
     speed_mbps_fraction_bits = 1
   metrics = {
@@ -757,11 +758,11 @@ def _summarize_station_connection_info(
 ) -> str:
   """Summarizes the station connection info during a single test iteration."""
   metrics = {}
-  if result.discoverer_sta_latency is not nc_constants.UNSET_LATENCY:
+  if result.discoverer_sta_latency is not constants.UNSET_LATENCY:
     metrics['source'] = _float_to_str(
         result.discoverer_sta_latency.total_seconds(), 1
     )
-  if result.advertiser_sta_latency is not nc_constants.UNSET_LATENCY:
+  if result.advertiser_sta_latency is not constants.UNSET_LATENCY:
     metrics['target'] = _float_to_str(
         result.advertiser_sta_latency.total_seconds(), 1
     )
@@ -795,32 +796,32 @@ class SingleTestResult:
   """The test result of a single iteration."""
 
   test_iteration: int = 0
-  prior_nc_fail_reason: nc_constants.SingleTestFailureReason = (
-      nc_constants.SingleTestFailureReason.UNINITIALIZED
+  prior_nc_fail_reason: constants.SingleTestFailureReason = (
+      constants.SingleTestFailureReason.UNINITIALIZED
   )
-  active_nc_fail_reason: nc_constants.SingleTestFailureReason = (
-      nc_constants.SingleTestFailureReason.UNINITIALIZED
+  active_nc_fail_reason: constants.SingleTestFailureReason = (
+      constants.SingleTestFailureReason.UNINITIALIZED
   )
   result_message: str = ''
-  prior_nc_quality_info: nc_constants.ConnectionSetupQualityInfo = (
-      dataclasses.field(default_factory=nc_constants.ConnectionSetupQualityInfo)
+  prior_nc_quality_info: constants.ConnectionSetupQualityInfo = (
+      dataclasses.field(default_factory=constants.ConnectionSetupQualityInfo)
   )
-  quality_info: nc_constants.ConnectionSetupQualityInfo = dataclasses.field(
-      default_factory=nc_constants.ConnectionSetupQualityInfo
+  quality_info: constants.ConnectionSetupQualityInfo = dataclasses.field(
+      default_factory=constants.ConnectionSetupQualityInfo
   )
-  file_transfer_throughput_kbps: float = nc_constants.UNSET_THROUGHPUT_KBPS
-  iperf_throughput_kbps: float = nc_constants.UNSET_THROUGHPUT_KBPS
-  discoverer_sta_latency: datetime.timedelta = nc_constants.UNSET_LATENCY
-  advertiser_sta_latency: datetime.timedelta = nc_constants.UNSET_LATENCY
-  sta_frequency: int = nc_constants.INVALID_INT
-  max_sta_link_speed_mbps: int = nc_constants.INVALID_INT
+  file_transfer_throughput_kbps: float = constants.UNSET_THROUGHPUT_KBPS
+  iperf_throughput_kbps: float = constants.UNSET_THROUGHPUT_KBPS
+  discoverer_sta_latency: datetime.timedelta = constants.UNSET_LATENCY
+  advertiser_sta_latency: datetime.timedelta = constants.UNSET_LATENCY
+  sta_frequency: int = constants.INVALID_INT
+  max_sta_link_speed_mbps: int = constants.INVALID_INT
   start_time: datetime.datetime = datetime.datetime.now()
   end_time: datetime.datetime | None = None
   debug_reference_info: dict[str, Any] = dataclasses.field(default_factory=dict)
-  speed_target: nc_constants.SpeedTarget = nc_constants.SpeedTarget(
-      nc_constants.INVALID_INT, nc_constants.INVALID_INT)
-  wifi_concurrency_mode: nc_constants.WifiConcurrencyMode = (
-      nc_constants.WifiConcurrencyMode.UNKNOWN
+  speed_target: constants.SpeedTarget = constants.SpeedTarget(
+      constants.INVALID_INT, constants.INVALID_INT)
+  wifi_concurrency_mode: constants.WifiConcurrencyMode = (
+      constants.WifiConcurrencyMode.UNKNOWN
   )
 
   def __post_init__(self):
@@ -830,10 +831,10 @@ class SingleTestResult:
     self.end_time = datetime.datetime.now()
 
   @property
-  def failure_reason(self) -> nc_constants.SingleTestFailureReason:
+  def failure_reason(self) -> constants.SingleTestFailureReason:
     if self.prior_nc_fail_reason not in (
-        nc_constants.SingleTestFailureReason.UNINITIALIZED,
-        nc_constants.SingleTestFailureReason.SUCCESS,
+        constants.SingleTestFailureReason.UNINITIALIZED,
+        constants.SingleTestFailureReason.SUCCESS,
     ):
       return self.prior_nc_fail_reason
     return self.active_nc_fail_reason
@@ -846,29 +847,29 @@ class SingleTestResult:
 
   def set_prior_nc_fail_reason(
       self,
-      failure_reason: nc_constants.SingleTestFailureReason,
+      failure_reason: constants.SingleTestFailureReason,
   ) -> None:
     """Sets fail reason related to establishing the prior NC."""
     self.prior_nc_fail_reason = failure_reason
-    if failure_reason == nc_constants.SingleTestFailureReason.SUCCESS:
+    if failure_reason == constants.SingleTestFailureReason.SUCCESS:
       return
     self.result_message = (
         f'FAIL (The prior BT connection): {failure_reason.name} - '
-        f'{nc_constants.COMMON_TRIAGE_TIP.get(failure_reason)}'
+        f'{constants.COMMON_TRIAGE_TIP.get(failure_reason)}'
     )
 
   def set_active_nc_fail_reason(
       self,
-      failure_reason: nc_constants.SingleTestFailureReason,
+      failure_reason: constants.SingleTestFailureReason,
       result_message: str | None = None,
   ) -> None:
     """Sets main fail reason and generates result message if not provided."""
     self.active_nc_fail_reason = failure_reason
-    if failure_reason == nc_constants.SingleTestFailureReason.SUCCESS:
+    if failure_reason == constants.SingleTestFailureReason.SUCCESS:
       self.result_message = result_message or 'PASS'
       return
     if result_message is None:
-      result_message = nc_constants.COMMON_TRIAGE_TIP.get(failure_reason)
+      result_message = constants.COMMON_TRIAGE_TIP.get(failure_reason)
     result_message = f'{failure_reason.name} - {result_message}'
     self.result_message = result_message
 
@@ -908,7 +909,7 @@ def check_gms_pids_changed(
   """
   for ad in ads:
     try:
-      current_gms_info = nc_constants.GmsInfo()
+      current_gms_info = constants.GmsInfo()
       current_gms_info.update_pids(ad)
       if ad.gms_info.has_valid_pids() and ad.gms_info != current_gms_info:
         ad.log.warning(
@@ -955,7 +956,7 @@ class PerformanceTestResults:
   """Records all test results of a performance test class."""
 
   # The test runtime object.
-  nc_test_runtime: nc_constants.NcTestRuntime | None = None
+  nc_test_runtime: constants.NcTestRuntime | None = None
   # Expected test iterations.
   test_iterations_expected: int = 1
   # Required success rate, Value range: 0 to 1
@@ -1004,28 +1005,28 @@ class PerformanceTestResults:
     )
     return actual_success_count >= min_success_iterations_required
 
-  def get_wifi_concurrency_mode(self) -> nc_constants.WifiConcurrencyMode:
+  def get_wifi_concurrency_mode(self) -> constants.WifiConcurrencyMode:
     """Returns the wifi concurrency mode of the test class."""
     if (
         self.nc_test_runtime is None
         or self.nc_test_runtime.wifi_info is None
     ):
-      return nc_constants.WifiConcurrencyMode.UNKNOWN
+      return constants.WifiConcurrencyMode.UNKNOWN
     nc_test_runtime = typing.cast(
-        nc_constants.NcTestRuntime, self.nc_test_runtime
+        constants.NcTestRuntime, self.nc_test_runtime
     )
-    if nc_constants.is_xcc_test(nc_test_runtime.wifi_info.d2d_type):
+    if constants.is_xcc_test(nc_test_runtime.wifi_info.d2d_type):
       for result in self._results:
         if (
             result.wifi_concurrency_mode
-            != nc_constants.WifiConcurrencyMode.UNKNOWN
+            != constants.WifiConcurrencyMode.UNKNOWN
         ):
           return result.wifi_concurrency_mode
     else:
-      return nc_constants.get_wifi_concurrency_mode_from_d2d_type(
+      return constants.get_wifi_concurrency_mode_from_d2d_type(
           nc_test_runtime.wifi_info.d2d_type
       )
-    return nc_constants.WifiConcurrencyMode.UNKNOWN
+    return constants.WifiConcurrencyMode.UNKNOWN
 
   def get_test_class_result_message(self) -> str:
     """Gets the test result message for the test class based on result enum."""
@@ -1053,7 +1054,7 @@ class PerformanceTestResults:
     """Summarizes test results of all iterations."""
     if (nc_test_runtime := self.nc_test_runtime) is None:
       raise ValueError('nc_test_runtime is None when generating test summary.')
-    nc_test_runtime = typing.cast(nc_constants.NcTestRuntime, nc_test_runtime)
+    nc_test_runtime = typing.cast(constants.NcTestRuntime, nc_test_runtime)
     advertiser = nc_test_runtime.advertiser
     discoverer = nc_test_runtime.discoverer
 
@@ -1088,14 +1089,14 @@ class PerformanceTestResults:
   def _get_success_iteration_count(self) -> int:
     return sum(
         test_result.failure_reason
-        is nc_constants.SingleTestFailureReason.SUCCESS
+        is constants.SingleTestFailureReason.SUCCESS
         for test_result in self._results
     )
 
   def _get_failed_iteration_count(self) -> int:
     return sum(
         test_result.failure_reason
-        is not nc_constants.SingleTestFailureReason.SUCCESS
+        is not constants.SingleTestFailureReason.SUCCESS
         for test_result in self._results
     )
 
@@ -1105,7 +1106,7 @@ class PerformanceTestResults:
     for result in self._results:
       if (
           result.failure_reason
-          is not nc_constants.SingleTestFailureReason.SUCCESS
+          is not constants.SingleTestFailureReason.SUCCESS
       ):
         messages.append(
             f'- Iter: {result.test_iteration}: {result.start_time}'
@@ -1122,7 +1123,7 @@ class PerformanceTestResults:
       return 'NA'
 
   def _get_file_transfer_stats(
-      self, nc_test_runtime: nc_constants.NcTestRuntime
+      self, nc_test_runtime: constants.NcTestRuntime
   ) -> list[str]:
     """Gets the file transfer connection stats for all iterations."""
     if not self._results:
@@ -1141,8 +1142,8 @@ class PerformanceTestResults:
         [result.iperf_throughput_kbps for result in self._results],
     )
     # find a valid benchmark speed from results.
-    benchmark_nc_speed_mbps = nc_constants.UNSET_THROUGHPUT_KBPS
-    benchmark_iperf_speed_mbps = nc_constants.UNSET_THROUGHPUT_KBPS
+    benchmark_nc_speed_mbps = constants.UNSET_THROUGHPUT_KBPS
+    benchmark_iperf_speed_mbps = constants.UNSET_THROUGHPUT_KBPS
     for result in self._results:
       if result.speed_target.nc_speed_mbtye_per_sec > 0:
         benchmark_nc_speed_mbps = result.speed_target.nc_speed_mbtye_per_sec
@@ -1174,7 +1175,7 @@ class PerformanceTestResults:
       stats.append(f'iperf_mbps_med: {iperf_stats.median_val}')
       stats.append(f'iperf_mbps_max: {iperf_stats.max_val}')
 
-    if nc_constants.is_high_quality_medium(
+    if constants.is_high_quality_medium(
         nc_test_runtime.upgrade_medium_under_test
     ):
       upgrade_latency_stats = self._get_latency_stats(
@@ -1191,7 +1192,7 @@ class PerformanceTestResults:
     return stats
 
   def _get_test_runtime_info(
-      self, nc_test_runtime: nc_constants.NcTestRuntime
+      self, nc_test_runtime: constants.NcTestRuntime
   ) -> str:
     """Gets the test runtime info for this test class."""
     info = {
@@ -1205,8 +1206,8 @@ class PerformanceTestResults:
     if (wifi_info := nc_test_runtime.wifi_info) is not None:
       # If the test could upgrade to either 2G or 5G WiFi mediums, do not show
       # below info in test summary.
-      if (nc_constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type)
-          or nc_constants.is_xcc_test(wifi_info.d2d_type)):
+      if (constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type)
+          or constants.is_xcc_test(wifi_info.d2d_type)):
         info.update(
             {'is_2g_only': 'NA', 'is_dbs_mode': 'NA', 'is_mcc_mode': 'NA'}
         )
@@ -1242,7 +1243,7 @@ class PerformanceTestResults:
         r
         for r in self._results
         if r.prior_nc_quality_info.discovery_latency
-        != nc_constants.UNSET_LATENCY
+        != constants.UNSET_LATENCY
     ]
     if not filtered_results:
       return 'NA'
@@ -1266,38 +1267,38 @@ class PerformanceTestResults:
 
   def _get_latency_stats(
       self, latency_indicators: list[datetime.timedelta]
-  ) -> nc_constants.TestResultStats:
+  ) -> constants.TestResultStats:
     """Gets the latency stats for all iterations."""
     filtered = [
         latency.total_seconds()
         for latency in latency_indicators
-        if latency != nc_constants.UNSET_LATENCY
+        if latency != constants.UNSET_LATENCY
     ]
     filtered_int = [round(latency) for latency in filtered]
     if not filtered:
       # All test cases are failed.
-      return nc_constants.TestResultStats(0, 0, 0, 0, 0)
+      return constants.TestResultStats(0, 0, 0, 0, 0)
 
     filtered.sort()
 
     percentile_50 = round(
-        filtered[int(len(filtered) * nc_constants.PERCENTILE_50_FACTOR)],
-        nc_constants.LATENCY_PRECISION_DIGITS,
+        filtered[int(len(filtered) * constants.PERCENTILE_50_FACTOR)],
+        constants.LATENCY_PRECISION_DIGITS,
     )
-    return nc_constants.TestResultStats(
+    return constants.TestResultStats(
         len(filtered),
         filtered_int.count(0),
-        round(filtered[0], nc_constants.LATENCY_PRECISION_DIGITS),
+        round(filtered[0], constants.LATENCY_PRECISION_DIGITS),
         percentile_50,
         round(
-            filtered[len(filtered) - 1], nc_constants.LATENCY_PRECISION_DIGITS
+            filtered[len(filtered) - 1], constants.LATENCY_PRECISION_DIGITS
         ),
     )
 
   def _get_transfer_stats(
       self,
       throughput_indicators: list[float],
-  ) -> nc_constants.TestResultStats:
+  ) -> constants.TestResultStats:
     """Get transfer stats.
 
     The stats include the min, median and max throughput in MB/s from
@@ -1312,19 +1313,19 @@ class PerformanceTestResults:
     filtered = [
         x
         for x in throughput_indicators
-        if x != nc_constants.UNSET_THROUGHPUT_KBPS
+        if x != constants.UNSET_THROUGHPUT_KBPS
     ]
     if not filtered:
       # all test cases are failed
-      return nc_constants.TestResultStats(0, 0, 0, 0, 0)
+      return constants.TestResultStats(0, 0, 0, 0, 0)
     # use the descenting order of the throughput
     filtered.sort(reverse=True)
-    return nc_constants.TestResultStats(
+    return constants.TestResultStats(
         len(filtered),
         0,
         _convert_kbps_to_mbps(filtered[len(filtered) - 1]),
         _convert_kbps_to_mbps(
-            filtered[int(len(filtered) * nc_constants.PERCENTILE_50_FACTOR)]
+            filtered[int(len(filtered) * constants.PERCENTILE_50_FACTOR)]
         ),
         _convert_kbps_to_mbps(filtered[0]),
     )

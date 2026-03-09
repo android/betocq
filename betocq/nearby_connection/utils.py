@@ -21,7 +21,7 @@ from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import snippet_client_v2
 
 from betocq import android_wifi_utils
-from betocq import nc_constants
+from betocq import constants
 from betocq import setup_utils
 from betocq import test_result_utils
 from betocq.nearby_connection import nearby_connection_wrapper
@@ -29,7 +29,7 @@ from betocq.nearby_connection import nearby_connection_wrapper
 
 def setup_android_device_for_nc_tests(
     ad: android_device.AndroidDevice,
-    snippet_confs: Sequence[nc_constants.SnippetConfig],
+    snippet_confs: Sequence[constants.SnippetConfig],
     country_code: str,
     skip_flag_override: bool = False,
 ) -> None:
@@ -112,10 +112,10 @@ def connect_ad_to_wifi_sta(
 
     if (
         current_wifi_ssid
-        and current_wifi_ssid != nc_constants.WIFI_UNKNOWN_SSID
+        and current_wifi_ssid != constants.WIFI_UNKNOWN_SSID
     ):
       network_id = setup_utils.get_sta_network_id_from_wifi_info(wifi_info)
-      if network_id != nc_constants.INVALID_NETWORK_ID:
+      if network_id != constants.INVALID_NETWORK_ID:
         ad.log.info(f'disconnecting from {current_wifi_ssid})')
         ad.nearby.wifiRemoveNetwork(network_id)
       else:
@@ -130,19 +130,19 @@ def connect_ad_to_wifi_sta(
     )
   except Exception:
     fail_reason = (
-        nc_constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
+        constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
         if is_discoverer
-        else nc_constants.SingleTestFailureReason.TARGET_WIFI_CONNECTION
+        else constants.SingleTestFailureReason.TARGET_WIFI_CONNECTION
     )
     result_messages = [
-        nc_constants.COMMON_TRIAGE_TIP.get(fail_reason, '').format(
+        constants.COMMON_TRIAGE_TIP.get(fail_reason, '').format(
             serial=ad.serial
         ),
     ]
     rssi = setup_utils.get_wifi_sta_rssi(ad, wifi_ssid)
-    if rssi == nc_constants.INVALID_RSSI:
+    if rssi == constants.INVALID_RSSI:
       ad.log.info('No valid RSSI')
-    if rssi > nc_constants.RSSI_HIGH_THRESHOLD:
+    if rssi > constants.RSSI_HIGH_THRESHOLD:
       high_rssi_tip = (
           f'RSSI={rssi} of which is too high. Consider to move the device'
           ' away from the AP.'
@@ -174,7 +174,7 @@ def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
-    test_parameters: nc_constants.TestParameters | None = None,
+    test_parameters: constants.TestParameters | None = None,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a prior BT Nearby Connection."""
   logging.info('Set up a prior BT connection.')
@@ -183,14 +183,14 @@ def start_prior_bt_nearby_connection(
       discoverer,
       advertiser.nearby2,
       discoverer.nearby2,
-      advertising_discovery_medium=nc_constants.NearbyMedium.BLE_ONLY,
-      connection_medium=nc_constants.NearbyMedium.BT_ONLY,
-      upgrade_medium=nc_constants.NearbyMedium.BT_ONLY,
+      advertising_discovery_medium=constants.NearbyMedium.BLE_ONLY,
+      connection_medium=constants.NearbyMedium.BT_ONLY,
+      upgrade_medium=constants.NearbyMedium.BT_ONLY,
   )
   try:
     prior_bt_snippet.start_nearby_connection(
-        timeouts=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
-        medium_upgrade_type=nc_constants.MediumUpgradeType.NON_DISRUPTIVE,
+        timeouts=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+        medium_upgrade_type=constants.MediumUpgradeType.NON_DISRUPTIVE,
         test_parameters=test_parameters,
     )
   finally:
@@ -203,13 +203,13 @@ def start_main_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     test_result: test_result_utils.SingleTestResult,
-    upgrade_medium_under_test: nc_constants.NearbyMedium,
-    test_parameters: nc_constants.TestParameters | None = None,
-    connection_medium: nc_constants.NearbyMedium = nc_constants.NearbyMedium.BT_ONLY,
-    connect_timeout: nc_constants.ConnectionSetupTimeouts = nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
-    medium_upgrade_type: nc_constants.MediumUpgradeType = nc_constants.MediumUpgradeType.DISRUPTIVE,
-    keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
-    keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
+    upgrade_medium_under_test: constants.NearbyMedium,
+    test_parameters: constants.TestParameters | None = None,
+    connection_medium: constants.NearbyMedium = constants.NearbyMedium.BT_ONLY,
+    connect_timeout: constants.ConnectionSetupTimeouts = constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+    medium_upgrade_type: constants.MediumUpgradeType = constants.MediumUpgradeType.DISRUPTIVE,
+    keep_alive_timeout_ms: int = constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
+    keep_alive_interval_ms: int = constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a main Nearby Connection which is used for file transfer."""
   logging.info('Set up a nearby connection for file transfer.')
@@ -219,7 +219,7 @@ def start_main_nearby_connection(
       discoverer,
       advertiser.nearby,
       discoverer.nearby,
-      advertising_discovery_medium=nc_constants.NearbyMedium.BLE_ONLY,
+      advertising_discovery_medium=constants.NearbyMedium.BLE_ONLY,
       connection_medium=connection_medium,
       upgrade_medium=upgrade_medium_under_test,
   )
@@ -236,30 +236,30 @@ def start_main_nearby_connection(
     test_result.quality_info = active_snippet.connection_quality_info
     fail_reason = active_snippet.test_failure_reason
     result_message = None
-    if fail_reason == nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
+    if fail_reason == constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
       default_message = (
           f'Unexpected upgrade medium - {upgrade_medium_under_test.name}.'
       )
-      result_message = nc_constants.MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS.get(
+      result_message = constants.MEDIUM_UPGRADE_FAIL_TRIAGE_TIPS.get(
           upgrade_medium_under_test, default_message
       )
 
-    if fail_reason != nc_constants.SingleTestFailureReason.SUCCESS:
+    if fail_reason != constants.SingleTestFailureReason.SUCCESS:
       test_result.set_active_nc_fail_reason(fail_reason, result_message)
 
   return active_snippet
 
 
 def handle_file_transfer_failure(
-    fail_reason: nc_constants.SingleTestFailureReason,
+    fail_reason: constants.SingleTestFailureReason,
     test_result: test_result_utils.SingleTestResult,
     file_transfer_failure_tip: str,
 ):
   """Collects metrics and generates result message for file transfer failure."""
-  if fail_reason == nc_constants.SingleTestFailureReason.SUCCESS:
+  if fail_reason == constants.SingleTestFailureReason.SUCCESS:
     return
   result_message = None
-  if fail_reason == nc_constants.SingleTestFailureReason.FILE_TRANSFER_FAIL:
+  if fail_reason == constants.SingleTestFailureReason.FILE_TRANSFER_FAIL:
     result_message = file_transfer_failure_tip
   test_result.set_active_nc_fail_reason(fail_reason, result_message)
 
@@ -269,9 +269,9 @@ def _get_snippet(
     discoverer: android_device.AndroidDevice,
     advertiser_nearby: snippet_client_v2.SnippetClientV2,
     discoverer_nearby: snippet_client_v2.SnippetClientV2,
-    advertising_discovery_medium: nc_constants.NearbyMedium,
-    connection_medium: nc_constants.NearbyMedium,
-    upgrade_medium: nc_constants.NearbyMedium,
+    advertising_discovery_medium: constants.NearbyMedium,
+    connection_medium: constants.NearbyMedium,
+    upgrade_medium: constants.NearbyMedium,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Gets the snippet for Nearby Connection."""
   return nearby_connection_wrapper.NearbyConnectionWrapper(

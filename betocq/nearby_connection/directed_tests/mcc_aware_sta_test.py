@@ -53,22 +53,22 @@ from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
 
-from betocq import nc_constants
+from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
 from betocq.nearby_connection import utils as nc_utils
 
 
-TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
-SUCCESS_RATE_TARGET = nc_constants.SUCCESS_RATE_TARGET
-_MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
+TEST_ITERATION_NUM = constants.MCC_PERFORMANCE_TEST_COUNT
+SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
+_MAX_CONSECUTIVE_ERROR = constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
 _FILE_TRANSFER_SIZE_KB = (
-    nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
+    constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
 )
-_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
-_PAYLOAD_TYPE = nc_constants.PayloadType.FILE
+_FILE_TRANSFER_TIMEOUT = constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
+_PAYLOAD_TYPE = constants.PayloadType.FILE
 
 
 _THROUGHPUT_LOW_TIP = (
@@ -86,23 +86,23 @@ _FILE_TRANSFER_FAILURE_TIP = (
 class MccAwareStaTest(performance_test_base.PerformanceTestBase):
   """Test class for Aware MCC with the STAs connected to two 5G channels."""
 
-  test_runtime: nc_constants.NcTestRuntime
-  wifi_info: nc_constants.WifiInfo
+  test_runtime: constants.NcTestRuntime
+  wifi_info: constants.WifiInfo
 
   def setup_class(self):
     super().setup_class()
 
-    self.wifi_info = nc_constants.WifiInfo(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA,
+    self.wifi_info = constants.WifiInfo(
+        d2d_type=constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA,
         advertiser_wifi_ssid=self.test_parameters.wifi_dfs_5g_ssid,
         advertiser_wifi_password=self.test_parameters.wifi_dfs_5g_password,
         discoverer_wifi_ssid=self.test_parameters.wifi_5g_ssid,
         discoverer_wifi_password=self.test_parameters.wifi_5g_password,
     )
-    self.test_runtime = nc_constants.NcTestRuntime(
+    self.test_runtime = constants.NcTestRuntime(
         advertiser=self.advertiser,
         discoverer=self.discoverer,
-        upgrade_medium_under_test=nc_constants.NearbyMedium.WIFIAWARE_ONLY,
+        upgrade_medium_under_test=constants.NearbyMedium.WIFIAWARE_ONLY,
         country_code='US',
         wifi_info=self.wifi_info,
     )
@@ -172,13 +172,13 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
     test_result_utils.set_and_assert_sta_frequency(
         self.discoverer,
         self.current_test_result,
-        nc_constants.WifiType.FREQ_5G,
+        constants.WifiType.FREQ_5G,
     )
 
     test_result_utils.set_and_assert_sta_frequency(
         self.advertiser,
         self.current_test_result,
-        nc_constants.WifiType.FREQ_5G_DFS,
+        constants.WifiType.FREQ_5G_DFS,
     )
 
     # Test Step: Set up a NC connection for file transfer.
@@ -187,7 +187,7 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
         self.discoverer,
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
-        connect_timeout=nc_constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
+        connect_timeout=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
     )
 
