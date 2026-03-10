@@ -262,7 +262,6 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
     nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
-    is_dct: bool = False,
 ):
   """Checks the throughput for 2G WiFi medium and runs iperf test if needed."""
   speed_target = _get_2g_wifi_throughput_benchmark(
@@ -276,7 +275,6 @@ def assert_2g_wifi_throughput_and_run_iperf_if_needed(
       speed_target,
       low_throughput_tip,
       did_nc_file_transfer,
-      is_discoverer_network_owner=is_dct,
   )
 
 
@@ -329,8 +327,8 @@ def _get_2g_wifi_throughput_benchmark(
 
   nc_test_runtime.advertiser.log.info(
       'target STA freq = %d, max STA speed (Mb/s): %d,'
-      ' max D2D speed (MB/s): %.2f, min D2D speed (MB/s),'
-      ' iperf: %.2f, nc: %.2f',
+      ' max D2D speed (MB/s): %.2f, iperf min throughput (MB/s): %.2f,'
+      ' nc min throughput (MB/s): %.2f',
       test_result.sta_frequency,
       test_result.max_sta_link_speed_mbps,
       max_phy_rate_mbps / _BITS_PER_BYTE,
@@ -348,14 +346,12 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
     nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
-    is_dct: bool = False,
     is_tdls_enabled: bool = True,
 ):
   """Checks the throughput for 5G WiFi medium and runs iperf test if needed."""
   speed_target = _get_5g_wifi_throughput_benchmark(
       test_result=test_result,
       nc_test_runtime=nc_test_runtime,
-      is_dct=is_dct,
       is_tdls_enabled=is_tdls_enabled,
   )
   logging.info('speed target: %s', speed_target)
@@ -365,7 +361,6 @@ def assert_5g_wifi_throughput_and_run_iperf_if_needed(
       speed_target,
       low_throughput_tip,
       did_nc_file_transfer,
-      is_discoverer_network_owner=is_dct,
   )
 
 
@@ -373,14 +368,12 @@ def assert_5g_wifi_throughput(
     test_result: SingleTestResult,
     nc_test_runtime: constants.NcTestRuntime,
     low_throughput_tip: str,
-    is_dct: bool = True,
     is_tdls_enabled: bool = True,
 ):
   """Checks the throughput for 5G medium."""
   speed_target = _get_5g_wifi_throughput_benchmark(
       test_result=test_result,
       nc_test_runtime=nc_test_runtime,
-      is_dct=is_dct,
       is_tdls_enabled=is_tdls_enabled,
   )
   logging.info('speed target: %s', speed_target)
@@ -394,7 +387,6 @@ def assert_5g_wifi_throughput(
 def _get_5g_wifi_throughput_benchmark(
     test_result: SingleTestResult,
     nc_test_runtime: constants.NcTestRuntime,
-    is_dct: bool = False,
     is_tdls_enabled: bool = True,
 ):
   """Gets the throughput benchmark as MBps."""
@@ -462,25 +454,21 @@ def _get_5g_wifi_throughput_benchmark(
     min_throughput_mbyte_per_sec /= 2.0
 
   # Step 4. Calculate nc_min_throughput_mbyte_per_sec.
-  iperf_to_nc_throughput_ratio = (
-      constants.IPERF_TO_NC_THROUGHPUT_RATIO_DCT
-      if is_dct
-      else constants.IPERF_TO_NC_THROUGHPUT_RATIO
-  )
+  iperf_to_nc_throughput_ratio = nc_test_runtime.iperf_to_d2d_throughput_ratio
   nc_min_throughput_mbyte_per_sec = (
       min_throughput_mbyte_per_sec * iperf_to_nc_throughput_ratio
   )
   # Limit NC min throughput due to encryption overhead
-  if is_wlan_medium and not is_dct:
+  if is_wlan_medium:
     nc_min_throughput_mbyte_per_sec = min(
         nc_min_throughput_mbyte_per_sec,
-        constants.WLAN_MEDIUM_THROUGHPUT_CAP_MBPS,
+        nc_test_runtime.wlan_throughput_cap_mbps,
     )
 
   nc_test_runtime.advertiser.log.info(
       'target STA freq = %d, max STA speed (Mb/s): %d,'
-      ' max D2D speed (MB/s): %.2f, min D2D speed (MB/s),'
-      ' iperf: %.2f, nc: %.2f',
+      ' max D2D speed (MB/s): %.2f, iperf min throughput (MB/s): %.2f,'
+      ' nc min throughput (MB/s): %.2f',
       test_result.sta_frequency,
       test_result.max_sta_link_speed_mbps,
       max_phy_rate_mbps / _BITS_PER_BYTE,
@@ -550,11 +538,8 @@ def assert_throughput_and_run_iperf_if_needed(
     speed_target: constants.SpeedTarget,
     low_throughput_tip: str,
     did_nc_file_transfer: bool = True,
-    is_discoverer_network_owner: bool = False,
 ):
   """Checks the file transfer throughput and runs iperf test if needed."""
-  advertiser = nc_test_runtime.advertiser
-  discoverer = nc_test_runtime.discoverer
   upgrade_medium_under_test = nc_test_runtime.upgrade_medium_under_test
 
   nc_speed_min_mbps = speed_target.nc_speed_mbtye_per_sec
@@ -570,11 +555,7 @@ def assert_throughput_and_run_iperf_if_needed(
   ]):
     iperf_speed_mbps = _run_iperf_test(
         test_result,
-        advertiser,
-        discoverer,
-        upgrade_medium_under_test,
-        nc_test_runtime.wifi_info,
-        is_discoverer_network_owner,
+        nc_test_runtime,
     )
 
   low_throughput_info = None
@@ -605,15 +586,13 @@ def assert_throughput_and_run_iperf_if_needed(
 
 def _run_iperf_test(
     test_result: SingleTestResult,
-    advertiser: android_device.AndroidDevice,
-    discoverer: android_device.AndroidDevice,
-    upgrade_medium_under_test: constants.NearbyMedium,
-    wifi_info: constants.WifiInfo | None,
-    is_discoverer_network_owner: bool = False,
+    nc_test_runtime: constants.NcTestRuntime,
 ) -> float:
   """Runs iperf test and returns the throughput. Returns 0 if not needed."""
+  wifi_info = nc_test_runtime.wifi_info
   if wifi_info is None or wifi_info.is_mcc:
     return 0
+  upgrade_medium_under_test = nc_test_runtime.upgrade_medium_under_test
   if upgrade_medium_under_test not in [
       constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
       constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
@@ -621,6 +600,9 @@ def _run_iperf_test(
       constants.NearbyMedium.WIFIAWARE_ONLY,
   ]:
     return 0
+  advertiser = nc_test_runtime.advertiser
+  discoverer = nc_test_runtime.discoverer
+  is_discoverer_network_owner = nc_test_runtime.is_discoverer_network_owner
   test_result.iperf_throughput_kbps = iperf_utils.run_iperf_test(
       ad_network_client=(
           advertiser if is_discoverer_network_owner else discoverer

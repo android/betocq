@@ -84,12 +84,13 @@ MCC_THROUGHPUT_MULTIPLIER = 0.25
 # MCC hotspot has lower throughput due to synchronization issue with STA.
 MCC_HOTSPOT_THROUGHPUT_MULTIPLIER = 0.2
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37  # 866/8*0.37 = 40
-IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
-IPERF_TO_NC_THROUGHPUT_RATIO_DCT = 1
+IPERF_TO_D2D_THROUGHPUT_RATIO_DEF = 0.8
+IPERF_TO_D2D_THROUGHPUT_RATIO_DCT = 1
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
 WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
     15  # cap for WLAN medium due to encryption overhead
 )
+WLAN_MEDIUM_THROUGHPUT_CAP_MBPS_NO_CAP = float('inf')
 
 CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
 BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
@@ -924,8 +925,11 @@ class NcTestRuntime:
   country_code: str = 'US'
   is_dbs_mode: bool = False
   advertising_discovery_medium: NearbyMedium = NearbyMedium.BLE_ONLY
-  connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
   wifi_info: WifiInfo | None = None
+  # Performance configuration
+  iperf_to_d2d_throughput_ratio: float = IPERF_TO_D2D_THROUGHPUT_RATIO_DEF
+  is_discoverer_network_owner: bool = False
+  wlan_throughput_cap_mbps: float = WLAN_MEDIUM_THROUGHPUT_CAP_MBPS
 
 
 @dataclasses.dataclass(frozen=True)
