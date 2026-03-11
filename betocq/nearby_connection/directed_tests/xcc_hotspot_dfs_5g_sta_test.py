@@ -65,13 +65,15 @@ from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
+
 
 # Use SCC strategy for iteration number and max consecutive error,
 # as this is similar to the xcc_wfd_dfs_5g_sta_test,
 # which is covered by the MCC strategy. Hotspot is using the WFD too.
 TEST_ITERATION_NUM = constants.SCC_PERFORMANCE_TEST_COUNT
-SUCCESS_RATE_TARGET = constants.MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET
+SUCCESS_RATE_TARGET = nc_constants.MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = constants.SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
 _PAYLOAD_TYPE = constants.PayloadType.FILE
@@ -231,11 +233,11 @@ class XccHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
     file_transfer_size_kb = (
-        constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
+        nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
     )
     file_transfer_timeout = constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
     if wifi_concurrency_mode == constants.WifiConcurrencyMode.SCC_5G:
-      file_transfer_size_kb = constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB
+      file_transfer_size_kb = nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB
       file_transfer_timeout = constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
 
     try:
@@ -251,9 +253,9 @@ class XccHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         # although this is not expected to happen (P2P freq is not gotten?).
         single_file_transfer_throughput_kbps = (
             active_snippet.transfer_file_for_unknown_concurrency_mode(
-                mcc_file_size_kb=constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB,
+                mcc_file_size_kb=nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB,
                 mcc_timeout=constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
-                scc_file_size_kb=constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
+                scc_file_size_kb=nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
                 scc_timeout=constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
                 payload_type=_PAYLOAD_TYPE,
             )

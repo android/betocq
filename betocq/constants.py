@@ -24,26 +24,16 @@ from typing import Any
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
-BETOCQ_NAME = 'BetoCQ'
+BETOCQ_NAME = 'BeToCQ'
 
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
-# MCC hotspot test is more flaky than other MCC tests due to the sync issue.
-MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET = 0.90
-MCC_PERFORMANCE_TEST_COUNT = 3
-MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-SCC_PERFORMANCE_TEST_COUNT = 3
-SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-BT_PERFORMANCE_TEST_COUNT = 3
-BT_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-BT_COEX_PERFORMANCE_TEST_COUNT = 3
-BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-LOHS_PERFORMANCE_TEST_COUNT = 3
-LOHS_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-WIFI_AWARE_SCC_PERFORMANCE_TEST_COUNT = 3
+SCC_PERFORMANCE_TEST_COUNT = 20
+SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 3
+WIFI_AWARE_SCC_PERFORMANCE_TEST_COUNT = 10
 
 PROGRAMMABLE_AP_CHANNEL_2G = 6
 PROGRAMMABLE_AP_CHANNEL_5G = 36
@@ -60,15 +50,12 @@ WIFI_AWARE_AFTER_CONNECTION_START_THROUGHPUT_WAIT_TIME_SEC = datetime.timedelta(
 FIRST_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=35)
-BT_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
-BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=35)
 BLE_20K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 BLE_100K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 SECOND_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=35)
 SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
-WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=60)
 WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
@@ -91,15 +78,6 @@ WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
 )
 WLAN_MEDIUM_THROUGHPUT_CAP_MBPS_NO_CAP = float('inf')
 
-CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
-BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
-
-
-KEEP_ALIVE_TIMEOUT_BT_MS = 30000
-KEEP_ALIVE_INTERVAL_BT_MS = 5000
-
-KEEP_ALIVE_TIMEOUT_WIFI_MS = 10000
-KEEP_ALIVE_INTERVAL_WIFI_MS = 3000
 
 PERCENTILE_50_FACTOR = 0.5
 LATENCY_PRECISION_DIGITS = 1
@@ -117,17 +95,10 @@ TRANSFER_FILE_SIZE_200MB = 200 * 1024  # kB
 TRANSFER_FILE_SIZE_100MB = 100 * 1024  # kB
 TRANSFER_FILE_SIZE_20MB = 20 * 1024  # kB
 TRANSFER_FILE_SIZE_1MB = 1024  # kB
-TRANSFER_FILE_SIZE_500KB = 512  # kB
 TRANSFER_FILE_SIZE_1KB = 1  # kB
 TRANSFER_FILE_SIZE_20KB = 20  # kB
 TRANSFER_FILE_SIZE_10KB = 10  # kB
 TRANSFER_FILE_SIZE_100KB = 100  # kB
-NC_MCC_2G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
-NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB = 120 * 1024  # kB
-NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 120 * 1024  # kB
-NC_SCC_2G_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
-NC_SCC_5G_TRANSFER_FILE_SIZE_KB = 500 * 1024  # kB
-
 
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
@@ -243,17 +214,6 @@ class PayloadType(enum.IntEnum):
   BYTES = 1
   FILE = 2
   STREAM = 3
-
-
-@enum.unique
-class NcBandwidthUpgradeStatus(enum.IntEnum):
-  UNKNOWN = 0
-  # The upgrade is successful.
-  SUCCESS = 1
-  # The connection is lost, attempting to reconnect.
-  SUSPENDED = 2
-  # The upgrade is timed out.
-  TIMED_OUT = 3
 
 
 @enum.unique
@@ -736,42 +696,6 @@ class SpeedTarget:
 
   iperf_speed_mbtye_per_sec: float
   nc_speed_mbtye_per_sec: float
-
-
-@dataclasses.dataclass(frozen=False)
-class NcPerformanceTestMetrics:
-  """Metrics data for quick start test."""
-
-  prior_bt_discovery_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  prior_bt_connection_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  discoverer_wifi_sta_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  file_transfer_discovery_latencies: list[datetime.timedelta] = (
-      dataclasses.field(default_factory=list[datetime.timedelta])
-  )
-  file_transfer_connection_latencies: list[datetime.timedelta] = (
-      dataclasses.field(default_factory=list[datetime.timedelta])
-  )
-  medium_upgrade_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  advertiser_wifi_sta_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  file_transfer_throughputs_kbps: list[float] = dataclasses.field(
-      default_factory=list[float]
-  )
-  iperf_throughputs_kbps: list[float] = dataclasses.field(
-      default_factory=list[float]
-  )
-  upgraded_wifi_transfer_mediums: list[NearbyConnectionMedium] = (
-      dataclasses.field(default_factory=list[NearbyConnectionMedium])
-  )
 
 
 @dataclasses.dataclass(frozen=True)

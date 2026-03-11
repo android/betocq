@@ -24,6 +24,7 @@ from betocq import android_wifi_utils
 from betocq import constants
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import nearby_connection_wrapper
 
 
@@ -208,8 +209,8 @@ def start_main_nearby_connection(
     connection_medium: constants.NearbyMedium = constants.NearbyMedium.BT_ONLY,
     connect_timeout: constants.ConnectionSetupTimeouts = constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
     medium_upgrade_type: constants.MediumUpgradeType = constants.MediumUpgradeType.DISRUPTIVE,
-    keep_alive_timeout_ms: int = constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
-    keep_alive_interval_ms: int = constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
+    keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
+    keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a main Nearby Connection which is used for file transfer."""
   logging.info('Set up a nearby connection for file transfer.')

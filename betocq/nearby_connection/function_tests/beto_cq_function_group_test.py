@@ -40,6 +40,7 @@ from betocq import base_test
 from betocq import constants
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
 
 
@@ -274,7 +275,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
         payload_size_kb=constants.TRANSFER_FILE_SIZE_1KB,
-        payload_transfer_timeout=constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
+        payload_transfer_timeout=nc_constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
         payload_num=constants.TRANSFER_FILE_NUM_DEFAULT,
     )
 
@@ -515,7 +516,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         payload_type=constants.PayloadType.FILE,
         test_parameters=self.test_parameters,
         payload_num=constants.TRANSFER_FILE_NUM_DEFAULT,
-        payload_transfer_timeout=constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
+        payload_transfer_timeout=nc_constants.BT_1K_PAYLOAD_TRANSFER_TIMEOUT,
         payload_size_kb=constants.TRANSFER_FILE_SIZE_1KB,
         connect_timeout=constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
     )

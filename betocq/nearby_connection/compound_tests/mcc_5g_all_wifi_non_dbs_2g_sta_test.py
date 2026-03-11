@@ -61,12 +61,13 @@ from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
 
 
-TEST_ITERATION_NUM = constants.MCC_PERFORMANCE_TEST_COUNT
+TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
 SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
-_MAX_CONSECUTIVE_ERROR = constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
+_MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
 _FILE_TRANSFER_SIZE_KB = constants.TRANSFER_FILE_SIZE_100MB
 _FILE_TRANSFER_TIMEOUT = constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT

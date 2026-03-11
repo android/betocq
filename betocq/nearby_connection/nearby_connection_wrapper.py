@@ -27,6 +27,7 @@ from mobly.controllers.android_device_lib import snippet_client_v2
 from mobly.snippet import callback_event
 
 from betocq import constants
+from betocq.nearby_connection import nc_constants
 
 # This number should be large enough to cover advertising interval, firmware
 # scheduling timing interval and user action delay
@@ -181,8 +182,8 @@ class NearbyConnectionWrapper:
       self,
       medium_upgrade_type: constants.MediumUpgradeType,
       timeout: datetime.timedelta,
-      keep_alive_timeout_ms: int = constants.KEEP_ALIVE_TIMEOUT_BT_MS,
-      keep_alive_interval_ms: int = constants.KEEP_ALIVE_INTERVAL_BT_MS,
+      keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
+      keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
   ) -> None:
     """Requests Nearby Connection.
 
@@ -331,11 +332,11 @@ class NearbyConnectionWrapper:
       upgrade_status = discoverer_medium_connection_event.data['upgradeStatus']
       asserts.assert_false(
           upgrade_status
-          == constants.NcBandwidthUpgradeStatus.TIMED_OUT,
+          == nc_constants.NcBandwidthUpgradeStatus.TIMED_OUT,
           'Source device reported bandwidth changed failed for the initial'
           ' bluetooth connection',
       )
-      if upgrade_status == constants.NcBandwidthUpgradeStatus.SUCCESS:
+      if upgrade_status == nc_constants.NcBandwidthUpgradeStatus.SUCCESS:
         on_bandwidth_changed_event_success = True
       else:
         self.discoverer.log.info(
@@ -406,12 +407,12 @@ class NearbyConnectionWrapper:
         self.discoverer.log.info(
             f'medium upgrade to {discoverer_medium_upgrade_event.data}'
         )
-        medium_upgrade_status = constants.NcBandwidthUpgradeStatus(
+        medium_upgrade_status = nc_constants.NcBandwidthUpgradeStatus(
             discoverer_medium_upgrade_event.data['upgradeStatus']
         )
         asserts.assert_false(
             medium_upgrade_status
-            == constants.NcBandwidthUpgradeStatus.TIMED_OUT,
+            == nc_constants.NcBandwidthUpgradeStatus.TIMED_OUT,
             'Source device reported bandwidth upgrade failed for the wifi'
             ' medium upgrade',
         )

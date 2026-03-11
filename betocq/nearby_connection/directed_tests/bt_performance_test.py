@@ -43,16 +43,17 @@ from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
 
 
-THROUGHPUT_TARGET = constants.CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS
-TEST_ITERATION_NUM = constants.BT_PERFORMANCE_TEST_COUNT
+THROUGHPUT_TARGET = nc_constants.CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS
 SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
-_MAX_CONSECUTIVE_ERROR = constants.BT_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
+TEST_ITERATION_NUM = nc_constants.BT_PERFORMANCE_TEST_COUNT
+_MAX_CONSECUTIVE_ERROR = nc_constants.BT_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
-_FILE_TRANSFER_SIZE_KB = constants.TRANSFER_FILE_SIZE_500KB
-_FILE_TRANSFER_TIMEOUT = constants.BT_500K_PAYLOAD_TRANSFER_TIMEOUT
+_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_500KB
+_FILE_TRANSFER_TIMEOUT = nc_constants.BT_500K_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = constants.PayloadType.FILE
 
 
@@ -127,8 +128,8 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
         connection_medium=self.test_runtime.connection_medium,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
-        keep_alive_timeout_ms=constants.KEEP_ALIVE_TIMEOUT_BT_MS,
-        keep_alive_interval_ms=constants.KEEP_ALIVE_INTERVAL_BT_MS,
+        keep_alive_timeout_ms=nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
+        keep_alive_interval_ms=nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
         test_parameters=self.test_parameters,
     )
 
