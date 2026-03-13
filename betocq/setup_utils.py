@@ -36,6 +36,7 @@ from betocq import gms_auto_updates_util
 from betocq import resources
 
 _DEFAULT_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:default_overrides'
+
 _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES = '//wireless/android/platform/testing/bettertogether/betocq:wifi_direct_hotspot_off_overrides'
 _FLAG_SETUP_TEMPLATE_KEY = 'google3/java/com/google/android/libraries/phenotype/codegen/hermetic/setup_flags_template.sh'
 _GMS_PACKAGE = 'com.google.android.gms'
@@ -341,7 +342,14 @@ def connect_to_wifi(
 def remove_current_connected_wifi_network(
     ad: android_device.AndroidDevice,
 ) -> bool:
-  """Removes and disconnects the current connected wifi network on the given device."""
+  """Removes the currently connected wifi network.
+
+  Args:
+    ad: The Android device to operate on.
+
+  Returns:
+    True if a network was found and removed, False otherwise.
+  """
   wifi_info = ad.nearby.wifiGetConnectionInfo()
   if (
       not wifi_info
@@ -966,7 +974,7 @@ def set_flags(
 ):
   """Sets default flags on the given device."""
   ad.log.info('Installing hermetic overrides from %s', _DEFAULT_OVERRIDES)
-  _install_overrides(ad, output_path, _DEFAULT_OVERRIDES, False)
+  install_overrides(ad, output_path, _DEFAULT_OVERRIDES, False)
 
 
 def set_flag_wifi_direct_hotspot_off(
@@ -975,7 +983,7 @@ def set_flag_wifi_direct_hotspot_off(
 ):
   """Turn off the flag use_wifi_direct_hotspot on the given device."""
   ad.log.info('turn off wifi direct hotspot')
-  _install_overrides(
+  install_overrides(
       ad,
       output_path,
       _WIFI_DIRECT_HOTSPOT_OFF_OVERRIDES,
@@ -983,7 +991,7 @@ def set_flag_wifi_direct_hotspot_off(
   )
 
 
-def _install_overrides(
+def install_overrides(
     ad: android_device.AndroidDevice,
     output_path: str,
     target: str,
@@ -1050,7 +1058,6 @@ def get_sta_frequency_and_max_link_speed(
   return (sta_frequency, sta_max_link_speed_mbps)
 
 
-# Add back temporarily, will be removed after refractoring refactor DCT tests.
 def get_target_sta_frequency_and_max_link_speed(
     ad: android_device.AndroidDevice,
 ) -> tuple[int, int]:
@@ -1403,7 +1410,16 @@ def is_gms_version_above_required_version(
 def is_nc_wlan_file_transfer_flaky_issue_fixed(
     advertiser: android_device.AndroidDevice,
 ) -> bool:
-  """Checks if the nearby connection WLAN file transfer flaky issue is fixed, see (internal)."""
+  """Checks if the nearby connection WLAN file transfer flaky issue is fixed.
+
+  See (internal) for details.
+
+  Args:
+    advertiser: The AndroidDevice instance.
+
+  Returns:
+    True if the GMS version is above the required version, False otherwise.
+  """
   return is_gms_version_above_required_version(advertiser, 260200000)
 
 
