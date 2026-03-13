@@ -179,42 +179,6 @@ class BaseTestClass(base_test.BaseTestClass):
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
 
-  def _get_snippet_apk_path(self, snippet_name: str) -> str | None:
-    """Gets the APK path for the given snippet name from user params.
-
-    Args:
-      snippet_name: The snippet name used to find the snippet
-      APK in user_params (e.g., 'nearby_snippet').
-
-    Returns:
-      The path to the snippet APK, or None if not provided.
-    """
-    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
-    apk_paths = self.user_params.get(file_tag, {}).get(snippet_name, [''])
-    if not apk_paths or not apk_paths[0]:
-      # allow the apk_path to be empty as github release does not install
-      # the apk in the script.
-      return None
-    return apk_paths[0]
-
-  @property
-  def nearby_snippet_config(self) -> constants.SnippetConfig:
-    """Snippet config for loading the first nearby snippet instance."""
-    return constants.SnippetConfig(
-        snippet_name='nearby',
-        package_name=constants.NEARBY_SNIPPET_PACKAGE_NAME,
-        apk_path=self._get_snippet_apk_path('nearby_snippet'),
-    )
-
-  @property
-  def nearby2_snippet_config(self) -> constants.SnippetConfig:
-    """Snippet config for loading the second nearby snippet instance."""
-    return constants.SnippetConfig(
-        snippet_name='nearby2',
-        package_name=constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
-        apk_path=self._get_snippet_apk_path('nearby_snippet_2'),
-    )
-
   def setup_wifi_env(
       self, d2d_type: constants.WifiD2DType, country_code: str
   ):
@@ -361,8 +325,8 @@ class BaseTestClass(base_test.BaseTestClass):
           ' killed from the logcat, disable the GMS auto update from the play'
           ' store (Settings -> Network perferences) and retry the test;\n'
           '3. The test snippet might be killed by a security app or service'
-          ' from the device, especially if this happens very frequently, check'
-          ' the logcat to verify if '
+          ' from the device, especially if this happens very frequently,'
+          ' check the logcat to verify if '
           f' {constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
           f' {constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
           ' was killed; you should'

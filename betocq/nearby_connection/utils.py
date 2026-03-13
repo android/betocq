@@ -14,8 +14,8 @@
 
 """Utility functions for testing against Nearby Connection."""
 
-from collections.abc import Sequence
 import logging
+from typing import Any, Sequence
 
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import snippet_client_v2
@@ -26,6 +26,30 @@ from betocq import setup_utils
 from betocq import test_result_utils
 from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import nearby_connection_wrapper
+
+
+def get_nearby_snippet_config(
+    user_params: dict[str, Any],
+) -> constants.SnippetConfig:
+  """Returns the snippet config for the first nearby snippet instance."""
+  return constants.SnippetConfig(
+      snippet_name='nearby',
+      package_name=constants.NEARBY_SNIPPET_PACKAGE_NAME,
+      apk_path=setup_utils.get_snippet_apk_path(user_params, 'nearby_snippet'),
+  )
+
+
+def get_nearby2_snippet_config(
+    user_params: dict[str, Any],
+) -> constants.SnippetConfig:
+  """Returns the snippet config for the second nearby snippet instance."""
+  return constants.SnippetConfig(
+      snippet_name='nearby2',
+      package_name=constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
+      apk_path=setup_utils.get_snippet_apk_path(
+          user_params, 'nearby_snippet_2'
+      ),
+  )
 
 
 def setup_android_device_for_nc_tests(

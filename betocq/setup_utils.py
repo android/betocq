@@ -103,6 +103,28 @@ def get_betocq_device_specific_info(
   return device_specific_dict
 
 
+def get_snippet_apk_path(
+    user_params: dict[str, Any], snippet_name: str
+) -> str | None:
+  """Gets the APK path for the given snippet name from user params.
+
+  Args:
+    user_params: The user parameters from the testbed.
+    snippet_name: The snippet name used to find the snippet APK in user_params
+      (e.g., 'nearby_snippet').
+
+  Returns:
+    The path to the snippet APK, or None if not provided.
+  """
+  file_tag = 'files' if 'files' in user_params else 'mh_files'
+  apk_paths = user_params.get(file_tag, {}).get(snippet_name, [''])
+  if not apk_paths or not apk_paths[0]:
+    # allow the apk_path to be empty as github release does not install
+    # the apk in the script.
+    return None
+  return apk_paths[0]
+
+
 def set_country_code(
     ad: android_device.AndroidDevice,
     country_code: str,

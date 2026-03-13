@@ -128,10 +128,12 @@ class Scc2gAllWifiStaTest(performance_test_base.PerformanceTestBase):
     setup_utils.abort_if_5g_band_supported([self.discoverer, self.advertiser])
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
-    # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
         ad,
-        snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
+        snippet_confs=[
+            nc_utils.get_nearby_snippet_config(self.user_params),
+            nc_utils.get_nearby2_snippet_config(self.user_params),
+        ],
         country_code=self.test_runtime.country_code,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )

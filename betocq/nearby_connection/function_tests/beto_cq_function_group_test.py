@@ -247,7 +247,10 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     # set up 2 nearby connections.
     nc_utils.setup_android_device_for_nc_tests(
         ad,
-        snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
+        snippet_confs=[
+            nc_utils.get_nearby_snippet_config(self.user_params),
+            nc_utils.get_nearby2_snippet_config(self.user_params),
+        ],
         country_code=_COUNTRY_CODE,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
