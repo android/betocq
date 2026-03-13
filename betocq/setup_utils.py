@@ -884,7 +884,7 @@ def set_wifi_tdls_mode_by_adb_wl_command(
     enable_tdls: bool,
     catch_exception: bool = True,
 ) -> None:
-  """Sets wifi tdls mode on the given device by using adb wl command.
+  """Sets Wi-Fi TDLS mode on the given device by using adb wl command.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
@@ -912,10 +912,27 @@ def set_wifi_tdls_mode_by_adb_wl_command(
 def set_wifi_tdls_mode_by_wifi_manager_api(
     ad: android_device.AndroidDevice,
     remote_ad: android_device.AndroidDevice,
+    *,
     enable_tdls: bool,
+    snippet_name: str,
     catch_exception: bool = True,
 ) -> None:
-  """Sets wifi tdls mode on the given device by using WifiManager API."""
+  """Sets Wi-Fi TDLS mode on the given device by using WifiManager API.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+    remote_ad: AndroidDevice, the remote device to get IP address from.
+    enable_tdls: True to enable TDLS, False to disable.
+    snippet_name: The name of the snippet (e.g., 'nearby').
+    catch_exception: True to catch exception, False to raise exception.
+
+  Raises:
+    AttributeError: If `snippet_name` is not a valid attribute of the device.
+    adb.AdbError: If an ADB command fails and `catch_exception` is False.
+    ValueError: If parsing the IP address from `cmd wifi status` fails and
+      `catch_exception` is False.
+  """
+  snippet = getattr(ad, snippet_name)
   # WifiManager.setTdlsEnabled() doesn't work with Pixel devices.
   # Use the wl command instead.
   remote_ip_address = None
@@ -939,7 +956,7 @@ def set_wifi_tdls_mode_by_wifi_manager_api(
     return
 
   # ad.log.info(f'Remote device IP address: {remote_ip_address}')
-  ad.nearby.wifiSetTdlsEnable(remote_ip_address, enable_tdls)
+  snippet.wifiSetTdlsEnable(remote_ip_address, enable_tdls)
   ad.log.info('Set wifi tdls mode to %s', enable_tdls)
 
 
