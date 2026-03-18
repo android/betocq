@@ -28,6 +28,7 @@ from mobly import signals
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import apk_utils
+from mobly.controllers.android_device_lib.services import snippet_management_service
 from mobly.snippet import errors
 
 from betocq.gms import hermetic_overrides_partner
@@ -1107,12 +1108,12 @@ def load_nearby_snippet(
   if config.apk_path:
     key_apk_installed = config.package_name + '_installed'
     if not device_specific_dict.get(key_apk_installed, False):
-      ad.log.info('try to install nearby_snippet_apk')
+      ad.log.info('try to install snippet apk')
       apk_utils.install(ad, config.apk_path)
       device_specific_dict[key_apk_installed] = True
   else:
     ad.log.warning(
-        'nearby_snippet apk is not specified, '
+        ' apk path is not specified, '
         'make sure it is installed in the device'
     )
   if not device_specific_dict.get('external_storage_permission_granted', False):
@@ -1121,6 +1122,23 @@ def load_nearby_snippet(
     device_specific_dict['external_storage_permission_granted'] = True
 
   ad.load_snippet(config.snippet_name, config.package_name)
+
+
+def unload_nearby_snippet(
+    ad: android_device.AndroidDevice,
+    config: constants.SnippetConfig,
+):
+  """Unloads a nearby snippet with the given snippet config."""
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  key_apk_installed = config.package_name + '_installed'
+  try:
+    ad.unload_snippet(config.snippet_name)
+    if device_specific_dict.get(key_apk_installed, False):
+      ad.log.info('try to uninstall snippet_apk')
+      apk_utils.uninstall(ad, config.package_name)
+      device_specific_dict[key_apk_installed] = False
+  except (adb.AdbError, snippet_management_service.Error):
+    ad.log.warning('Failed to unload snippet_apk.')
 
 
 def wait_for_predicate(
