@@ -58,7 +58,8 @@ class BetoCqAqtTestSuite(base_suite.BaseSuite):
     test_params = constants.TestParameters.from_user_params(
         config.user_params
     )
-    if test_params.target_cuj_name is None:
+    if (not test_params.target_cuj_name
+        or test_params.target_cuj_name == constants.TARGET_CUJ_UNSET):
       return
     asserts.abort_all_if(
         test_params.target_cuj_name

@@ -105,6 +105,7 @@ TRANSFER_FILE_NUM_DEFAULT = 1
 TRANSFER_FILE_NUM_FUNC_TEST = 100
 TRANSFER_TIMEOUT_FUNC_TEST = datetime.timedelta(seconds=100)
 
+TARGET_CUJ_UNSET = 'unspecified'
 TARGET_CUJ_QUICK_START = 'quick_start'
 TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
 TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
@@ -124,7 +125,7 @@ WIFI_SUPPLICANT_STATE_COMPLETED = 'COMPLETED'
 class TestParameters:
   """Test parameters to be customized for Nearby Connection."""
 
-  target_cuj_name: str = 'unspecified'
+  target_cuj_name: str = TARGET_CUJ_UNSET
   wifi_2g_ssid: str = ''
   wifi_2g_password: str = ''
   wifi_5g_ssid: str = ''
