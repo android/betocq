@@ -806,6 +806,29 @@ def is_valid_wifi_5g_dfs_freq(freq: int) -> bool:
   )
 
 
+def is_aware_pairing_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if Aware pairing is supported on the given device."""
+  try:
+    # get the dumpsys output
+    dumpsys_output = ad.adb.shell('dumpsys wifiaware').decode('utf-8')
+    return 'isNanPairingSupported=true' in dumpsys_output
+  except Exception as e:  # pylint: disable=broad-except
+    ad.log.info('Aware pairing is not supported due to %s', e)
+    return False
+
+
+def wait_for_aware_pairing_supported(
+    ad: android_device.AndroidDevice,
+    timeout: datetime.timedelta = constants.WIFI_AWARE_AVAILABLE_WAIT_TIME,
+) -> bool:
+  """Waits for Wifi Aware pairing to be available on the given device."""
+  return wait_for_predicate(
+      lambda: is_aware_pairing_supported(ad),
+      timeout,
+      interval=datetime.timedelta(seconds=1),
+  )
+
+
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware is supported on the given device."""
   try:
@@ -1370,6 +1393,19 @@ def abort_if_wifi_aware_not_available(
     asserts.abort_class_if(
         not wait_for_aware_available(ad),
         f'Wifi Aware is not available in the device {ad}.',
+    )
+
+
+def abort_if_wifi_aware_pairing_not_supported(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Aborts test class if Wi-Fi Aware pairing is not supported in any device."""
+  for ad in ads:
+    # The utility function waits a small time. This is because Aware is not
+    # immediately available after enabling WiFi.
+    asserts.abort_class_if(
+        not wait_for_aware_pairing_supported(ad),
+        f'Wifi Aware pairing is not supported in the device {ad}.',
     )
 
 
