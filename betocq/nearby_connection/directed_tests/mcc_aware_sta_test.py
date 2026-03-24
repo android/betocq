@@ -107,6 +107,9 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
         country_code='US',
         wifi_info=self.wifi_info,
     )
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters
+    )
 
     self.test_results.test_iterations_expected = TEST_ITERATION_NUM
     self.test_results.success_rate_target = SUCCESS_RATE_TARGET

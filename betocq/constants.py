@@ -21,6 +21,7 @@ import enum
 import logging
 from typing import Any
 
+from mobly import signals
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
@@ -155,6 +156,9 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
+  # Whether to run all tests in the suite. abort_all should be replaced by
+  # a failure error.
+  run_all_tests_in_suite: bool = False
   skip_throughput_assertion: bool = False
   is_wifi_chipset_model_mandatory: bool = True
   # The model of the wifi chipset used by both devices under test.
@@ -191,6 +195,7 @@ class TestParameters:
       test_parameters.requires_bt_multiplex = True
 
     if test_parameters.target_cuj_name == TARGET_CUJ_AQT:
+      test_parameters.run_all_tests_in_suite = True
       test_parameters.skip_throughput_assertion = True
       test_parameters.is_wifi_chipset_model_mandatory = False
 
@@ -864,3 +869,27 @@ class SnippetConfig:
   snippet_name: str
   package_name: str
   apk_path: str | None = None
+
+
+class WifiApNotReadyError(signals.TestAbortClass):
+  """APs not ready error, abort all tests in the class."""
+
+
+class PythonVersionError(signals.TestAbortClass):
+  """Python version error, abort all tests in the class."""
+
+
+class DeviceRegistrationError(signals.TestAbortClass):
+  """Device registration error, abort all tests in the class."""
+
+
+class UnrootedDeviceError(signals.TestAbortClass):
+  """Unrooted device error, abort all tests in the class."""
+
+
+class MissingConfigError(signals.TestAbortClass):
+  """Missing config error, abort all tests in the class."""
+
+
+class SnippetDisconnectionError(signals.TestAbortClass):
+  """Snippet disconnection error, abort all tests in the class."""

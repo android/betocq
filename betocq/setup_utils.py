@@ -1267,27 +1267,41 @@ def abort_if_on_unrooted_device(
     )
 
 
-def abort_all_and_report_error_on_setup(
-    test: base_test.BaseTestClass, error_message: str
-):
-  """Aborts all tests and reports a class error.
+def report_error_on_setup_class(
+    test: base_test.BaseTestClass,
+    error_message: str,
+    abort_all: bool = False,
+    error_class: type[signals.TestSignal] = signals.TestAbortClass,
+) -> None:
+  """Reports an error on setup class and aborts all test in the suite or class.
 
-  This function is used in setup to ensure that test failures result in a
-  class error rather than a PASS/SKIP, which is the default behavior for
-  `asserts.abort_all` in the setup stage.
+  Generally, result store/sponge takes such error as skip; with this method,
+  this will be taken as error/failure.
 
   Args:
     test: The Mobly base test class instance.
     error_message: The message to include in the abort signal.
+    abort_all: If True, aborts all tests in all classes, otherwise aborts all
+      tests in the current class.
+    error_class: The specific TestSignal class to raise if abort_all is False.
   """
   test_result_record = records.TestResultRecord(
       base_test.STAGE_NAME_SETUP_CLASS,
       test.TAG,
   )
   test_result_record.test_begin()
-  termination_signal = signals.TestAbortAll(
-      f'Aborting all tests due to {error_message}.'
-  )
+  if abort_all:
+    termination_signal = signals.TestAbortAll(
+        f'Aborting all tests due to {error_message}.'
+    )
+  else:
+    if issubclass(error_class, signals.TestAbortClass):
+      termination_signal = error_class(
+          f'Aborting all tests in current class due to {error_message}.'
+      )
+    else:
+      termination_signal = error_class(error_message)
+
   test_result_record.test_fail(termination_signal)
   test.results.add_class_error(test_result_record)
   test.summary_writer.dump(

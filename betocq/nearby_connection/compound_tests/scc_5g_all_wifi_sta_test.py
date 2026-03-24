@@ -102,6 +102,9 @@ class Scc5gAllWifiStaTest(performance_test_base.PerformanceTestBase):
         d2d_type=constants.WifiD2DType.SCC_5G,
         country_code=_COUNTRY_CODE,
     )
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters
+    )
     self.wifi_info = constants.WifiInfo.from_test_parameters(
         d2d_type=constants.WifiD2DType.SCC_5G, params=self.test_parameters
     )

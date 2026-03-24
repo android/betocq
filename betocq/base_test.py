@@ -16,14 +16,15 @@
 
 import logging
 import sys
-
 import os
 import traceback
 
 from mobly import base_test
 from mobly import records
+from mobly import signals
 from mobly import utils
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import errors
 from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
@@ -80,32 +81,20 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def setup_class(self) -> None:
     if sys.version_info < (3, 12):
-      setup_utils.abort_all_and_report_error_on_setup(
-          self, 'Python 3.12 or higher is required for this test.'
+      setup_utils.report_error_on_setup_class(
+          self,
+          'Python 3.12 or higher is required for this test.',
+          error_class=constants.PythonVersionError,
       )
-    if (
-        not self.test_parameters.use_programmable_ap
-        and self.test_parameters.abort_all_if_any_ap_not_ready
-    ):
-      error_messages = ''
-      if not self.test_parameters.wifi_2g_ssid:
-        error_messages += '2G AP is not ready for this test.\n'
-        logging.warning('2G AP is not ready for this test.')
-      if not self.test_parameters.wifi_5g_ssid:
-        error_messages += '5G AP is not ready for this test.\n'
-        logging.warning('5G AP is not ready for this test.')
-      if not self.test_parameters.wifi_dfs_5g_ssid:
-        error_messages += '5G DFS AP is not ready for this test.\n'
-        logging.warning('5G DFS AP is not ready for this test.')
-      if error_messages:
-        setup_utils.abort_all_and_report_error_on_setup(self, error_messages)
     try:
       self.ads = self.register_controller(android_device, min_number=2)
-    except errors.Error as e:
-      setup_utils.abort_all_and_report_error_on_setup(
+    except (errors.Error, adb.Error, signals.ControllerError) as e:
+      setup_utils.report_error_on_setup_class(
           self,
           'Failed to get Android devices with error: %s,'
           f' {traceback.format_exception(e)}',
+          abort_all=not self.test_parameters.run_all_tests_in_suite,
+          error_class=constants.DeviceRegistrationError,
       )
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
@@ -161,8 +150,10 @@ class BaseTestClass(base_test.BaseTestClass):
     if not self.test_parameters.allow_unrooted_device:
       if not self.advertiser.is_adb_root or not self.discoverer.is_adb_root:
         logging.warning('The test is aborted because the device is unrooted.')
-        setup_utils.abort_all_and_report_error_on_setup(
-            self, 'The test only can run on rooted device.'
+        setup_utils.report_error_on_setup_class(
+            self,
+            'The test only can run on rooted device.',
+            error_class=constants.UnrootedDeviceError,
         )
     else:
       logging.warning(
@@ -172,8 +163,10 @@ class BaseTestClass(base_test.BaseTestClass):
     if self.test_parameters.is_wifi_chipset_model_mandatory:
       if not self.test_parameters.wifi_chipset_model:
         if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
-          setup_utils.abort_all_and_report_error_on_setup(
-              self, 'wifi_chipset is empty in the config file'
+          setup_utils.report_error_on_setup_class(
+              self,
+              'wifi_chipset is empty in the config file',
+              error_class=constants.MissingConfigError,
           )
 
   def _assert_test_conditions(self) -> None:
@@ -316,7 +309,7 @@ class BaseTestClass(base_test.BaseTestClass):
         )
     ):
       error_message = (
-          f'Abort all test due to the following error happened during the'
+          f'The following error happened during the'
           ' test:\n'
           f'{record.stacktrace}\n'
           'it could be one of the following issues:\n'
@@ -338,7 +331,12 @@ class BaseTestClass(base_test.BaseTestClass):
       )
       logging.error(error_message)
       # show the error in setup_class clearly.
-      setup_utils.abort_all_and_report_error_on_setup(self, error_message)
+      setup_utils.report_error_on_setup_class(
+          self,
+          error_message,
+          abort_all=not self.test_parameters.run_all_tests_in_suite,
+          error_class=constants.SnippetDisconnectionError,
+      )
 
     # Reset the Nearby Connection state to ensure the testbed is in a good
     # state for the next test.
