@@ -144,14 +144,14 @@ def set_country_code(
     country_code: WiFi and Telephony Country Code.
     force_telephony_cc: True to force Telephony Country Code.
   """
-  if not ad.is_adb_root:
-    ad.log.info(
-        'Skipped setting wifi country code on device %r '
-        'because we do not set country code on unrooted phone.',
-        ad.serial,
-    )
-    return
   try:
+    if not ad.is_adb_root:
+      ad.log.info(
+          'Skipped setting wifi country code on device %r '
+          'because we do not set country code on unrooted phone.',
+          ad.serial,
+      )
+      return
     _do_set_country_code(ad, country_code, force_telephony_cc)
   except adb.AdbError:
     ad.log.exception(
@@ -168,55 +168,62 @@ def _do_set_country_code(
 ) -> None:
   """Sets Wi-Fi and Telephony country code."""
   ad.log.info('Set Wi-Fi country code to %s.', country_code)
-  ad.adb.shell('cmd wifi set-wifi-enabled disabled')
-  time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
-  if force_telephony_cc:
-    ad.log.info('Set Telephony country code to %s.', country_code)
-    ad.adb.shell(
-        'am broadcast -a com.android.internal.telephony.action.COUNTRY_OVERRIDE'
-        f' --es country {country_code}'
+  try:
+    ad.adb.shell('cmd wifi set-wifi-enabled disabled')
+    time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+    if force_telephony_cc:
+      ad.log.info('Set Telephony country code to %s.', country_code)
+      ad.adb.shell(
+          'am broadcast -a'
+          ' com.android.internal.telephony.action.COUNTRY_OVERRIDE --es'
+          f' country {country_code}'
+      )
+      toggle_airplane_mode(ad)
+    ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
+    ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+    if force_telephony_cc:
+      telephony_country_code = (
+          ad.adb.shell('dumpsys wifi | grep mTelephonyCountryCode')
+          .decode('utf-8')
+          .strip()
+      )
+      ad.log.info('Telephony country code: %s', telephony_country_code)
+  except adb.AdbError:
+    ad.log.exception(
+        'Failed to set country code on device %r.', ad.serial
     )
-    toggle_airplane_mode(ad)
-  ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
-  ad.adb.shell('cmd wifi set-wifi-enabled enabled')
-  if force_telephony_cc:
-    telephony_country_code = (
-        ad.adb.shell('dumpsys wifi | grep mTelephonyCountryCode')
-        .decode('utf-8')
-        .strip()
-    )
-    ad.log.info('Telephony country code: %s', telephony_country_code)
 
 
 def enable_logs(ad: android_device.AndroidDevice) -> None:
   """Enables Nearby, WiFi and BT detailed logs."""
-  ad.log.info('Enable Nearby loggings.')
-  if ad.is_adb_root:
-    # Increase log buffer size.
-    ad.adb.shell('setprop persist.logd.size 8388608')  # 8M
-  else:
-    try:
+  op = 'adb shell'
+  try:
+    op = 'increase log buffer size'
+    if ad.is_adb_root:
+      # Increase log buffer size.
+      ad.adb.shell('setprop persist.logd.size 8388608')  # 8M
+    else:
       ad.adb.shell('logcat -G 5242880')  # 5M
-    except adb.AdbError:
-      ad.log.info('Failed to increase log buffer size on device.')
+    op = 'enable Nearby verbose logs'
+    for tag in NEARBY_LOG_TAGS:
+      ad.adb.shell(f'setprop log.tag.{tag} VERBOSE')
 
-  for tag in NEARBY_LOG_TAGS:
-    ad.adb.shell(f'setprop log.tag.{tag} VERBOSE')
-
-  # Enable WiFi verbose logging.
-  ad.adb.shell('cmd wifi set-verbose-logging enabled')
-
-  # Enable Bluetooth HCI logs.
-  if ad.is_adb_root:
-    ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
-  else:
-    ad.log.info(
-        'Skipped setting Bluetooth HCI logs on device,'
-        'because we do not set Bluetooth HCI logs on unrooted phone.'
-    )
-
-  # Enable Bluetooth verbose logs.
-  ad.adb.shell('setprop persist.log.tag.bluetooth VERBOSE')
+    # Enable WiFi verbose logging.
+    ad.adb.shell('cmd wifi set-verbose-logging enabled')
+    op = 'enable Bluetooth HCI logs'
+    # Enable Bluetooth HCI logs.
+    if ad.is_adb_root:
+      ad.adb.shell('setprop persist.bluetooth.btsnooplogmode full')
+    else:
+      ad.log.info(
+          'Skipped setting Bluetooth HCI logs on device,'
+          'because we do not set Bluetooth HCI logs on unrooted phone.'
+      )
+    op = 'enable Bluetooth verbose logs'
+    # Enable Bluetooth verbose logs.
+    ad.adb.shell('setprop persist.log.tag.bluetooth VERBOSE')
+  except adb.AdbError:
+    ad.log.info('Failed to enable logs on device for "%s".', op)
 
 
 def grant_manage_external_storage_permission(
@@ -271,28 +278,31 @@ def grant_permission(
     ad.log.warning(no_such_permission_error)
 
 
-def dump_gms_version(ad: android_device.AndroidDevice) -> int:
+def dump_gms_version(ad: android_device.AndroidDevice) -> int | None:
   """Dumps GMS version from dumpsys to sponge properties."""
-  try:
-    gms_version = _do_dump_gms_version(ad)
-  except adb.AdbError:
-    ad.log.exception(
-        'Failed to dump GMS version on device %r, try again.', ad.serial
-    )
+  gms_version = _do_dump_gms_version(ad)
+  if gms_version is None:
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
     gms_version = _do_dump_gms_version(ad)
   return gms_version
 
 
-def _do_dump_gms_version(ad: android_device.AndroidDevice) -> int:
+def _do_dump_gms_version(ad: android_device.AndroidDevice) -> int | None:
   """Dumps GMS version from dumpsys to sponge properties."""
-  out = (
-      ad.adb.shell(
-          'dumpsys package com.google.android.gms | grep "versionCode="'
-      )
-      .decode('utf-8')
-      .strip()
-  )
+  try:
+    out = (
+        ad.adb.shell(
+            'dumpsys package com.google.android.gms | grep "versionCode="'
+        )
+        .decode('utf-8')
+        .strip()
+    )
+  except adb.AdbError:
+    ad.log.exception(
+        'Failed to dump GMS version on device %r, try again.', ad.serial
+    )
+    return None
+
   ad.log.info('GMS version: %s', out)
   prefix = 'versionCode='
   postfix = 'minSdk'
@@ -1203,11 +1213,12 @@ def get_thermal_zone_data(
     A dictionary mapping thermal zone types to their temperatures in integer
     format, or an empty dictionary if data could not be retrieved.
   """
-  if not ad.is_adb_root:
-    ad.log.info('Skipped getting thermal zone data on unrooted device.')
-    return {}
   thermal_data = []
   try:
+    if not ad.is_adb_root:
+      ad.log.info('Skipped getting thermal zone data on unrooted device.')
+      return {}
+
     thermal_zones = (
         ad.adb.shell('ls /sys/class/thermal | grep thermal_zone')
         .decode('utf-8')
@@ -1465,7 +1476,13 @@ def log_message_to_logcat(
     priority: The priority of the log. Default is 'd' (debug). d: DEBUG  e:
       ERROR  f: FATAL  i: INFO  v: VERBOSE  w: WARN  s: SILENT
   """
-  ad.adb.shell(f'log -p {priority} -t {tag} "{message}"')
+  try:
+    ad.adb.shell(f'log -p {priority} -t {tag} "{message}"')
+  except adb.AdbError:
+    ad.log.warning(
+        'Failed to log message to logcat on device %r.',
+        ad.serial,
+    )
 
 
 def is_gms_version_above_required_version(
