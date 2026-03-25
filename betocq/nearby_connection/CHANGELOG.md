@@ -1,4 +1,8 @@
 # BetoCQ test suite release history
+## 2.6.2 (03/25/2026)
+## Bug fixes
+* Optimize error handling for AQT
+
 ## 2.6.1 (03/03/2026)
 ## New
 * Bump the minimum required Python version from 3.11 to 3.12
