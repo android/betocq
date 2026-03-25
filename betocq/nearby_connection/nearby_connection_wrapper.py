@@ -26,7 +26,8 @@ from mobly.controllers.android_device_lib import callback_handler_v2
 from mobly.controllers.android_device_lib import snippet_client_v2
 from mobly.snippet import callback_event
 
-from betocq import nc_constants
+from betocq import constants
+from betocq.nearby_connection import nc_constants
 
 # This number should be large enough to cover advertising interval, firmware
 # scheduling timing interval and user action delay
@@ -50,14 +51,14 @@ class NearbyConnectionWrapper:
       discoverer: android_device.AndroidDevice,
       advertiser_nearby: snippet_client_v2.SnippetClientV2,
       discoverer_nearby: snippet_client_v2.SnippetClientV2,
-      advertising_discovery_medium: nc_constants.NearbyMedium = (
-          nc_constants.NearbyMedium.BLE_ONLY
+      advertising_discovery_medium: constants.NearbyMedium = (
+          constants.NearbyMedium.BLE_ONLY
       ),
-      connection_medium: nc_constants.NearbyMedium = (
-          nc_constants.NearbyMedium.BT_ONLY
+      connection_medium: constants.NearbyMedium = (
+          constants.NearbyMedium.BT_ONLY
       ),
-      upgrade_medium: nc_constants.NearbyMedium = (
-          nc_constants.NearbyMedium.BT_ONLY
+      upgrade_medium: constants.NearbyMedium = (
+          constants.NearbyMedium.BT_ONLY
       ),
   ):
     self.advertiser = advertiser
@@ -69,11 +70,11 @@ class NearbyConnectionWrapper:
     self.discoverer_nearby = discoverer_nearby
     self.advertiser_nearby = advertiser_nearby
     self.test_failure_reason = (
-        nc_constants.SingleTestFailureReason.UNINITIALIZED
+        constants.SingleTestFailureReason.UNINITIALIZED
     )
 
-    self.connection_quality_info: nc_constants.ConnectionSetupQualityInfo = (
-        nc_constants.ConnectionSetupQualityInfo()
+    self.connection_quality_info: constants.ConnectionSetupQualityInfo = (
+        constants.ConnectionSetupQualityInfo()
     )
 
     self._advertiser_connection_lifecycle_callback: (
@@ -179,7 +180,7 @@ class NearbyConnectionWrapper:
 
   def request_connection(
       self,
-      medium_upgrade_type: nc_constants.MediumUpgradeType,
+      medium_upgrade_type: constants.MediumUpgradeType,
       timeout: datetime.timedelta,
       keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_BT_MS,
       keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_BT_MS,
@@ -325,7 +326,7 @@ class NearbyConnectionWrapper:
       discoverer_medium_connection_event = (
           self._discoverer_connection_lifecycle_callback.waitAndGet(
               'onBandwidthChanged',
-              nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
+              constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
           )
       )
       upgrade_status = discoverer_medium_connection_event.data['upgradeStatus']
@@ -342,7 +343,7 @@ class NearbyConnectionWrapper:
             f'onBandwidthChanged event upgrade status is {upgrade_status.name}'
         )
 
-    discoverer_connection_medium = nc_constants.NearbyConnectionMedium(
+    discoverer_connection_medium = constants.NearbyConnectionMedium(
         discoverer_medium_connection_event.data['medium']
     )
     is_connection_medium_high_quality = (
@@ -350,7 +351,7 @@ class NearbyConnectionWrapper:
     )
 
     if discoverer_connection_medium == (
-        nc_constants.NearbyConnectionMedium.UNKNOWN
+        constants.NearbyConnectionMedium.UNKNOWN
     ):
       self.discoverer.log.info(
           'connection medium from onBandwidthChanged is unknown, set to the'
@@ -372,7 +373,7 @@ class NearbyConnectionWrapper:
     # check if it's instant connection
     if (
         is_connection_medium_high_quality
-        and nc_constants.is_high_quality_medium(self.upgrade_medium)
+        and constants.is_high_quality_medium(self.upgrade_medium)
     ):
       self.connection_quality_info.medium_upgrade_latency = datetime.timedelta(
           seconds=0
@@ -389,17 +390,19 @@ class NearbyConnectionWrapper:
     # no upgrade happens after already connected to high quality medium
     if (
         not is_connection_medium_high_quality
-        and nc_constants.is_high_quality_medium(self.upgrade_medium)
+        and constants.is_high_quality_medium(self.upgrade_medium)
     ):
       self.test_failure_reason = (
-          nc_constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE
+          constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE
       )
       upgrade_start_time = datetime.datetime.now()
       wait_high_quality = True
       while wait_high_quality:
-        discoverer_medium_upgrade_event = self._discoverer_connection_lifecycle_callback.waitAndGet(
-            'onBandwidthChanged',
-            nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
+        discoverer_medium_upgrade_event = (
+            self._discoverer_connection_lifecycle_callback.waitAndGet(
+                'onBandwidthChanged',
+                constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT.total_seconds(),
+            )
         )
         self.discoverer.log.info(
             f'medium upgrade to {discoverer_medium_upgrade_event.data}'
@@ -419,12 +422,12 @@ class NearbyConnectionWrapper:
               datetime.datetime.now() - upgrade_start_time
           )
           self.connection_quality_info.upgrade_medium = (
-              nc_constants.NearbyConnectionMedium(
+              constants.NearbyConnectionMedium(
                   discoverer_medium_upgrade_event.data['medium']
               )
           )
           if self.connection_quality_info.upgrade_medium == (
-              nc_constants.NearbyConnectionMedium.UNKNOWN
+              constants.NearbyConnectionMedium.UNKNOWN
           ):
             self.discoverer.log.info(
                 'medium upgrade from onBandwidthChanged is unknown, set to the'
@@ -441,7 +444,7 @@ class NearbyConnectionWrapper:
           )
         else:
           latency = datetime.datetime.now() - upgrade_start_time
-          if latency >= nc_constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT:
+          if latency >= constants.CONNECTION_BANDWIDTH_CHANGED_TIMEOUT:
             raise TimeoutError(
                 'Timeout to upgrade to high quality medium'
                 f' {self.upgrade_medium.name}'
@@ -467,7 +470,7 @@ class NearbyConnectionWrapper:
       disconnected_event = (
           self._discoverer_connection_lifecycle_callback.waitAndGet(
               'onDisconnected',
-              timeout=nc_constants.DISCONNECTION_TIMEOUT.total_seconds(),
+              timeout=constants.DISCONNECTION_TIMEOUT.total_seconds(),
           )
       )
       asserts.assert_equal(
@@ -480,7 +483,7 @@ class NearbyConnectionWrapper:
       disconnected_event = (
           self._advertiser_connection_lifecycle_callback.waitAndGet(
               'onDisconnected',
-              timeout=nc_constants.DISCONNECTION_TIMEOUT.total_seconds(),
+              timeout=constants.DISCONNECTION_TIMEOUT.total_seconds(),
           )
       )
       asserts.assert_equal(
@@ -500,14 +503,14 @@ class NearbyConnectionWrapper:
 
   def start_nearby_connection(
       self,
-      timeouts: nc_constants.ConnectionSetupTimeouts,
-      medium_upgrade_type: nc_constants.MediumUpgradeType = (
-          nc_constants.MediumUpgradeType.DEFAULT
+      timeouts: constants.ConnectionSetupTimeouts,
+      medium_upgrade_type: constants.MediumUpgradeType = (
+          constants.MediumUpgradeType.DEFAULT
       ),
       keep_alive_timeout_ms: int = 0,
       keep_alive_interval_ms: int = 0,
       enable_target_discovery: bool = False,
-      test_parameters: nc_constants.TestParameters | None = None,
+      test_parameters: constants.TestParameters | None = None,
   ) -> None:
     """Starts Nearby Connection between two Android devices.
 
@@ -525,7 +528,7 @@ class NearbyConnectionWrapper:
       request_connection, and accept_connection.
     """
     self.test_failure_reason = (
-        nc_constants.SingleTestFailureReason.TARGET_START_ADVERTISING
+        constants.SingleTestFailureReason.TARGET_START_ADVERTISING
     )
     # Start advertising.
     self.start_advertising()
@@ -539,7 +542,7 @@ class NearbyConnectionWrapper:
       )
 
     self.test_failure_reason = (
-        nc_constants.SingleTestFailureReason.SOURCE_START_DISCOVERY
+        constants.SingleTestFailureReason.SOURCE_START_DISCOVERY
     )
     # Start discovery.
     self.start_discovery(
@@ -549,7 +552,7 @@ class NearbyConnectionWrapper:
 
     # Request connection.
     self.test_failure_reason = (
-        nc_constants.SingleTestFailureReason.SOURCE_REQUEST_CONNECTION
+        constants.SingleTestFailureReason.SOURCE_REQUEST_CONNECTION
     )
     self.request_connection(
         medium_upgrade_type=medium_upgrade_type,
@@ -563,13 +566,13 @@ class NearbyConnectionWrapper:
 
     # Accept connection.
     self.test_failure_reason = (
-        nc_constants.SingleTestFailureReason.TARGET_ACCEPT_CONNECTION
+        constants.SingleTestFailureReason.TARGET_ACCEPT_CONNECTION
     )
     self.accept_connection(timeout=timeouts.connection_result_timeout)
 
     # Stop advertising.
     self.stop_advertising()
-    self.test_failure_reason = nc_constants.SingleTestFailureReason.SUCCESS
+    self.test_failure_reason = constants.SingleTestFailureReason.SUCCESS
 
   def transfer_file_for_unknown_concurrency_mode(
       self,
@@ -577,7 +580,7 @@ class NearbyConnectionWrapper:
       mcc_timeout: datetime.timedelta,
       scc_file_size_kb: int,
       scc_timeout: datetime.timedelta,
-      payload_type: nc_constants.PayloadType,
+      payload_type: constants.PayloadType,
   ) -> float:
     """Sends payloads and returns the transfer speed in kilo byte per second."""
     mcc_transfer_speed_kbps, mcc_transfer_time_s = self._transfer_file(
@@ -612,8 +615,8 @@ class NearbyConnectionWrapper:
       self,
       file_size_kb: int,
       timeout: datetime.timedelta,
-      payload_type: nc_constants.PayloadType,
-      num_files: int = nc_constants.TRANSFER_FILE_NUM_DEFAULT,
+      payload_type: constants.PayloadType,
+      num_files: int = constants.TRANSFER_FILE_NUM_DEFAULT,
   ) -> float:
     """Sends payloads and returns the transfer speed in kilo byte per second.
 
@@ -634,7 +637,7 @@ class NearbyConnectionWrapper:
     """
     try:
       self.test_failure_reason = (
-          nc_constants.SingleTestFailureReason.FILE_TRANSFER_FAIL
+          constants.SingleTestFailureReason.FILE_TRANSFER_FAIL
       )
       self.discoverer.log.info(
           f'sending {num_files} payloads with type: {payload_type.name}'
@@ -643,7 +646,7 @@ class NearbyConnectionWrapper:
           file_size_kb, timeout, payload_type, num_files
       )
       self.advertiser.log.info(f'{num_files} payloads received')
-      self.test_failure_reason = nc_constants.SingleTestFailureReason.SUCCESS
+      self.test_failure_reason = constants.SingleTestFailureReason.SUCCESS
     finally:
       # clean up
       utils.concurrent_exec(
@@ -657,8 +660,8 @@ class NearbyConnectionWrapper:
       self,
       file_size_kb: int,
       timeout: datetime.timedelta,
-      payload_type: nc_constants.PayloadType,
-      num_files: int = nc_constants.TRANSFER_FILE_NUM_DEFAULT,
+      payload_type: constants.PayloadType,
+      num_files: int = constants.TRANSFER_FILE_NUM_DEFAULT,
   ) -> tuple[float, float]:
     """Sends payloads and returns the transfer speed in kBS and transfer time in seconds."""
     # Creates a file and send it to the advertiser.
@@ -732,7 +735,7 @@ class NearbyConnectionWrapper:
       tx_id = tx_transfer_event.data['update']['payloadId']
       rx_id_payload_received = rx_received_event.data['payload']['id']
       rx_id_transfer_update = rx_transfer_event.data['update']['payloadId']
-      if payload_type == nc_constants.PayloadType.FILE:
+      if payload_type == constants.PayloadType.FILE:
         asserts.assert_equal(
             tx_id,
             rx_id_payload_received,

@@ -57,20 +57,21 @@ from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
 
-from betocq import nc_constants
+from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
 
 
 TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
-SUCCESS_RATE_TARGET = nc_constants.SUCCESS_RATE_TARGET
+SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
-_FILE_TRANSFER_SIZE_KB = nc_constants.TRANSFER_FILE_SIZE_100MB
-_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
-_PAYLOAD_TYPE = nc_constants.PayloadType.FILE
+_FILE_TRANSFER_SIZE_KB = constants.TRANSFER_FILE_SIZE_100MB
+_FILE_TRANSFER_TIMEOUT = constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
+_PAYLOAD_TYPE = constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
 _THROUGHPUT_LOW_TIP_RAW = (
@@ -91,23 +92,26 @@ _FILE_TRANSFER_FAILURE_TIP = (
 class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
   """Test class for CUJ MCC with 5G D2D medium and 2G STA test."""
 
-  test_runtime: nc_constants.NcTestRuntime
-  wifi_info: nc_constants.WifiInfo
+  test_runtime: constants.NcTestRuntime
+  wifi_info: constants.WifiInfo
 
   def setup_class(self):
     super().setup_class()
     self.setup_wifi_env(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_WFD_2G_STA,
+        d2d_type=constants.WifiD2DType.MCC_5G_WFD_2G_STA,
         country_code=_COUNTRY_CODE,
     )
-    self.wifi_info = nc_constants.WifiInfo.from_test_parameters(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_WFD_2G_STA,
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters
+    )
+    self.wifi_info = constants.WifiInfo.from_test_parameters(
+        d2d_type=constants.WifiD2DType.MCC_5G_WFD_2G_STA,
         params=self.test_parameters,
     )
-    self.test_runtime = nc_constants.NcTestRuntime(
+    self.test_runtime = constants.NcTestRuntime(
         advertiser=self.advertiser,
         discoverer=self.discoverer,
-        upgrade_medium_under_test=nc_constants.NearbyMedium.UPGRADE_TO_ALL_WIFI,
+        upgrade_medium_under_test=constants.NearbyMedium.UPGRADE_TO_ALL_WIFI,
         country_code=_COUNTRY_CODE,
         wifi_info=self.wifi_info,
     )
@@ -132,7 +136,10 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
         ad,
-        snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
+        snippet_confs=[
+            nc_utils.get_nearby_snippet_config(self.user_params),
+            nc_utils.get_nearby2_snippet_config(self.user_params),
+        ],
         country_code=self.test_runtime.country_code,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
@@ -194,7 +201,7 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
         self.discoverer,
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
-        connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        connect_timeout=constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
     )
     upgraded_medium_name = None
@@ -203,8 +210,8 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
       upgraded_medium_name = upgrade_medium.name
 
     if upgrade_medium in [
-        nc_constants.NearbyConnectionMedium.WIFI_DIRECT,
-        nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT,
+        constants.NearbyConnectionMedium.WIFI_DIRECT,
+        constants.NearbyConnectionMedium.WIFI_HOTSPOT,
     ]:
       test_result_utils.set_and_assert_p2p_frequency(
           self.advertiser,
@@ -220,7 +227,7 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
 
     do_file_transfer = True
     if (
-        upgrade_medium == nc_constants.NearbyMedium.WIFILAN_ONLY
+        upgrade_medium == constants.NearbyMedium.WIFILAN_ONLY
         and not setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(
             self.advertiser
         )

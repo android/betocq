@@ -24,7 +24,7 @@ channels.
 from mobly import base_suite
 from mobly import suite_runner
 
-from betocq import nc_constants
+from betocq import constants
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
 from betocq.nearby_connection.compound_tests import mcc_5g_all_wifi_non_dbs_2g_sta_test
 from betocq.nearby_connection.compound_tests import scc_2g_all_wifi_sta_test
@@ -66,7 +66,7 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     self.user_params['suite_name'] = _SUITE_NAME
     self.user_params['suite_version'] = _SUITE_VERSION
 
-    test_parameters = nc_constants.TestParameters.from_user_params(
+    test_parameters = constants.TestParameters.from_user_params(
         config.user_params
     )
 

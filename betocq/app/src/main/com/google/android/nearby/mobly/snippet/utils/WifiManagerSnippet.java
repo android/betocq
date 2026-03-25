@@ -47,6 +47,7 @@ import com.google.common.base.Ascii;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.lang.reflect.Field;
+import java.net.InetAddress;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
@@ -998,6 +999,23 @@ public final class WifiManagerSnippet implements Snippet {
   }
 
   /**
+   * Connects/Enables TDLS connection using remote IP address.
+   *
+   * @param remoteIpAddress Peer IP address
+   * @param enable {@code true} to setup a connection to the given peer IP address, {@code false} to
+   *     tear down TDLS
+   */
+  @Rpc(description = "set wifi TDLS enabled or disabled with remote ip address).")
+  public void wifiSetTdlsEnable(String remoteIpAddress, boolean enable) {
+    try {
+      InetAddress ipAddress = InetAddress.getByName(remoteIpAddress);
+      wifiManager.setTdlsEnabled(ipAddress, enable);
+    } catch (Exception e) {
+      Log.e("Failed to set wifi TDLS enabled or disabled with remote ip address: " + e);
+    }
+  }
+
+  /**
    * Connects/Enables TDLS connection using peer MAC address. True to enable, False to disable
    *
    * @param remoteMacAddress Peer MAC address
@@ -1005,7 +1023,7 @@ public final class WifiManagerSnippet implements Snippet {
    *     false} to tear down TDLS
    */
   @Rpc(description = "Set TDLS connection enabled/disabled with peer MAC address.")
-  public void setTdlsEnabledWithMacAddress(String remoteMacAddress, boolean enable) {
+  public void wifiSetTdlsEnabledWithMacAddress(String remoteMacAddress, boolean enable) {
     wifiManager.setTdlsEnabledWithMacAddress(remoteMacAddress, enable);
   }
 

@@ -16,14 +16,15 @@
 
 import logging
 import sys
-
 import os
 import traceback
 
 from mobly import base_test
 from mobly import records
+from mobly import signals
 from mobly import utils
 from mobly.controllers import android_device
+from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import errors
 from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
@@ -31,7 +32,7 @@ from mobly.controllers.wifi.lib import wifi_configs
 import yaml
 
 from betocq import ap_utils
-from betocq import nc_constants
+from betocq import constants
 from betocq import setup_utils
 
 # TODO: Need to design external path for OEM.
@@ -69,8 +70,8 @@ class BaseTestClass(base_test.BaseTestClass):
     self.ads: list[android_device.AndroidDevice] = []
     self.advertiser: android_device.AndroidDevice = None
     self.discoverer: android_device.AndroidDevice = None
-    self.test_parameters: nc_constants.TestParameters = (
-        nc_constants.TestParameters.from_user_params(self.user_params)
+    self.test_parameters: constants.TestParameters = (
+        constants.TestParameters.from_user_params(self.user_params)
     )
     logging.info('all test parameters: %s', self.test_parameters)
     self.num_bug_reports: int = 0
@@ -80,38 +81,26 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def setup_class(self) -> None:
     if sys.version_info < (3, 12):
-      setup_utils.abort_all_and_report_error_on_setup(
-          self, 'Python 3.12 or higher is required for this test.'
+      setup_utils.report_error_on_setup_class(
+          self,
+          'Python 3.12 or higher is required for this test.',
+          error_class=constants.PythonVersionError,
       )
-    if (
-        not self.test_parameters.use_programmable_ap
-        and self.test_parameters.abort_all_if_any_ap_not_ready
-    ):
-      error_messages = ''
-      if not self.test_parameters.wifi_2g_ssid:
-        error_messages += '2G AP is not ready for this test.\n'
-        logging.warning('2G AP is not ready for this test.')
-      if not self.test_parameters.wifi_5g_ssid:
-        error_messages += '5G AP is not ready for this test.\n'
-        logging.warning('5G AP is not ready for this test.')
-      if not self.test_parameters.wifi_dfs_5g_ssid:
-        error_messages += '5G DFS AP is not ready for this test.\n'
-        logging.warning('5G DFS AP is not ready for this test.')
-      if error_messages:
-        setup_utils.abort_all_and_report_error_on_setup(self, error_messages)
     try:
       self.ads = self.register_controller(android_device, min_number=2)
-    except errors.Error as e:
-      setup_utils.abort_all_and_report_error_on_setup(
+    except (errors.Error, adb.Error, signals.ControllerError) as e:
+      setup_utils.report_error_on_setup_class(
           self,
           'Failed to get Android devices with error: %s,'
           f' {traceback.format_exception(e)}',
+          abort_all=not self.test_parameters.run_all_tests_in_suite,
+          error_class=constants.DeviceRegistrationError,
       )
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']
       if self.is_using_gms_api:
-        ad.gms_info = nc_constants.GmsInfo()
+        ad.gms_info = constants.GmsInfo()
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'
@@ -161,8 +150,10 @@ class BaseTestClass(base_test.BaseTestClass):
     if not self.test_parameters.allow_unrooted_device:
       if not self.advertiser.is_adb_root or not self.discoverer.is_adb_root:
         logging.warning('The test is aborted because the device is unrooted.')
-        setup_utils.abort_all_and_report_error_on_setup(
-            self, 'The test only can run on rooted device.'
+        setup_utils.report_error_on_setup_class(
+            self,
+            'The test only can run on rooted device.',
+            error_class=constants.UnrootedDeviceError,
         )
     else:
       logging.warning(
@@ -172,51 +163,17 @@ class BaseTestClass(base_test.BaseTestClass):
     if self.test_parameters.is_wifi_chipset_model_mandatory:
       if not self.test_parameters.wifi_chipset_model:
         if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
-          setup_utils.abort_all_and_report_error_on_setup(
-              self, 'wifi_chipset is empty in the config file'
+          setup_utils.report_error_on_setup_class(
+              self,
+              'wifi_chipset is empty in the config file',
+              error_class=constants.MissingConfigError,
           )
 
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
 
-  def _get_snippet_apk_path(self, snippet_name: str) -> str | None:
-    """Gets the APK path for the given snippet name from user params.
-
-    Args:
-      snippet_name: The snippet name used to find the snippet
-      APK in user_params (e.g., 'nearby_snippet').
-
-    Returns:
-      The path to the snippet APK, or None if not provided.
-    """
-    file_tag = 'files' if 'files' in self.user_params else 'mh_files'
-    apk_paths = self.user_params.get(file_tag, {}).get(snippet_name, [''])
-    if not apk_paths or not apk_paths[0]:
-      # allow the apk_path to be empty as github release does not install
-      # the apk in the script.
-      return None
-    return apk_paths[0]
-
-  @property
-  def nearby_snippet_config(self) -> nc_constants.SnippetConfig:
-    """Snippet config for loading the first nearby snippet instance."""
-    return nc_constants.SnippetConfig(
-        snippet_name='nearby',
-        package_name=nc_constants.NEARBY_SNIPPET_PACKAGE_NAME,
-        apk_path=self._get_snippet_apk_path('nearby_snippet'),
-    )
-
-  @property
-  def nearby2_snippet_config(self) -> nc_constants.SnippetConfig:
-    """Snippet config for loading the second nearby snippet instance."""
-    return nc_constants.SnippetConfig(
-        snippet_name='nearby2',
-        package_name=nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
-        apk_path=self._get_snippet_apk_path('nearby_snippet_2'),
-    )
-
   def setup_wifi_env(
-      self, d2d_type: nc_constants.WifiD2DType, country_code: str
+      self, d2d_type: constants.WifiD2DType, country_code: str
   ):
     """Sets up the WiFi environment with given d2d type and country code.
 
@@ -229,7 +186,7 @@ class BaseTestClass(base_test.BaseTestClass):
       d2d_type: The Wi-Fi D2D type.
       country_code: The country code of the test.
     """
-    if d2d_type == nc_constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA and (
+    if d2d_type == constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA and (
         self.test_parameters.use_programmable_ap
         or self.test_parameters.use_sniffer
     ):
@@ -240,7 +197,7 @@ class BaseTestClass(base_test.BaseTestClass):
       )
       return
 
-    wifi_channel = nc_constants.get_wifi_channel_for_programmable_ap(d2d_type)
+    wifi_channel = constants.get_wifi_channel_for_programmable_ap(d2d_type)
     if self.test_parameters.use_programmable_ap:
       self._setup_programmable_ap(wifi_channel, country_code)
 
@@ -352,7 +309,7 @@ class BaseTestClass(base_test.BaseTestClass):
         )
     ):
       error_message = (
-          f'Abort all test due to the following error happened during the'
+          f'The following error happened during the'
           ' test:\n'
           f'{record.stacktrace}\n'
           'it could be one of the following issues:\n'
@@ -361,12 +318,11 @@ class BaseTestClass(base_test.BaseTestClass):
           ' killed from the logcat, disable the GMS auto update from the play'
           ' store (Settings -> Network perferences) and retry the test;\n'
           '3. The test snippet might be killed by a security app or service'
-          ' from the device, especially if this happens very frequently, check'
-          ' the logcat to verify if '
-          f' {nc_constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
-          f' {nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
-          f' {nc_constants.DCT_SNIPPET_PACKAGE_NAME} or'
-          f' {nc_constants.DCT_SNIPPET_2_PACKAGE_NAME} was killed; you should'
+          ' from the device, especially if this happens very frequently,'
+          ' check the logcat to verify if '
+          f' {constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
+          f' {constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
+          ' was killed; you should'
           ' put them to the allowlist of the security app.\n'
           '4. The USB cable or port is not stable, change the USB cable or the'
           ' connection portal and try again;\n'
@@ -375,7 +331,12 @@ class BaseTestClass(base_test.BaseTestClass):
       )
       logging.error(error_message)
       # show the error in setup_class clearly.
-      setup_utils.abort_all_and_report_error_on_setup(self, error_message)
+      setup_utils.report_error_on_setup_class(
+          self,
+          error_message,
+          abort_all=not self.test_parameters.run_all_tests_in_suite,
+          error_class=constants.SnippetDisconnectionError,
+      )
 
     # Reset the Nearby Connection state to ensure the testbed is in a good
     # state for the next test.
@@ -390,7 +351,7 @@ class BaseTestClass(base_test.BaseTestClass):
       logging.info('skip bug report for failure')
     else:
       self.num_bug_reports = self.num_bug_reports + 1
-      if self.num_bug_reports <= nc_constants.MAX_NUM_BUG_REPORT:
+      if self.num_bug_reports <= constants.MAX_NUM_BUG_REPORT:
         logging.info('take bug report for failure')
         android_device.take_bug_reports(
             self.ads,
@@ -423,7 +384,7 @@ class BaseTestClass(base_test.BaseTestClass):
     if BaseTestClass._run_identifier_is_set:
       return
     suite_name_items = [
-        nc_constants.BETOCQ_NAME,
+        constants.BETOCQ_NAME,
     ]
     if 'suite_name' in self.user_params:
       suite_name_items.append(self.user_params['suite_name'])

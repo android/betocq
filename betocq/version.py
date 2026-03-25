@@ -34,4 +34,4 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 #          'improve the test stability and fix some bugs.')
 # '2.6.1': ('Add XCC test cases for AQT.'
 #          'Update the snippet SDK version to 35 and other bug fixes.')
-
+# '2.6.2': ('Optimize tests for AQT and fix some bugs.')

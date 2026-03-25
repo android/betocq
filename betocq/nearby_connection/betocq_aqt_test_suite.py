@@ -25,7 +25,7 @@ from mobly import asserts
 from mobly import base_suite
 from mobly import suite_runner
 
-from betocq import nc_constants
+from betocq import constants
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import scc_2g_wfd_sta_test
@@ -55,14 +55,15 @@ class BetoCqAqtTestSuite(base_suite.BaseSuite):
     """Assert that the config parameters are set correctly."""
     if config is None or not hasattr(config, 'user_params'):
       return
-    test_params = nc_constants.TestParameters.from_user_params(
+    test_params = constants.TestParameters.from_user_params(
         config.user_params
     )
-    if test_params.target_cuj_name is None:
+    if (not test_params.target_cuj_name
+        or test_params.target_cuj_name == constants.TARGET_CUJ_UNSET):
       return
     asserts.abort_all_if(
         test_params.target_cuj_name
-        != nc_constants.TARGET_CUJ_AQT,
+        != constants.TARGET_CUJ_AQT,
         'target_cuj_name is not aqt',
     )
     if not test_params.use_programmable_ap:

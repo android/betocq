@@ -21,28 +21,19 @@ import enum
 import logging
 from typing import Any
 
+from mobly import signals
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
-BETOCQ_NAME = 'BetoCQ'
-
+BETOCQ_NAME = 'BeToCQ'
+# TODO: Move these to component specific constants.
 NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
 NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
-# MCC hotspot test is more flaky than other MCC tests due to the sync issue.
-MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET = 0.90
-MCC_PERFORMANCE_TEST_COUNT = 50
-MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
 SCC_PERFORMANCE_TEST_COUNT = 20
-SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 2
-BT_PERFORMANCE_TEST_COUNT = 20
-BT_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
-BT_COEX_PERFORMANCE_TEST_COUNT = 100
-BT_COEX_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
-LOHS_PERFORMANCE_TEST_COUNT = 100
-LOHS_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 5
+SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 3
 WIFI_AWARE_SCC_PERFORMANCE_TEST_COUNT = 10
 
 PROGRAMMABLE_AP_CHANNEL_2G = 6
@@ -60,15 +51,12 @@ WIFI_AWARE_AFTER_CONNECTION_START_THROUGHPUT_WAIT_TIME_SEC = datetime.timedelta(
 FIRST_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=30)
 FIRST_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=35)
-BT_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
-BT_500K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=35)
 BLE_20K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 BLE_100K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=25)
 SECOND_DISCOVERY_TIMEOUT = datetime.timedelta(seconds=35)
 SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
-WIFI_1K_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=20)
 WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=60)
 WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
@@ -84,21 +72,13 @@ MCC_THROUGHPUT_MULTIPLIER = 0.25
 # MCC hotspot has lower throughput due to synchronization issue with STA.
 MCC_HOTSPOT_THROUGHPUT_MULTIPLIER = 0.2
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_5G = 0.37  # 866/8*0.37 = 40
-IPERF_TO_NC_THROUGHPUT_RATIO = 0.8
-IPERF_TO_NC_THROUGHPUT_RATIO_DCT = 1
+IPERF_TO_D2D_THROUGHPUT_RATIO_DEF = 0.8
 MAX_PHY_RATE_TO_MIN_THROUGHPUT_RATIO_2G = 0.10
 WLAN_MEDIUM_THROUGHPUT_CAP_MBPS = (
     15  # cap for WLAN medium due to encryption overhead
 )
+WLAN_MEDIUM_THROUGHPUT_CAP_MBPS_NO_CAP = float('inf')
 
-CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
-BLE_MEDIUM_THROUGHPUT_BENCHMARK_MBPS = 0.02
-
-KEEP_ALIVE_TIMEOUT_BT_MS = 30000
-KEEP_ALIVE_INTERVAL_BT_MS = 5000
-
-KEEP_ALIVE_TIMEOUT_WIFI_MS = 10000
-KEEP_ALIVE_INTERVAL_WIFI_MS = 3000
 
 PERCENTILE_50_FACTOR = 0.5
 LATENCY_PRECISION_DIGITS = 1
@@ -116,23 +96,17 @@ TRANSFER_FILE_SIZE_200MB = 200 * 1024  # kB
 TRANSFER_FILE_SIZE_100MB = 100 * 1024  # kB
 TRANSFER_FILE_SIZE_20MB = 20 * 1024  # kB
 TRANSFER_FILE_SIZE_1MB = 1024  # kB
-TRANSFER_FILE_SIZE_500KB = 512  # kB
 TRANSFER_FILE_SIZE_1KB = 1  # kB
 TRANSFER_FILE_SIZE_20KB = 20  # kB
 TRANSFER_FILE_SIZE_10KB = 10  # kB
 TRANSFER_FILE_SIZE_100KB = 100  # kB
-NC_MCC_2G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
-NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB = 120 * 1024  # kB
-NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB = 120 * 1024  # kB
-NC_SCC_2G_TRANSFER_FILE_SIZE_KB = 20 * 1024  # kB
-NC_SCC_5G_TRANSFER_FILE_SIZE_KB = 500 * 1024  # kB
-
 
 TRANSFER_FILE_SIZE_FUNC_TEST_KB = 1
 TRANSFER_FILE_NUM_DEFAULT = 1
 TRANSFER_FILE_NUM_FUNC_TEST = 100
 TRANSFER_TIMEOUT_FUNC_TEST = datetime.timedelta(seconds=100)
 
+TARGET_CUJ_UNSET = 'unspecified'
 TARGET_CUJ_QUICK_START = 'quick_start'
 TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
 TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
@@ -152,7 +126,7 @@ WIFI_SUPPLICANT_STATE_COMPLETED = 'COMPLETED'
 class TestParameters:
   """Test parameters to be customized for Nearby Connection."""
 
-  target_cuj_name: str = 'unspecified'
+  target_cuj_name: str = TARGET_CUJ_UNSET
   wifi_2g_ssid: str = ''
   wifi_2g_password: str = ''
   wifi_5g_ssid: str = ''
@@ -182,6 +156,9 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
+  # Whether to run all tests in the suite. abort_all should be replaced by
+  # a failure error.
+  run_all_tests_in_suite: bool = False
   skip_throughput_assertion: bool = False
   is_wifi_chipset_model_mandatory: bool = True
   # The model of the wifi chipset used by both devices under test.
@@ -218,6 +195,7 @@ class TestParameters:
       test_parameters.requires_bt_multiplex = True
 
     if test_parameters.target_cuj_name == TARGET_CUJ_AQT:
+      test_parameters.run_all_tests_in_suite = True
       test_parameters.skip_throughput_assertion = True
       test_parameters.is_wifi_chipset_model_mandatory = False
 
@@ -242,17 +220,6 @@ class PayloadType(enum.IntEnum):
   BYTES = 1
   FILE = 2
   STREAM = 3
-
-
-@enum.unique
-class NcBandwidthUpgradeStatus(enum.IntEnum):
-  UNKNOWN = 0
-  # The upgrade is successful.
-  SUCCESS = 1
-  # The connection is lost, attempting to reconnect.
-  SUSPENDED = 2
-  # The upgrade is timed out.
-  TIMED_OUT = 3
 
 
 @enum.unique
@@ -737,42 +704,6 @@ class SpeedTarget:
   nc_speed_mbtye_per_sec: float
 
 
-@dataclasses.dataclass(frozen=False)
-class NcPerformanceTestMetrics:
-  """Metrics data for quick start test."""
-
-  prior_bt_discovery_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  prior_bt_connection_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  discoverer_wifi_sta_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  file_transfer_discovery_latencies: list[datetime.timedelta] = (
-      dataclasses.field(default_factory=list[datetime.timedelta])
-  )
-  file_transfer_connection_latencies: list[datetime.timedelta] = (
-      dataclasses.field(default_factory=list[datetime.timedelta])
-  )
-  medium_upgrade_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  advertiser_wifi_sta_latencies: list[datetime.timedelta] = dataclasses.field(
-      default_factory=list[datetime.timedelta]
-  )
-  file_transfer_throughputs_kbps: list[float] = dataclasses.field(
-      default_factory=list[float]
-  )
-  iperf_throughputs_kbps: list[float] = dataclasses.field(
-      default_factory=list[float]
-  )
-  upgraded_wifi_transfer_mediums: list[NearbyConnectionMedium] = (
-      dataclasses.field(default_factory=list[NearbyConnectionMedium])
-  )
-
-
 @dataclasses.dataclass(frozen=True)
 class TestResultStats:
   """The test result stats."""
@@ -924,8 +855,11 @@ class NcTestRuntime:
   country_code: str = 'US'
   is_dbs_mode: bool = False
   advertising_discovery_medium: NearbyMedium = NearbyMedium.BLE_ONLY
-  connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
   wifi_info: WifiInfo | None = None
+  # Performance configuration
+  iperf_to_d2d_throughput_ratio: float = IPERF_TO_D2D_THROUGHPUT_RATIO_DEF
+  is_discoverer_network_owner: bool = False
+  wlan_throughput_cap_mbps: float = WLAN_MEDIUM_THROUGHPUT_CAP_MBPS
 
 
 @dataclasses.dataclass(frozen=True)
@@ -935,3 +869,27 @@ class SnippetConfig:
   snippet_name: str
   package_name: str
   apk_path: str | None = None
+
+
+class WifiApNotReadyError(signals.TestAbortClass):
+  """APs not ready error, abort all tests in the class."""
+
+
+class PythonVersionError(signals.TestAbortClass):
+  """Python version error, abort all tests in the class."""
+
+
+class DeviceRegistrationError(signals.TestAbortClass):
+  """Device registration error, abort all tests in the class."""
+
+
+class UnrootedDeviceError(signals.TestAbortClass):
+  """Unrooted device error, abort all tests in the class."""
+
+
+class MissingConfigError(signals.TestAbortClass):
+  """Missing config error, abort all tests in the class."""
+
+
+class SnippetDisconnectionError(signals.TestAbortClass):
+  """Snippet disconnection error, abort all tests in the class."""

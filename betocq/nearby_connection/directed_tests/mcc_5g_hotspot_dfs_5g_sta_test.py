@@ -63,10 +63,11 @@ from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
 
-from betocq import nc_constants
+from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
 
 
@@ -77,8 +78,8 @@ _FILE_TRANSFER_NUM = 1
 _FILE_TRANSFER_SIZE_KB = (
     nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
 )
-_FILE_TRANSFER_TIMEOUT = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
-_PAYLOAD_TYPE = nc_constants.PayloadType.FILE
+_FILE_TRANSFER_TIMEOUT = constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
+_PAYLOAD_TYPE = constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
 
@@ -100,25 +101,28 @@ _FILE_TRANSFER_FAILURE_TIP = (
 class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
   """Test class for MCC with 5G HOTSPOT and DFS 5G STA."""
 
-  test_runtime: nc_constants.NcTestRuntime
-  wifi_info: nc_constants.WifiInfo
+  test_runtime: constants.NcTestRuntime
+  wifi_info: constants.WifiInfo
 
   def setup_class(self):
     super().setup_class()
 
     self.setup_wifi_env(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_HS_5G_DFS_STA,
+        d2d_type=constants.WifiD2DType.MCC_5G_HS_5G_DFS_STA,
         country_code=_COUNTRY_CODE,
     )
-    self.wifi_info = nc_constants.WifiInfo.from_test_parameters(
-        d2d_type=nc_constants.WifiD2DType.MCC_5G_HS_5G_DFS_STA,
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters
+    )
+    self.wifi_info = constants.WifiInfo.from_test_parameters(
+        d2d_type=constants.WifiD2DType.MCC_5G_HS_5G_DFS_STA,
         params=self.test_parameters,
     )
-    self.test_runtime = nc_constants.NcTestRuntime(
+    self.test_runtime = constants.NcTestRuntime(
         advertiser=self.advertiser,
         discoverer=self.discoverer,
         upgrade_medium_under_test=(
-            nc_constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT
+            constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT
         ),
         country_code=_COUNTRY_CODE,
         wifi_info=self.wifi_info,
@@ -146,7 +150,10 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
     # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
         ad,
-        snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
+        snippet_confs=[
+            nc_utils.get_nearby_snippet_config(self.user_params),
+            nc_utils.get_nearby2_snippet_config(self.user_params),
+        ],
         country_code=self.test_runtime.country_code,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
@@ -211,7 +218,7 @@ class Mcc5gHotspotDfs5gStaTest(performance_test_base.PerformanceTestBase):
         self.discoverer,
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
-        connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        connect_timeout=constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
     )
 

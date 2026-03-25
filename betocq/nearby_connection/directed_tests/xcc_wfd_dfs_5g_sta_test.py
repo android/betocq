@@ -58,19 +58,21 @@ from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
 
-from betocq import nc_constants
+from betocq import constants
 from betocq import performance_test_base
 from betocq import setup_utils
 from betocq import test_result_utils
+from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import utils as nc_utils
+
 
 # Use MCC strategy for iteration number and max consecutive error,
 # as most devices do not support SCC_5G mode in this case.
 TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
-SUCCESS_RATE_TARGET = nc_constants.SUCCESS_RATE_TARGET
+SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = nc_constants.MCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
-_PAYLOAD_TYPE = nc_constants.PayloadType.FILE
+_PAYLOAD_TYPE = constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
 
@@ -86,25 +88,28 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
   supports using DFS channels for peer networks when STA is on a DFS channel.
   """
 
-  test_runtime: nc_constants.NcTestRuntime
-  wifi_info: nc_constants.WifiInfo
+  test_runtime: constants.NcTestRuntime
+  wifi_info: constants.WifiInfo
 
   def setup_class(self) -> None:
     super().setup_class()
 
     self.setup_wifi_env(
-        d2d_type=nc_constants.WifiD2DType.XCC_5G_DFS_STA,
+        d2d_type=constants.WifiD2DType.XCC_5G_DFS_STA,
         country_code=_COUNTRY_CODE,
     )
-    self.wifi_info = nc_constants.WifiInfo.from_test_parameters(
-        d2d_type=nc_constants.WifiD2DType.XCC_5G_DFS_STA,
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters
+    )
+    self.wifi_info = constants.WifiInfo.from_test_parameters(
+        d2d_type=constants.WifiD2DType.XCC_5G_DFS_STA,
         params=self.test_parameters,
     )
-    self.test_runtime = nc_constants.NcTestRuntime(
+    self.test_runtime = constants.NcTestRuntime(
         advertiser=self.advertiser,
         discoverer=self.discoverer,
         upgrade_medium_under_test=(
-            nc_constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT
+            constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT
         ),
         country_code=_COUNTRY_CODE,
         wifi_info=self.wifi_info,
@@ -130,10 +135,12 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
-    # Load an extra snippet instance nearby2 for the prior BT connection.
     nc_utils.setup_android_device_for_nc_tests(
         ad,
-        snippet_confs=[self.nearby_snippet_config, self.nearby2_snippet_config],
+        snippet_confs=[
+            nc_utils.get_nearby_snippet_config(self.user_params),
+            nc_utils.get_nearby2_snippet_config(self.user_params),
+        ],
         country_code=self.test_runtime.country_code,
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
@@ -196,7 +203,7 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
         self.discoverer,
         self.current_test_result,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
-        connect_timeout=nc_constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
+        connect_timeout=constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
     )
 
@@ -210,16 +217,16 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
     test_result_utils.set_and_assert_concurrency_mode(
         current_concurrency_mode=wifi_concurrency_mode,
         valid_concurrency_modes=[
-            nc_constants.WifiConcurrencyMode.SCC_5G,
-            nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA,
-            nc_constants.WifiConcurrencyMode.UNKNOWN,
+            constants.WifiConcurrencyMode.SCC_5G,
+            constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA,
+            constants.WifiConcurrencyMode.UNKNOWN,
         ],
         test_result=self.current_test_result,
         additional_error_message=(
             'If enable_sta_dfs_channel_for_peer_network=False, concurrency'
             ' should be'
-            f' {nc_constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA.name},'
-            f' otherwise {nc_constants.WifiConcurrencyMode.SCC_5G.name}. If'
+            f' {constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA.name},'
+            f' otherwise {constants.WifiConcurrencyMode.SCC_5G.name}. If'
             ' not, something is wrong with the firmware of the device.'
         ),
     )
@@ -233,14 +240,14 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
     file_transfer_size_kb = (
         nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
     )
-    file_transfer_timeout = nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
-    if wifi_concurrency_mode == nc_constants.WifiConcurrencyMode.SCC_5G:
-      file_transfer_size_kb = nc_constants.TRANSFER_FILE_SIZE_500MB
-      file_transfer_timeout = nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
+    file_transfer_timeout = constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT
+    if wifi_concurrency_mode == constants.WifiConcurrencyMode.SCC_5G:
+      file_transfer_size_kb = constants.TRANSFER_FILE_SIZE_500MB
+      file_transfer_timeout = constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
 
     # Test Step: Transfer file on the established NC.
     try:
-      if wifi_concurrency_mode is not nc_constants.WifiConcurrencyMode.UNKNOWN:
+      if wifi_concurrency_mode is not constants.WifiConcurrencyMode.UNKNOWN:
         single_file_transfer_throughput_kbps = active_snippet.transfer_file(
             file_size_kb=file_transfer_size_kb,
             timeout=file_transfer_timeout,
@@ -255,9 +262,9 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
                 mcc_file_size_kb=(
                     nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
                 ),
-                mcc_timeout=nc_constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
+                mcc_timeout=constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
                 scc_file_size_kb=nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
-                scc_timeout=nc_constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
+                scc_timeout=constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
                 payload_type=_PAYLOAD_TYPE,
             )
         )

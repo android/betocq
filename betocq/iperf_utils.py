@@ -20,7 +20,7 @@ import re
 import time
 from mobly import utils
 from mobly.controllers import android_device
-from betocq import nc_constants
+from betocq import constants
 
 # IPv4, 10 sec, 1 stream
 DEFAULT_IPV4_CLIENT_ARGS = '-t 10 -P1'
@@ -58,7 +58,7 @@ class IPerfServerOnDevice:
 def run_iperf_test(
     ad_network_client: android_device.AndroidDevice,
     ad_network_owner: android_device.AndroidDevice,
-    medium: nc_constants.NearbyConnectionMedium,
+    medium: constants.NearbyConnectionMedium,
 ) -> int:
   """Run iperf test from ad_network_client to ad_network_owner.
 
@@ -68,21 +68,21 @@ def run_iperf_test(
     medium: wifi medium used in the transfer
 
   Returns:
-    speed in KB/s if there is a valid result or nc_constants.INVALID_INT.
+    speed in KB/s if there is a valid result or constants.INVALID_INT.
   """
-  speed_kbyte_sec = nc_constants.INVALID_INT
+  speed_kbyte_sec = constants.INVALID_INT
   try:
     owner_addr = get_owner_ip_addr(ad_network_client, ad_network_owner, medium)
     if not owner_addr:
       log_owner_ifconfig_after_fail_to_get_owner_ip_addr(
           ad_network_client, ad_network_owner
       )
-      return nc_constants.INVALID_INT
+      return constants.INVALID_INT
   except android_device.adb.Error:
     log_owner_ifconfig_after_fail_to_get_owner_ip_addr(
         ad_network_client, ad_network_owner
     )
-    return nc_constants.INVALID_INT
+    return constants.INVALID_INT
 
   client_arg = DEFAULT_IPV4_CLIENT_ARGS
   server_arg = DEFAULT_IPV4_SERVER_ARGS
@@ -135,7 +135,7 @@ def log_owner_ifconfig_after_fail_to_get_owner_ip_addr(
 def get_owner_ip_addr(
     ad_network_client: android_device.AndroidDevice,
     ad_network_owner: android_device.AndroidDevice,
-    medium: nc_constants.NearbyConnectionMedium,
+    medium: constants.NearbyConnectionMedium,
 ) -> str:
   """Get owner ip address.
 
@@ -150,13 +150,13 @@ def get_owner_ip_addr(
     The IP address of the owner device.
   """
   ip_addr = ''
-  if medium == nc_constants.NearbyConnectionMedium.WIFI_DIRECT:
+  if medium == constants.NearbyConnectionMedium.WIFI_DIRECT:
     ip_addr = get_group_owner_addr(ad_network_client)
-  elif medium == nc_constants.NearbyConnectionMedium.WIFI_LAN:
+  elif medium == constants.NearbyConnectionMedium.WIFI_LAN:
     ip_addr = get_wlan_ip_addr(ad_network_owner)
     if len(ip_addr) > GROUP_OWNER_IPV4_ADDR_LEN_MAX:
       ip_addr = f'{ip_addr}%{get_wlan_ifname(ad_network_client)}'
-  elif medium == nc_constants.NearbyConnectionMedium.WIFI_HOTSPOT:
+  elif medium == constants.NearbyConnectionMedium.WIFI_HOTSPOT:
     try:
       ip_addr = get_p2p_ip_addr(ad_network_owner)
     except android_device.adb.Error:
@@ -166,7 +166,7 @@ def get_owner_ip_addr(
       ip_addr = get_wlan_ip_addr(ad_network_owner)
     if len(ip_addr) > GROUP_OWNER_IPV4_ADDR_LEN_MAX:
       ip_addr = f'{ip_addr}%{get_wlan_ifname(ad_network_client)}'
-  elif medium == nc_constants.NearbyConnectionMedium.WIFI_AWARE:
+  elif medium == constants.NearbyConnectionMedium.WIFI_AWARE:
     ip_addr = get_aware_ip_addr(ad_network_owner)
     if len(ip_addr) > GROUP_OWNER_IPV4_ADDR_LEN_MAX:
       ip_addr = f'{ip_addr}%{get_aware_ifname(ad_network_client)}'
