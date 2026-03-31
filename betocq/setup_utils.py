@@ -76,7 +76,7 @@ _WIFI_SCAN_PATTERN = re.compile(
         \s+
         (\d+)            # Captures Frequency
         \s+
-        [-\d.]+          # Matches RSSI (skipped)
+        [-\d()./:]+      # Matches RSSI (skipped)
         \s+
         [\d.]+           # Matches Age (skipped)
         \s*
