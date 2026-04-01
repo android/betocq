@@ -115,7 +115,10 @@ def check_wifi_ap_status_in_setup_class(
         wifi_dfs_5g_ssid,
         freq_5g_dfs,
     )
-    wifi_scan_results_list = setup_utils.check_wifi_env(advertiser)
+    wifi_scan_results_list = setup_utils.check_wifi_env(
+        advertiser,
+        wifi_scan_wait_time_sec=setup_utils.WIFI_SCAN_WAIT_TIME_SEC * 2
+    )
     if wifi_scan_results_list:
       freq_by_ssids = {
           result['SSID']: result['Frequency']

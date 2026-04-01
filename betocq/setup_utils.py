@@ -738,11 +738,13 @@ def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
 
 def check_wifi_env(
     ad: android_device.AndroidDevice,
+    wifi_scan_wait_time_sec: int = WIFI_SCAN_WAIT_TIME_SEC,
 ) -> Sequence[dict[str, Any]] | None:
   """Let WI-FI scan and get scan results. Check if the environment is clean.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
+    wifi_scan_wait_time_sec: The time to wait for Wi-Fi scan to complete.
 
   Returns:
     Wi-Fi scan results as a list of SSID and Frequency or None if it fails to
@@ -754,7 +756,7 @@ def check_wifi_env(
   # Start wifi scan.
   try:
     ad.adb.shell('cmd wifi start-scan')
-    time.sleep(WIFI_SCAN_WAIT_TIME_SEC)
+    time.sleep(wifi_scan_wait_time_sec)
   except adb.AdbError:
     ad.log.warning('Failed to start wifi scan.', exc_info=True)
     return None
