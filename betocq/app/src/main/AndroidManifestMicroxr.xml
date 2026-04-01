@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.google.android.mobly.snippet.microxr">
+  <!-- Declare the minimum Android SDK version and internet permission,
+       which are required by Mobly Snippet Lib since it uses network socket. -->
+  <uses-sdk
+      android:minSdkVersion="16"
+      android:targetSdkVersion="24"/>
+  <uses-feature android:name="android.hardware.camera.any" />
+  <uses-permission android:name="android.permission.INJECT_EVENTS" />
+  <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.CAMERA" />
+  <uses-permission android:name="android.permission.RECORD_AUDIO" />
+  <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+</manifest>
