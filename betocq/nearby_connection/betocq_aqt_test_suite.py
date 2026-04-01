@@ -42,7 +42,7 @@ _SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '5'
+_SUITE_VERSION = '6'
 # LINT.ThenChange()
 
 
@@ -77,11 +77,6 @@ class BetoCqAqtTestSuite(base_suite.BaseSuite):
           not test_params.wifi_dfs_5g_ssid, 'wifi_dfs_5g_ssid is not set'
       )
 
-    asserts.abort_all_if(
-        not test_params.abort_all_if_any_ap_not_ready,
-        'do not change testbed parameters, abort_all_if_any_ap_not_ready is'
-        ' expected to be True',
-    )
     asserts.abort_all_if(
         test_params.skip_default_flag_override,
         'do not change testbed parameters, skip_default_flag_override is'
