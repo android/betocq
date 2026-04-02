@@ -1,4 +1,8 @@
 # BetoCQ test suite release history
+## 2.6.3 (04/02/2026)
+## Bug fixes
+* Improve the robustness of wifi SSIDs checking
+
 ## 2.6.2 (03/25/2026)
 ## Bug fixes
 * Optimize error handling for AQT
