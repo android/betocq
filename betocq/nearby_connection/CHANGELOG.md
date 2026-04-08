@@ -1,4 +1,8 @@
 # BetoCQ test suite release history
+## 2.6.4 (04/08/2026)
+### Bug fixes
+* Replace scc_2g_wfd_sta_test with xcc_2g_wfd_sta_test.
+
 ## 2.6.3 (04/02/2026)
 ### Bug fixes
 * Improve the robustness of wifi SSIDs checking
