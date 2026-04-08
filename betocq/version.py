@@ -36,3 +36,4 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 #          'Update the snippet SDK version to 35 and other bug fixes.')
 # '2.6.2': ('Optimize tests for AQT and fix some bugs.')
 # '2.6.3': ('Fix some bugs.')
+# '2.6.4': 'Replace the SCC 2G WFD STA test with XCC 2G WFD STA test.'
