@@ -1712,9 +1712,56 @@ def _extract_bt_firmware_version(
             version = match.group('version').strip()
             ad.log.info('version: %s', version)
             # Basic check to ensure it looks like a version string
-            if ('FW' in version or 'Firmware' in version or
-                re.search(r'[0-9a-fA-F]{6,}', version)):
+            if (
+                'FW' in version
+                or 'Firmware' in version
+                or re.search(r'[0-9a-fA-F]{6,}', version)
+            ):
               return version
           break  # Stop searching after checking the line(s) below the header
         break  # Move to the next line in the dumpsys output
   return _UNKNOWN_BT_FIRMWARE_VERSION
+
+
+def disable_package_verifiers(ad: android_device.AndroidDevice):
+  """Disables package verifier and Play Protect for ADB installs."""
+  try:
+    if not ad.is_adb_root:
+      ad.log.info(
+          'Device is not rooted. Skipping disabling package verifiers.'
+      )
+      return
+    ad.log.info(
+        'Device is in Root. Disabling package verifier and Play Protect for ADB'
+        ' installs.'
+    )
+    ad.adb.shell(['settings', 'put', 'global', 'package_verifier_enable', '0'])
+    ad.adb.shell(
+        ['settings', 'put', 'global', 'verifier_verify_adb_installs', '0']
+    )
+    ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '1'])
+  except adb.AdbError as e:
+    ad.log.error(f'Failed to disable package verifiers: {e} on '
+                 f'device {ad.serial}.')
+
+
+def enable_package_verifiers(ad: android_device.AndroidDevice):
+  """Reverts package verifier and Play Protect settings."""
+  try:
+    if not ad.is_adb_root:
+      ad.log.info(
+          'Device is not rooted. Skipping reverting package verifiers.'
+      )
+      return
+    ad.log.info(
+        'Device is in Root. Reverting package verifier and Play Protect'
+        ' settings for ADB installs.'
+    )
+    ad.adb.shell(['settings', 'put', 'global', 'package_verifier_enable', '1'])
+    ad.adb.shell(
+        ['settings', 'put', 'global', 'verifier_verify_adb_installs', '1']
+    )
+    ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '0'])
+  except adb.AdbError as e:
+    ad.log.error(f'Failed to enable package verifiers: {e} on '
+                 f'device {ad.serial}.')
