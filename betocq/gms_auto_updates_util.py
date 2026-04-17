@@ -191,7 +191,14 @@ class GmsAutoUpdatesUtil:
     except adb.AdbError as e:
       self._device.log.warning('failed to pull %s: %s', device_path, e)
 
-    config_doc = ElementTree.parse(path) if os.path.isfile(path) else None
+    config_doc = None
+    if os.path.isfile(path):
+      try:
+        config_doc = ElementTree.parse(path)
+      except ElementTree.ParseError as e:
+        self._device.log.warning(
+            'failed to parse %s due to %s, assume it as blank config.', path, e
+        )
 
     changing_element = None
     root = (
