@@ -1,4 +1,8 @@
 # BetoCQ test suite release history
+## 2.6.5 (04/22/2026)
+### New
+* Reduce the test cases for AQT and fix some bugs
+
 ## 2.6.4 (04/08/2026)
 ### Bug fixes
 * Replace scc_2g_wfd_sta_test with xcc_2g_wfd_sta_test.
@@ -8,11 +12,11 @@
 * Improve the robustness of wifi SSIDs checking
 
 ## 2.6.2 (03/25/2026)
-## Bug fixes
+### Bug fixes
 * Optimize error handling for AQT
 
 ## 2.6.1 (03/03/2026)
-## New
+### New
 * Bump the minimum required Python version from 3.11 to 3.12
 * Add XCC test cases for AQT which have no dependency on the  hardware
   capability.
@@ -21,12 +25,12 @@
 
 ## 2.6.0 (01/08/2026)
 
-## New
+### New
 * Optimized tests to achieve a 300% speedup in execution time.
 * Integrated a new test suite specifically for AQT.
 * Improved test maintainability with granular and descriptive error logging.
 
-Minor changes
+### Minor changes
 * Enable the location mode before test.
 * Detect the file transfer failure and onBandwidthChanged failure specifically.
 * Make the tests runnable on userbuild with the rooted ramdisk.
@@ -34,18 +38,18 @@ Minor changes
 * Increase the logcat cache size.
 * Added runtime monitoring to identify GMS activity or USB connectivity loss while tests are running.
 
-## Bug fixes
+### Bug fixes
 * Resolve issues preventing GMS updates from being enabled or disabled.
 * Correct frequency checking and reorder to run prior to file transfer.
 * Wait 'onDisconnected' from both source and target devices.
 
 ## 2.5.0 (06/24/2025)
 
-## New
+### New
 * Refactor the test code structure to improve readability and maintainability, while keeping the test logic unchanged.
 * Split 3 functional test cases into 6 to make each test case more focused.
 
-Minor changes:
+### Minor changes:
 * Move all device setup steps out from `NCBaseTestClass`.
 * For each BeToCQ suite, define a unique `suite_name` string
 * Set result message when a function test case is skipped.
@@ -60,38 +64,38 @@ Please read the updated instructions in the README for the installation and exec
 
 ## 2.4.2 (05/16/2025)
 
-## Bug fixes
+### Bug fixes
 * update snippet apk to fix the WiFi direct capability check issue.
 
 ## 2.4.1 (05/07/2025)
 
-## New
+### New
 * Add Android Auto test suite and test cases.
 * Increase SCC test iterations from 10 to 20 and reduce MCC test iterations from 100 to 50.
 * Add WiFi Direct capability check.
 
-## Bug fixes
+### Bug fixes
 * Fix GMS flag overrides on Windows.
 
 ## 2.4.0 (12/20/2024)
 
-## New
+### New
 * Update Triage tips for the WLAN upgrade failure.
 * Add multi-payload test parameters and optimize multi-payload transfer tests.
 * Open source Mobly snippet APK codes.
 
-## Bug fixes
+### Bug fixes
 * Lower MCC Hotspot speed target as the speed is further degraded due to out-of-sync between source and target devices.
 * Move to use hermetic override for P/H flag configuration.
 
 ## 2.3.3 (08/27/2024)
 
-## New
+### New
 * Add TDLS support check and cut the WLAN speed target by half if TDLS is not supported.
 * Add Aware device capability check in Aware test which is disabled by default.
 * Add Payload.Type.STREAM mode in the function test in addition to the existing FILE mode.
 
-## Bug fixes
+### Bug fixes
 * Use upgrade_medium_under_test to set up the speed bar as
   quality_info.upgrade_medium sometimes is not updated correctly.
 * Include iperf speed (if available) in the low throughput triaging tips.
@@ -103,12 +107,12 @@ Please read the updated instructions in the README for the installation and exec
   
 ## 2.3.2 (07/29/2024)
 
-## New
+### New
 * Enable scc_indoor_5g_wfd_sta_test only if both sides support indoor channel feature.
 * Add the support of sending multiple files and enable them in function test.
 * Add the support of instant connection. This is disabled by default.
 
-## Bug fixes
+### Bug fixes
 * Fix the occasional connection issue by disabling WiFi before removing all
   network. When WiFi is active, it is sometimes too busy and leads to the
   network removal or config read timing out after 4s.
@@ -119,7 +123,7 @@ Please read the updated instructions in the README for the installation and exec
 
 ## 2.3.1 (06/24/2024)
 
-## New
+### New
 * Reformat and unify the test summary field definitions for all tests
 * Enable WiFi/BT verbose logging and BT HCI full log.
 * Add target model, build_id, wifi_chipset, gms_versions to suite-level
@@ -142,7 +146,7 @@ Please read the updated instructions in the README for the installation and exec
 
 ## 2.3 (05/28/2024)
 
-## New
+### New
 * Skip test if wifi_chipset is empty.
 * Add MCC Aware test case with STAs connected to 2G/5G.
 * Make connection, advertising/discovery mediums configurable.
@@ -164,7 +168,7 @@ Please read the updated instructions in the README for the installation and exec
 
 ## 2.2 (05/10/2024)
 
-## New
+### New
 * Add iperf test for Aware, hotspot modes.
 * Disable WLAN deny list so that the past failure won't affect the new runs.
 * Add the key test info in test summary.
@@ -181,7 +185,7 @@ Please read the updated instructions in the README for the installation and exec
 
 ## 2.1 (05/02/2024)
 
-## New
+### New
 * Add iperf test for WFD mode. iperf test speed requirement is 40MB/s while Nearby
   Connections speed requirement is 20MB/s in 2-stream 80MHz mode.
 * Add the BT coex performance test.
