@@ -12,15 +12,11 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""This test is to test the WFD medium with 2G channel and Country code JP.
+"""This test is to test the WFD medium with 2G channel and Country code 00.
 
 In this case, the STA is using the 2G channel; and the WFD is expected to use
-the 2G channel as well if the device cannot tell if they are indoor or not;
-otherwise, the WFD may use 5G channel.
-
-Note: This test case is not related to the capability of
-'enable_sta_indoor_channel_for_peer_network', which is only for 5G when the
-device is connected to a sta 5G network.
+the 2G channel as well in the world wide country code '00'. but allow 5G channel
+in case the device does not follow the world wide country code wifi channel.
 
 Test requirements:
   The device requirements
@@ -29,7 +25,7 @@ Test requirements:
     Wi-Fi channel: 6 (2437) or other 2G channels.
 
 Test preparations:
-  Set country code to JP on Android devices.
+  Set country code to '00' on Android devices.
 
 Test steps:
   1. Disconnect discoverer from the current connected Wi-Fi network.
@@ -64,13 +60,14 @@ from betocq.nearby_connection import utils as nc_utils
 
 
 # use the SCC test count as most devices should be in SCC mode, except the
-# device has indoor channel detection capability, which will be MCC mode.
+# device does not follow the world wide country code wifi channel, which will be
+# MCC mode.
 TEST_ITERATION_NUM = constants.SCC_PERFORMANCE_TEST_COUNT
 SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
 _MAX_CONSECUTIVE_ERROR = constants.SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR
 _FILE_TRANSFER_NUM = 1
 _PAYLOAD_TYPE = constants.PayloadType.FILE
-_COUNTRY_CODE = 'JP'
+_COUNTRY_CODE = '00'
 
 
 _THROUGHPUT_LOW_TIP = (
@@ -219,9 +216,11 @@ class Xcc2gWfdStaTest(performance_test_base.PerformanceTestBase):
         ],
         test_result=self.current_test_result,
         additional_error_message=(
-            'If the device can detected as indoor, the concurrency mode should'
-            ' be SCC_2G. If the device can not detect the indoor environment,'
-            ' the concurrency mode will be MCC_5G_P2P_2G_STA.'
+            'In world wide country code, WFD should use the 2G channel, but the'
+            ' device may use the 5G channel as well if the device does not'
+            ' follow the world wide country code wifi channel. You may work'
+            ' with your wifi chipset vendor to fix this frequency selection'
+            ' issue.'
         ),
     )
     self.advertiser.log.info(

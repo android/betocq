@@ -91,7 +91,7 @@ class BaseTestClass(base_test.BaseTestClass):
     except (errors.Error, adb.Error, signals.ControllerError) as e:
       setup_utils.report_error_on_setup_class(
           self,
-          'Failed to get Android devices with error: %s,'
+          'Failed to get Android devices with error:'
           f' {traceback.format_exception(e)}',
           abort_all=not self.test_parameters.run_all_tests_in_suite,
           error_class=constants.DeviceRegistrationError,

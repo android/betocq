@@ -35,14 +35,15 @@ from betocq.nearby_connection.directed_tests import xcc_2g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import xcc_hotspot_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import xcc_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import xcc_wfd_dfs_5g_sta_test
-from betocq.nearby_connection.directed_tests import xcc_wfd_indoor_5g_sta_test
+from betocq.nearby_connection.directed_tests import xcc_wfd_ww_5g_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
+
 
 _SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '7'
+_SUITE_VERSION = '8'
 # LINT.ThenChange()
 
 
@@ -95,7 +96,7 @@ class BetoCqAqtTestSuite(base_suite.BaseSuite):
     # 5G STA
     self.add_test_class(scc_5g_wfd_sta_test.Scc5gWfdStaTest)
     self.add_test_class(scc_5g_wlan_sta_test.Scc5gWifiLanStaTest)
-    self.add_test_class(xcc_wfd_indoor_5g_sta_test.XccWfdIndoor5gStaTest)
+    self.add_test_class(xcc_wfd_ww_5g_sta_test.XccWfdWw5gStaTest)
     # 5G DFS STA
     self.add_test_class(xcc_hotspot_dfs_5g_sta_test.XccHotspotDfs5gStaTest)
     self.add_test_class(xcc_wfd_dfs_5g_sta_test.XccWfdDfs5gStaTest)

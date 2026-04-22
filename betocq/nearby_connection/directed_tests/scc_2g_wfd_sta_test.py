@@ -18,10 +18,6 @@ In this case, both the WFD and STA are using the same 2G channel.
 Note that the country code is set to JP so that 5G is not available for
 any D2D mediums.
 
-Note: This test case is not related to the capability of
-'enable_sta_indoor_channel_for_peer_network', which is only for 5G when the
-device is connected to a sta 5G network.
-
 Test requirements:
   The device requirements
     support Wi-Fi Direct
@@ -29,7 +25,7 @@ Test requirements:
     Wi-Fi channel: 6 (2437) or other 2G channels.
 
 Test preparations:
-  Set country code to JP on Android devices.
+  Set country code to '00' on Android devices.
 
 Test steps:
   1. Disconnect discoverer from the current connected Wi-Fi network.
@@ -71,7 +67,7 @@ _FILE_TRANSFER_NUM = 1
 _FILE_TRANSFER_SIZE_KB = constants.TRANSFER_FILE_SIZE_20MB
 _FILE_TRANSFER_TIMEOUT = constants.WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = constants.PayloadType.FILE
-_COUNTRY_CODE = 'JP'
+_COUNTRY_CODE = '00'
 
 
 _THROUGHPUT_LOW_TIP = (

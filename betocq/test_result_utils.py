@@ -33,7 +33,6 @@ from betocq import iperf_utils
 from betocq import setup_utils
 from betocq import version
 
-
 _BITS_PER_BYTE = 8
 
 
@@ -211,9 +210,7 @@ def set_and_assert_sta_frequency(
         test_result.test_failure_reason = (
             constants.SingleTestFailureReason.SOURCE_WIFI_CONNECTION
         )
-      asserts.fail(
-          constants.COMMON_TRIAGE_TIP[test_result.test_failure_reason]
-      )
+      asserts.fail(constants.COMMON_TRIAGE_TIP[test_result.test_failure_reason])
     ad.log.warning(
         'The STA frequency is not available, but the STA is'
         ' connected, the test result may not be expected.'
@@ -304,9 +301,7 @@ def _get_2g_wifi_throughput_benchmark(
   discoverer = nc_test_runtime.discoverer
   advertiser = nc_test_runtime.advertiser
   if nc_test_runtime.wifi_info is None:
-    return constants.SpeedTarget(
-        constants.INVALID_INT, constants.INVALID_INT
-    )
+    return constants.SpeedTarget(constants.INVALID_INT, constants.INVALID_INT)
 
   max_num_streams = min(discoverer.max_num_streams, advertiser.max_num_streams)
 
@@ -393,9 +388,7 @@ def _get_5g_wifi_throughput_benchmark(
   discoverer = nc_test_runtime.discoverer
   advertiser = nc_test_runtime.advertiser
   if nc_test_runtime.wifi_info is None:
-    return constants.SpeedTarget(
-        constants.INVALID_INT, constants.INVALID_INT
-    )
+    return constants.SpeedTarget(constants.INVALID_INT, constants.INVALID_INT)
   is_mcc = nc_test_runtime.wifi_info.is_mcc
   is_dbs_mode = nc_test_runtime.is_dbs_mode
   is_wlan_medium = (
@@ -612,9 +605,7 @@ def _run_iperf_test(
       ),
       medium=test_result.quality_info.upgrade_medium,
   )
-  logging.info(
-      'iperf throughput: %d (KB/s)', test_result.iperf_throughput_kbps
-  )
+  logging.info('iperf throughput: %d (KB/s)', test_result.iperf_throughput_kbps)
   return round(test_result.iperf_throughput_kbps / 1024, 1)
 
 
@@ -626,7 +617,7 @@ def assert_nc_throughput_meets_target(
   """Checks the Nearby connection throughput meets the target."""
   test_result.speed_target = constants.SpeedTarget(
       nc_speed_mbtye_per_sec=nc_speed_min_mbps,
-      iperf_speed_mbtye_per_sec=constants.INVALID_INT
+      iperf_speed_mbtye_per_sec=constants.INVALID_INT,
   )
   nc_speed_mbps = round(test_result.file_transfer_throughput_kbps / 1024, 3)
   if nc_speed_mbps >= nc_speed_min_mbps:
@@ -655,8 +646,10 @@ def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
   return '\n'.join([
       f'serial: {getattr(ad, "serial", "NA")}',
       f'model: {getattr(ad, "model", "NA")}',
-      f'android_version: {getattr(ad, "android_version", "NA")}\n'
-      f'build_info: {getattr(ad, "build_info", "NA")}',
+      (
+          f'android_version: {getattr(ad, "android_version", "NA")}\n'
+          f'build_info: {getattr(ad, "build_info", "NA")}'
+      ),
       f'gms_version: {setup_utils.dump_gms_version(ad)}',
       f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
       f'wifi_fw: {wifi_fw}',
@@ -801,7 +794,8 @@ class SingleTestResult:
   end_time: datetime.datetime | None = None
   debug_reference_info: dict[str, Any] = dataclasses.field(default_factory=dict)
   speed_target: constants.SpeedTarget = constants.SpeedTarget(
-      constants.INVALID_INT, constants.INVALID_INT)
+      constants.INVALID_INT, constants.INVALID_INT
+  )
   wifi_concurrency_mode: constants.WifiConcurrencyMode = (
       constants.WifiConcurrencyMode.UNKNOWN
   )
@@ -821,9 +815,7 @@ class SingleTestResult:
       return self.prior_nc_fail_reason
     return self.active_nc_fail_reason
 
-  def add_debug_reference_info(
-      self, key: str, value: Any
-  ) -> None:
+  def add_debug_reference_info(self, key: str, value: Any) -> None:
     """Adds debug reference info for the current test iteration."""
     self.debug_reference_info[key] = value
 
@@ -876,6 +868,58 @@ def gen_basic_test_summary(
   if wifi_env_bssid_count := device_specific_info.get('wifi_env_bssid_count'):
     basic_test_summary['wifi_ap_number'] = f'{wifi_env_bssid_count}'
   return basic_test_summary
+
+
+def gen_uiautomation_test_summary(
+    ad: android_device.AndroidDevice,
+    ios_model: str,
+    ios_build_info: str,
+    test_passed: bool,
+    error_code: str | None,
+    upgrade_medium: str,
+    medium_frequency: str,
+    sta_frequency: str,
+    speed: str,
+    total_transfer_size: str | None = None,
+    transfer_time: str | None = None,
+    completed_types: Sequence[str] | None = None,
+    incomplete_types: Sequence[str] | None = None,
+) -> dict[str, Any]:
+  """Generates a test summary for UI Automation tests."""
+  transfer_quality_info = {
+      'upgrade_medium': upgrade_medium,
+      'speed': speed,
+  }
+  if medium_frequency != 'Unknown':
+    transfer_quality_info['medium_frequency'] = medium_frequency
+  if sta_frequency != 'Unknown':
+    transfer_quality_info['sta_frequency'] = sta_frequency
+  if total_transfer_size:
+    transfer_quality_info['total_transfer_size'] = total_transfer_size
+  if transfer_time:
+    transfer_quality_info['transfer_time'] = transfer_time
+
+  result_message = 'PASS' if test_passed else 'FAIL'
+  if not test_passed and error_code:
+    result_message += f' - {error_code}'
+
+  res = {
+      'result': result_message,
+      'transfer_info': '\n'.join(
+          [f'{k}: {v}' for k, v in transfer_quality_info.items()]
+      ),
+      'device_android': _get_device_attributes(ad),
+      'device_ios': f'model: {ios_model}\nbuild: {ios_build_info}',
+  }
+
+  if completed_types or incomplete_types:
+    completed_str = ', '.join(completed_types) if completed_types else ''
+    incomplete_str = ', '.join(incomplete_types) if incomplete_types else ''
+    res['data_types'] = (
+        f'completed: {completed_str}\nincomplete: {incomplete_str}'
+    )
+
+  return res
 
 
 def check_gms_pids_changed(
@@ -989,14 +1033,9 @@ class PerformanceTestResults:
 
   def get_wifi_concurrency_mode(self) -> constants.WifiConcurrencyMode:
     """Returns the wifi concurrency mode of the test class."""
-    if (
-        self.nc_test_runtime is None
-        or self.nc_test_runtime.wifi_info is None
-    ):
+    if self.nc_test_runtime is None or self.nc_test_runtime.wifi_info is None:
       return constants.WifiConcurrencyMode.UNKNOWN
-    nc_test_runtime = typing.cast(
-        constants.NcTestRuntime, self.nc_test_runtime
-    )
+    nc_test_runtime = typing.cast(constants.NcTestRuntime, self.nc_test_runtime)
     if constants.is_xcc_test(nc_test_runtime.wifi_info.d2d_type):
       for result in self._results:
         if (
@@ -1070,8 +1109,7 @@ class PerformanceTestResults:
 
   def _get_success_iteration_count(self) -> int:
     return sum(
-        test_result.failure_reason
-        is constants.SingleTestFailureReason.SUCCESS
+        test_result.failure_reason is constants.SingleTestFailureReason.SUCCESS
         for test_result in self._results
     )
 
@@ -1086,10 +1124,7 @@ class PerformanceTestResults:
     """Summarizes failed iterations with detailed reasons and signatures."""
     messages = []
     for result in self._results:
-      if (
-          result.failure_reason
-          is not constants.SingleTestFailureReason.SUCCESS
-      ):
+      if result.failure_reason is not constants.SingleTestFailureReason.SUCCESS:
         messages.append(
             f'- Iter: {result.test_iteration}: {result.start_time}'
             f' {result.result_message}\n'
@@ -1188,8 +1223,9 @@ class PerformanceTestResults:
     if (wifi_info := nc_test_runtime.wifi_info) is not None:
       # If the test could upgrade to either 2G or 5G WiFi mediums, do not show
       # below info in test summary.
-      if (constants.is_upgrading_to_wifi_of_any_freq(wifi_info.d2d_type)
-          or constants.is_xcc_test(wifi_info.d2d_type)):
+      if constants.is_upgrading_to_wifi_of_any_freq(
+          wifi_info.d2d_type
+      ) or constants.is_xcc_test(wifi_info.d2d_type):
         info.update(
             {'is_2g_only': 'NA', 'is_dbs_mode': 'NA', 'is_mcc_mode': 'NA'}
         )
@@ -1224,8 +1260,7 @@ class PerformanceTestResults:
     filtered_results = [
         r
         for r in self._results
-        if r.prior_nc_quality_info.discovery_latency
-        != constants.UNSET_LATENCY
+        if r.prior_nc_quality_info.discovery_latency != constants.UNSET_LATENCY
     ]
     if not filtered_results:
       return 'NA'
@@ -1272,9 +1307,7 @@ class PerformanceTestResults:
         filtered_int.count(0),
         round(filtered[0], constants.LATENCY_PRECISION_DIGITS),
         percentile_50,
-        round(
-            filtered[len(filtered) - 1], constants.LATENCY_PRECISION_DIGITS
-        ),
+        round(filtered[len(filtered) - 1], constants.LATENCY_PRECISION_DIGITS),
     )
 
   def _get_transfer_stats(
@@ -1293,9 +1326,7 @@ class PerformanceTestResults:
       An instance of TestResultStats.
     """
     filtered = [
-        x
-        for x in throughput_indicators
-        if x != constants.UNSET_THROUGHPUT_KBPS
+        x for x in throughput_indicators if x != constants.UNSET_THROUGHPUT_KBPS
     ]
     if not filtered:
       # all test cases are failed
