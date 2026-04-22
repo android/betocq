@@ -16,6 +16,7 @@
 
 from collections.abc import Callable, Iterable, Sequence
 import datetime
+import logging
 import pprint
 import re
 import time
@@ -1303,12 +1304,12 @@ def report_error_on_setup_class(
       )
     else:
       termination_signal = error_class(error_message)
-
   test_result_record.test_fail(termination_signal)
   test.results.add_class_error(test_result_record)
   test.summary_writer.dump(
       test_result_record.to_dict(), records.TestSummaryEntryType.RECORD
   )
+  logging.error('%s', termination_signal)
   raise termination_signal
 
 
