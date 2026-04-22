@@ -69,9 +69,7 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     test_parameters = constants.TestParameters.from_user_params(
         config.user_params
     )
-    self.add_test_class(scc_indoor_5g_wfd_sta_test.SccIndoor5gWfdStaTest)
 
-    return
     # Function tests cases.
     self.add_test_class(beto_cq_function_group_test.BetoCqFunctionGroupTest)
 
