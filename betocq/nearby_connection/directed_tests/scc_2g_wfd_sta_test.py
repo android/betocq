@@ -15,7 +15,7 @@
 """This test is to test the Wifi SCC in a general case.
 
 In this case, both the WFD and STA are using the same 2G channel.
-Note that the country code is set to JP so that 5G is not available for
+Note that the country code is set to '00' so that 5G is not available for
 any D2D mediums.
 
 Test requirements:
@@ -202,8 +202,11 @@ class Scc2gWfdStaTest(performance_test_base.PerformanceTestBase):
         self.test_runtime.is_dbs_mode,
         sta_frequency=self.current_test_result.sta_frequency,
         additional_error_message=(
-            'The device violates the regulation of Wi-Fi 5G indoor channel.'
-            'You may work with the chipset vendor.'
+            'In world wide country code, WFD should use the 2G channel, but'
+            ' the device is using the 5G channel. if the device does not'
+            ' follow the world wide country code wifi channel. You may work'
+            ' with your wifi chipset vendor to fix this frequency selection'
+            ' issue.'
         ),
     )
 
