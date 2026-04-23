@@ -37,4 +37,5 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 # '2.6.2': ('Optimize tests for AQT and fix some bugs.')
 # '2.6.3': ('Fix some bugs.')
 # '2.6.4': 'Replace the SCC 2G WFD STA test with XCC 2G WFD STA test.'
-# '2.6.5': ('Making the test compatible with the China version of the AP.')
+# '2.6.5': ('Making the test compatible with the China version of the '
+#          'tri-band AP.')

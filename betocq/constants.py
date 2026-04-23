@@ -165,9 +165,9 @@ class TestParameters:
   wifi_chipset_model: str = ''
   # check if the test is running in debug mode.
   debug_mode: bool = False
-  # Ignore the indoor 5g test for china ap, as China AP has no 5g channel
-  # for Japan country code.
-  ignore_indoor_5g_test_for_china_ap: bool = False
+  # Ignore the indoor 5g test for China tri-band AP, as China tri-band AP only
+  # can use UNII-3 band for 5G wifi, which is not supported by Japan devices.
+  ignore_indoor_5g_test_for_china_triband_ap: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
