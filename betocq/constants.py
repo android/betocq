@@ -863,6 +863,7 @@ class NcTestRuntime:
   iperf_to_d2d_throughput_ratio: float = IPERF_TO_D2D_THROUGHPUT_RATIO_DEF
   is_discoverer_network_owner: bool = False
   wlan_throughput_cap_mbps: float = WLAN_MEDIUM_THROUGHPUT_CAP_MBPS
+  all_tests_should_be_skipped: bool = False
 
 
 @dataclasses.dataclass(frozen=True)

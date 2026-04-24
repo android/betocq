@@ -53,6 +53,7 @@ Expected results:
 
 import time
 
+from mobly import asserts
 from mobly import base_test
 from mobly import test_runner
 from mobly import utils
@@ -166,6 +167,11 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
     supported) and MCC (otherwise) scenarios.
     """
     # Test Step: Disconnect discoverer from the current connected wifi sta.
+    if getattr(self.test_runtime, 'all_tests_should_be_skipped', False):
+      asserts.skip(
+          'medium_frequency is equal to sta_frequency, skipping all following'
+          ' iterations. duplicate test case with SCC_5G_WFD_STA_TEST.'
+      )
     discoverer_sta_op = setup_utils.remove_current_connected_wifi_network(
         self.discoverer
     )
@@ -236,6 +242,19 @@ class XccWfdDfs5gStaTest(performance_test_base.PerformanceTestBase):
         self.current_test_result.sta_frequency,
         wifi_concurrency_mode.name,
     )
+    if (
+        self.current_test_result.quality_info.medium_frequency
+        == self.current_test_result.sta_frequency
+        and self.current_test_result.sta_frequency is not constants.INVALID_INT
+    ):
+      self.test_runtime.all_tests_should_be_skipped = True
+      prior_bt_snippet.disconnect_endpoint()
+      active_snippet.disconnect_endpoint()
+
+      asserts.skip(
+          'medium_frequency is equal to sta_frequency, skipping all following'
+          ' iterations. duplicate test case with SCC_5G_WFD_STA_TEST.'
+      )
 
     file_transfer_size_kb = (
         nc_constants.NC_MCC_5G_D2D_5G_STA_TRANSFER_FILE_SIZE_KB
