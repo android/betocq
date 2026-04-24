@@ -101,8 +101,8 @@ class SccIndoor5gWfdStaTest(performance_test_base.PerformanceTestBase):
   def setup_class(self):
     super().setup_class()
     asserts.skip_if(
-        self.test_parameters.ignore_indoor_5g_test_for_china_ap,
-        'Skip indoor 5g test for China AP',
+        self.test_parameters.ignore_indoor_5g_test_for_china_triband_ap,
+        'Skip indoor 5g test for China tri-band AP',
     )
 
     self.setup_wifi_env(

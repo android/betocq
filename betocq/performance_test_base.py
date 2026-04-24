@@ -97,7 +97,16 @@ class PerformanceTestBase(base_test.BaseTestClass):
             self.TAG: final_result_message,
         },
     })
+    test_runtime = getattr(
+        self, 'test_runtime', getattr(self, 'test_runtime', None)
+    )
+    if getattr(test_runtime, 'all_tests_should_be_skipped', False):
+      logging.info(
+          'Skipping result assertion in teardown class because all test'
+          ' iterations are skipped.'
+      )
+    else:
+      passed = self.test_results.is_test_class_passed()
+      asserts.assert_true(passed, final_result_message)
 
-    passed = self.test_results.is_test_class_passed()
-    asserts.assert_true(passed, final_result_message)
     super().teardown_class()

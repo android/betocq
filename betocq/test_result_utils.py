@@ -1051,6 +1051,10 @@ class PerformanceTestResults:
 
   def get_test_class_result_message(self) -> str:
     """Gets the test result message for the test class based on result enum."""
+    if self.nc_test_runtime and getattr(
+        self.nc_test_runtime, 'all_tests_should_be_skipped', False
+    ):
+      return 'SKIP'
     finished_iteration_count = len(self._results)
     if finished_iteration_count == 0:
       return 'FAIL: Test did not execute any iterations. Zero finished tests.'

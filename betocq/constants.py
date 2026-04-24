@@ -165,9 +165,9 @@ class TestParameters:
   wifi_chipset_model: str = ''
   # check if the test is running in debug mode.
   debug_mode: bool = False
-  # Ignore the indoor 5g test for china ap, as China AP has no 5g channel
-  # for Japan country code.
-  ignore_indoor_5g_test_for_china_ap: bool = False
+  # Ignore the indoor 5g test for China tri-band AP, as China tri-band AP only
+  # can use UNII-3 band for 5G wifi, which is not supported by Japan devices.
+  ignore_indoor_5g_test_for_china_triband_ap: bool = False
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
@@ -863,6 +863,7 @@ class NcTestRuntime:
   iperf_to_d2d_throughput_ratio: float = IPERF_TO_D2D_THROUGHPUT_RATIO_DEF
   is_discoverer_network_owner: bool = False
   wlan_throughput_cap_mbps: float = WLAN_MEDIUM_THROUGHPUT_CAP_MBPS
+  all_tests_should_be_skipped: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
