@@ -35,7 +35,7 @@ Test requirements:
     wifi channel: 52 (5260) or 112 (5560) or other DFS channels.
 
 Test preparations:
-  Set country code to GB on Android devices.
+  Set country code to US on Android devices.
 
 Test steps:
   1. Disconnect discoverer from the current connected Wi-Fi network.
@@ -77,7 +77,7 @@ _FILE_TRANSFER_NUM = 1
 _FILE_TRANSFER_SIZE_KB = constants.TRANSFER_FILE_SIZE_500MB
 _FILE_TRANSFER_TIMEOUT = constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
 _PAYLOAD_TYPE = constants.PayloadType.FILE
-_COUNTRY_CODE = 'GB'
+_COUNTRY_CODE = 'US'
 
 
 _THROUGHPUT_LOW_TIP = (
