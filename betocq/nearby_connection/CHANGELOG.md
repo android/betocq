@@ -49,7 +49,7 @@
 * Refactor the test code structure to improve readability and maintainability, while keeping the test logic unchanged.
 * Split 3 functional test cases into 6 to make each test case more focused.
 
-### Minor changes:
+### Minor changes
 * Move all device setup steps out from `NCBaseTestClass`.
 * For each BeToCQ suite, define a unique `suite_name` string
 * Set result message when a function test case is skipped.
