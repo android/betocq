@@ -24,9 +24,14 @@ wireless/android/platform/testing/bettertogether/betocq/internal/unified_protoco
 from mobly import base_suite
 from mobly import test_runner
 
+from betocq.beto_core.function_tests import beto_core_discovery_test
+
 
 class BetoCoreTestSuite(base_suite.BaseSuite):
-  """Add test suites for Unified Protocol tests."""
+  """A test suite for BeToCore tests."""
+
+  def setup_suite(self, config):
+    self.add_test_class(beto_core_discovery_test.BetoCoreDiscoveryTest)
 
 if __name__ == '__main__':
   test_runner.main()
