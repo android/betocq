@@ -1766,3 +1766,36 @@ def enable_package_verifiers(ad: android_device.AndroidDevice):
   except adb.AdbError as e:
     ad.log.error(f'Failed to enable package verifiers: {e} on '
                  f'device {ad.serial}.')
+
+
+def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
+  """Returns true if the device is a cuttlefish emulator."""
+  return device.build_info['hardware'] == 'cutf_cvm'
+
+
+def unlock_screen(device: android_device.AndroidDevice):
+  """Unlocks the screen on a device if locked."""
+  if is_cuttlefish(device):
+    device.adb.shell('wm dismiss-keyguard')
+  else:
+    device.adb.shell('input keyevent KEYCODE_MENU')
+
+
+def is_device_on(device: android_device.AndroidDevice) -> bool:
+  """Returns true if the device is on."""
+  output = device.adb.shell(['dumpsys', 'power', '|', 'grep', 'mWakefulness'])
+  return 'mWakefulness=Awake' in output.decode()
+
+
+def turn_device_on(
+    device: android_device.AndroidDevice,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=10),
+) -> None:
+  """Turns the device on."""
+  device.adb.shell('input keyevent KEYCODE_WAKEUP')
+  if not wait_for_predicate(
+      lambda: is_device_on(device),
+      timeout=timeout,
+      interval=datetime.timedelta(seconds=1),
+  ):
+    raise signals.TestFailure('Failed to turn the device on')
