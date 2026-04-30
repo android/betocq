@@ -101,6 +101,13 @@ class BaseTestClass(base_test.BaseTestClass):
         ad.role = ad.dimensions['role']
       if self.is_using_gms_api:
         ad.gms_info = constants.GmsInfo()
+
+    utils.concurrent_exec(
+        setup_utils.wait_for_device_root,
+        param_list=[[ad] for ad in self.ads],
+        raise_on_exception=True,
+    )
+
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'

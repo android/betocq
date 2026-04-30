@@ -48,6 +48,7 @@ TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC = 2
 PH_FLAG_WRITE_WAIT_TIME_SEC = 3
 WIFI_DISCONNECTION_DELAY_SEC = 3
 ADB_RETRY_WAIT_TIME_SEC = 2
+_WAIT_FOR_DEVICE_TIMEOUT_SEC = 60
 
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
@@ -125,6 +126,19 @@ def get_snippet_apk_path(
     # the apk in the script.
     return None
   return apk_paths[0]
+
+
+def wait_for_device_root(ad: android_device.AndroidDevice) -> None:
+  """Robustly roots the device with wait_for_device calls."""
+  ad.log.info('Waiting for device to be online before rooting.')
+  ad.adb.wait_for_device(timeout=_WAIT_FOR_DEVICE_TIMEOUT_SEC)
+  if ad.is_adb_root:
+    ad.log.info('Device is already rooted.')
+    return
+  ad.log.info('Rooting device.')
+  ad.adb.root()
+  ad.log.info('Waiting for device to be online after rooting.')
+  ad.adb.wait_for_device(timeout=_WAIT_FOR_DEVICE_TIMEOUT_SEC)
 
 
 def set_country_code(
