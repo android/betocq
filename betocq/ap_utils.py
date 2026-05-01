@@ -35,6 +35,9 @@ def start_wifi(
     country_code: The country code to set the AP to.
     test_parameters: The test parameter object to set the SSID and password to.
   """
+  if country_code in ('00', 'XY'):
+    country_code = 'US'
+
   ap_config = wifi_configs.WiFiConfig(
       channel=wifi_channel,
       country_code=country_code,
