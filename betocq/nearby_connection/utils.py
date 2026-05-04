@@ -161,7 +161,7 @@ def get_nearby_snippet_config(
   """Returns the snippet config for the first nearby snippet instance."""
   return constants.SnippetConfig(
       snippet_name='nearby',
-      package_name=constants.NEARBY_SNIPPET_PACKAGE_NAME,
+      package_name=nc_constants.NEARBY_SNIPPET_PACKAGE_NAME,
       apk_path=setup_utils.get_snippet_apk_path(user_params, 'nearby_snippet'),
   )
 
@@ -172,7 +172,7 @@ def get_nearby2_snippet_config(
   """Returns the snippet config for the second nearby snippet instance."""
   return constants.SnippetConfig(
       snippet_name='nearby2',
-      package_name=constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
+      package_name=nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
       apk_path=setup_utils.get_snippet_apk_path(
           user_params, 'nearby_snippet_2'
       ),
