@@ -1172,6 +1172,9 @@ def load_nearby_snippet(
     device_specific_dict['external_storage_permission_granted'] = True
 
   ad.load_snippet(config.snippet_name, config.package_name)
+  if not hasattr(ad, 'loaded_snippet_packages'):
+    ad.loaded_snippet_packages = set()
+  ad.loaded_snippet_packages.add(config.package_name)
 
 
 def unload_nearby_snippet(
@@ -1183,6 +1186,8 @@ def unload_nearby_snippet(
   key_apk_installed = config.package_name + '_installed'
   try:
     ad.unload_snippet(config.snippet_name)
+    if hasattr(ad, 'loaded_snippet_packages'):
+      ad.loaded_snippet_packages.discard(config.package_name)
     if device_specific_dict.get(key_apk_installed, False):
       ad.log.info('try to uninstall snippet_apk')
       apk_utils.uninstall(ad, config.package_name)

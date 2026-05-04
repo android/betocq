@@ -315,8 +315,16 @@ class BaseTestClass(base_test.BaseTestClass):
             )
         )
     ):
+      loaded_packages = set()
+      for ad in self.ads:
+        if hasattr(ad, 'loaded_snippet_packages'):
+          loaded_packages.update(ad.loaded_snippet_packages)
+      packages_str = (
+          ' or '.join(loaded_packages) if loaded_packages else 'the snippet'
+      )
+
       error_message = (
-          f'The following error happened during the'
+          'The following error happened during the'
           ' test:\n'
           f'{record.stacktrace}\n'
           'it could be one of the following issues:\n'
@@ -326,11 +334,8 @@ class BaseTestClass(base_test.BaseTestClass):
           ' store (Settings -> Network perferences) and retry the test;\n'
           '3. The test snippet might be killed by a security app or service'
           ' from the device, especially if this happens very frequently,'
-          ' check the logcat to verify if '
-          f' {constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
-          f' {constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
-          ' was killed; you should'
-          ' put them to the allowlist of the security app.\n'
+          f' check the logcat to verify if {packages_str} was killed; you'
+          ' should put them to the allowlist of the security app.\n'
           '4. The USB cable or port is not stable, change the USB cable or the'
           ' connection portal and try again;\n'
           '5. The "Play protect" in the play store might disable the test'

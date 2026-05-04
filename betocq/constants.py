@@ -26,9 +26,7 @@ from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
 BETOCQ_NAME = 'BeToCQ'
-# TODO: Move these to component specific constants.
-NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
-NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
+
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
