@@ -190,7 +190,7 @@ performance tests.
 
 ## 7. Build Configuration (Bazel/Blaze)
 
-BeToCQ uses a custom macro `nearby_connection_integration_test` to define test
+BeToCQ uses a custom macro `betocq_integration_test` to define test
 targets that run in MobileHarness labs, locally, or in virtual environments.
 
 ### Defining a New Test Suite in `BUILD`
@@ -198,9 +198,9 @@ targets that run in MobileHarness labs, locally, or in virtual environments.
 1.  **Load the rule and devices**:
     ```python
     load(
-        "//wireless/android/platform/testing/bettertogether/betocq:nearby_connection_integration_test.bzl",
+        "//wireless/android/platform/testing/bettertogether/betocq:betocq_integration_test.bzl",
         "DEFAULT_TIMEOUT",
-        "nearby_connection_integration_test",
+        "betocq_integration_test",
     )
     load(
         "//wireless/android/platform/testing/bettertogether/betocq:mh_device.bzl",
@@ -212,7 +212,7 @@ targets that run in MobileHarness labs, locally, or in virtual environments.
 
 2.  **Add the target**:
     ```python
-    nearby_connection_integration_test(
+    betocq_integration_test(
         name = "my_new_test_suite",
         timeout = DEFAULT_TIMEOUT,
         srcs = ["my_new_test_suite.py"],
