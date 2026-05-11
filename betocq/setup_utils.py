@@ -1818,3 +1818,53 @@ def turn_device_on(
       interval=datetime.timedelta(seconds=1),
   ):
     raise signals.TestFailure('Failed to turn the device on')
+
+
+def verify_wfd_ip_setup(device: android_device.AndroidDevice) -> None:
+  """Verifies that a wifi direct interface is up and has an IP address."""
+  start_time = time.time()
+  p2p_lines = []
+  while time.time() - start_time < 30:
+    out = device.adb.shell('ip addr show')
+    if isinstance(out, bytes):
+      out = out.decode('utf-8')
+    p2p_lines = [line for line in out.splitlines() if 'p2p' in line]
+    if any('inet ' in line for line in p2p_lines):
+      device.log.info('p2p interface lines: %s', p2p_lines)
+      return
+    time.sleep(1)
+  device.log.info('p2p interface lines after timeout: %s', p2p_lines)
+  asserts.fail('Wifi direct interface not fully configured with IP')
+
+
+def enable_ble_for_devices(ads: list[android_device.AndroidDevice]) -> None:
+  """Enables BLE on the given devices."""
+  for ad in ads:
+    ad.log.info('Turning on BLE')
+    try:
+      ad.adb.shell('svc bluetooth enable')
+    except adb.AdbError as e:
+      ad.log.warning('Failed to enable bluetooth via svc: %s', e)
+
+
+def reset_wifi_and_enable_ble_for_devices(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Enables BLE and resets WiFi (turns off, turns on, and disconnects networks) for the given devices."""
+  enable_ble_for_devices(ads)
+  for ad in ads:
+    ad.log.info('Turning off WiFi')
+    try:
+      ad.adb.shell('cmd wifi set-wifi-enabled disabled')
+      time.sleep(2)
+    except adb.AdbError as e:
+      ad.log.warning('Failed to disable wifi via cmd: %s', e)
+    ad.log.info('Turning on WiFi and disconnecting from networks')
+    try:
+      ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+    except adb.AdbError as e:
+      ad.log.warning('Failed to enable wifi via cmd: %s', e)
+    try:
+      ad.adb.shell('cmd wifi disconnect')
+    except adb.AdbError as e:
+      ad.log.warning('Failed to disconnect wifi via cmd: %s', e)
