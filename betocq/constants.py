@@ -166,6 +166,10 @@ class TestParameters:
   # Ignore the indoor 5g test for China tri-band AP, as China tri-band AP only
   # can use UNII-3 band for 5G wifi, which is not supported by Japan devices.
   ignore_indoor_5g_test_for_china_triband_ap: bool = False
+  # The filename to export metrics as JSON. If empty, JSON export is skipped.
+  metrics_json_filename: str = ''
+  # The filename to export metrics as YAML. If empty, YAML export is skipped.
+  metrics_yaml_filename: str = ''
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':

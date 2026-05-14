@@ -633,44 +633,6 @@ def assert_nc_throughput_meets_target(
   asserts.fail(low_throughput_info)
 
 
-def _get_device_attributes(ad: android_device.AndroidDevice) -> str:
-  """Gets device attributes for debugging."""
-  device_specific_info = setup_utils.get_betocq_device_specific_info(ad)
-  wifi_fw = device_specific_info.get('wifi_fw', '')
-  if not wifi_fw:
-    wifi_fw = setup_utils.get_wifi_firmware_version(ad)
-  bt_fw = device_specific_info.get('bt_fw', '')
-  if not bt_fw:
-    bt_fw = setup_utils.get_bt_firmware_version(ad)
-
-  return '\n'.join([
-      f'serial: {getattr(ad, "serial", "NA")}',
-      f'model: {getattr(ad, "model", "NA")}',
-      (
-          f'android_version: {getattr(ad, "android_version", "NA")}\n'
-          f'build_info: {getattr(ad, "build_info", "NA")}'
-      ),
-      f'gms_version: {setup_utils.dump_gms_version(ad)}',
-      f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
-      f'wifi_fw: {wifi_fw}',
-      f'bt_fw: {bt_fw}',
-      f'support_aware: {setup_utils.is_wifi_aware_available(ad)}',
-      f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
-      (
-          'enable_sta_dfs_channel_for_peer_network:'
-          f' {getattr(ad, "enable_sta_dfs_channel_for_peer_network", "NA")}'
-      ),
-      (
-          'enable_sta_indoor_channel_for_peer_network:'
-          f' {getattr(ad, "enable_sta_indoor_channel_for_peer_network", "NA")}'
-      ),
-      f'max_num_streams: {getattr(ad, "max_num_streams", "NA")}',
-      f'max_num_streams_dbs: {getattr(ad, "max_num_streams_dbs", "NA")}',
-      f'max_phy_rate_5g_mbps: {getattr(ad, "max_phy_rate_5g_mbps", "NA")}',
-      f'max_phy_rate_2g_mbps: {getattr(ad, "max_phy_rate_2g_mbps", "NA")}',
-  ])
-
-
 def _summarize_prior_connection_info(
     result: SingleTestResult,
 ) -> str:
@@ -857,8 +819,8 @@ def gen_basic_test_summary(
   basic_test_summary = collections.OrderedDict({
       'test_script_verion': version.TEST_SCRIPT_VERSION,
       'test_result': test_result,
-      'device_source': _get_device_attributes(discoverer),
-      'device_target': _get_device_attributes(advertiser),
+      'device_source': setup_utils.get_device_attributes(discoverer),
+      'device_target': setup_utils.get_device_attributes(advertiser),
       'target_build_id': f'{advertiser.build_info["build_id"]}',
       'target_model': f'{advertiser.model}',
       'target_gms_version': f'{setup_utils.dump_gms_version(advertiser)}',
@@ -901,14 +863,14 @@ def gen_uiautomation_test_summary(
 
   result_message = 'PASS' if test_passed else 'FAIL'
   if not test_passed and error_code:
-    result_message += f' - {error_code}'
+    result_message += ' - ' + error_code
 
   res = {
       'result': result_message,
       'transfer_info': '\n'.join(
-          [f'{k}: {v}' for k, v in transfer_quality_info.items()]
+          f'{k}: {v}' for k, v in transfer_quality_info.items()
       ),
-      'device_android': _get_device_attributes(ad),
+      'device_android': setup_utils.get_device_attributes(ad),
       'device_ios': f'model: {ios_model}\nbuild: {ios_build_info}',
   }
 
@@ -991,7 +953,7 @@ class PerformanceTestResults:
   _results: Sequence[SingleTestResult]
   _start_time: datetime.datetime
 
-  def __init__(self):
+  def __init__(self) -> None:
     self._results = []
     self._start_time = datetime.datetime.now()
 

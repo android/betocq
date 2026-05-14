@@ -80,6 +80,7 @@ class BaseTestClass(base_test.BaseTestClass):
     self.is_using_gms_api = True
 
   def setup_class(self) -> None:
+    super().setup_class()
     if sys.version_info < (3, 12):
       setup_utils.report_error_on_setup_class(
           self,
@@ -232,6 +233,7 @@ class BaseTestClass(base_test.BaseTestClass):
     )
 
   def setup_test(self):
+    super().setup_test()
     self.record_data({
         'Test Name': self.current_test_info.name,
         'properties': {
@@ -271,26 +273,35 @@ class BaseTestClass(base_test.BaseTestClass):
     setup_utils.clear_hermetic_overrides(ad)
 
   def teardown_test(self) -> None:
-    self._log_test_end_on_device(self.advertiser)
-    self._log_test_end_on_device(self.discoverer)
-    utils.concurrent_exec(
-        lambda d: d.services.create_output_excerpts_all(self.current_test_info),
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
+    try:
+      self._log_test_end_on_device(self.advertiser)
+      self._log_test_end_on_device(self.discoverer)
+      utils.concurrent_exec(
+          lambda d: d.services.create_output_excerpts_all(
+              self.current_test_info
+          ),
+          param_list=[[ad] for ad in self.ads],
+          raise_on_exception=True,
+      )
+    finally:
+      super().teardown_test()
 
   def teardown_class(self) -> None:
-    if self.__skipped_test_class:
-      logging.info('Skipping teardown class.')
-      return
+    try:
+      if self.__skipped_test_class:
+        logging.info('Skipping teardown class.')
+        return
 
-    utils.concurrent_exec(
-        self._teardown_device,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
+      utils.concurrent_exec(
+          self._teardown_device,
+          param_list=[[ad] for ad in self.ads],
+          raise_on_exception=True,
+      )
+    finally:
+      super().teardown_class()
 
   def on_fail(self, record: records.TestResultRecord) -> None:
+    super().on_fail(record)
     if self.__skipped_test_class:
       logging.info('Skipping on_fail.')
       return
@@ -373,6 +384,7 @@ class BaseTestClass(base_test.BaseTestClass):
         logging.info('reach the max number of bug reports, skip the rest')
 
   def on_pass(self, record: records.TestResultRecord) -> None:
+    super().on_pass(record)
     # Ignore captured packets when the test passes.
     self._stop_packet_capture(ignore_packets=True)
 

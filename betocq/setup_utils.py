@@ -1387,7 +1387,17 @@ def abort_if_any_5g_or_dfs_aps_not_ready(
 def abort_if_5g_band_not_supported(
     ads: list[android_device.AndroidDevice],
 ) -> None:
-  """Skips test class if any device does not support 5G band."""
+  """Skips test class if any device does not support 5G band.
+
+  Note: We explicitly prefer asserts.abort_class_if over asserts.skip_if here.
+  In Sponge's data model, setup fixtures cannot natively report a skipped state.
+  Raising TestSkip during setup_class causes Sponge to mark setup as an ERROR.
+  Configuring ResultStore to map TestAbortClass to a clean skip natively allows
+  us to bypass the suite without implementing complex deferred-skipping logic.
+
+  Args:
+    ads: A list of AndroidDevice instances.
+  """
   for ad in ads:
     asserts.abort_class_if(
         not is_5g_band_supported(ad),
@@ -1398,7 +1408,17 @@ def abort_if_5g_band_not_supported(
 def abort_if_5g_band_supported(
     ads: list[android_device.AndroidDevice],
 ) -> None:
-  """Aborts test class if any device supports 5G band."""
+  """Aborts test class if any device supports 5G band.
+
+  Note: We explicitly prefer asserts.abort_class_if over asserts.skip_if here.
+  In Sponge's data model, setup fixtures cannot natively report a skipped state.
+  Raising TestSkip during setup_class causes Sponge to mark setup as an ERROR.
+  Configuring ResultStore to map TestAbortClass to a clean skip natively allows
+  us to bypass the suite without implementing complex deferred-skipping logic.
+
+  Args:
+    ads: A list of AndroidDevice instances.
+  """
   for ad in ads:
     asserts.abort_class_if(
         is_5g_band_supported(ad),
@@ -1868,3 +1888,53 @@ def reset_wifi_and_enable_ble_for_devices(
       ad.adb.shell('cmd wifi disconnect')
     except adb.AdbError as e:
       ad.log.warning('Failed to disconnect wifi via cmd: %s', e)
+
+
+def get_device_attributes(ad: android_device.AndroidDevice) -> str:
+  """Gets device attributes for debugging."""
+  device_specific_info = get_betocq_device_specific_info(ad)
+  wifi_fw = device_specific_info.get('wifi_fw', '')
+  if not wifi_fw:
+    wifi_fw = get_wifi_firmware_version(ad)
+  bt_fw = device_specific_info.get('bt_fw', '')
+  if not bt_fw:
+    bt_fw = get_bt_firmware_version(ad)
+
+  return '\n'.join((
+      f'serial: {getattr(ad, "serial", "NA")}',
+      f'model: {getattr(ad, "model", "NA")}',
+      (
+          f'android_version: {getattr(ad, "android_version", "NA")}\n'
+          f'build_info: {getattr(ad, "build_info", "NA")}'
+      ),
+      f'gms_version: {dump_gms_version(ad)}',
+      f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
+      f'wifi_fw: {wifi_fw}',
+      f'bt_fw: {bt_fw}',
+      f'support_aware: {is_wifi_aware_available(ad)}',
+      f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
+      (
+          'enable_sta_dfs_channel_for_peer_network:'
+          f' {getattr(ad, "enable_sta_dfs_channel_for_peer_network", "NA")}'
+      ),
+      (
+          'enable_sta_indoor_channel_for_peer_network:'
+          f' {getattr(ad, "enable_sta_indoor_channel_for_peer_network", "NA")}'
+      ),
+      f'max_num_streams: {getattr(ad, "max_num_streams", "NA")}',
+      f'max_num_streams_dbs: {getattr(ad, "max_num_streams_dbs", "NA")}',
+      f'max_phy_rate_5g_mbps: {getattr(ad, "max_phy_rate_5g_mbps", "NA")}',
+      f'max_phy_rate_2g_mbps: {getattr(ad, "max_phy_rate_2g_mbps", "NA")}',
+  ))
+
+
+def betocq_repeat(
+    count: int, *, max_consecutive_error: int = 2
+) -> Callable[..., Any]:
+  """Decorator to wrap Mobly repeat and attach metadata for dynamic discovery."""
+
+  def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+    func.expected_iterations = count
+    return base_test.repeat(count, max_consecutive_error)(func)
+
+  return decorator
