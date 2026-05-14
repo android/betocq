@@ -29,6 +29,7 @@ import com.google.android.gms.nearby.connection.AdvertisingOptions;
 import com.google.android.gms.nearby.connection.ConnectionOptions;
 import com.google.android.gms.nearby.connection.ConnectionType;
 import com.google.android.gms.nearby.connection.DiscoveryOptions;
+import com.google.android.gms.nearby.connection.PowerLevel;
 import com.google.android.gms.nearby.connection.Strategy;
 import java.util.stream.IntStream;
 
@@ -56,7 +57,7 @@ public final class MediumSettingsFactory {
   public static AdvertisingOptions getAdvertisingOptions(int advertisingMedium, int upgradeMedium) {
     boolean autoUpgradeBandwidth = false;
     boolean enforceTopologyConstraints = true;
-    boolean lowPower = false;
+    int powerLevel = PowerLevel.HIGH_POWER;
     IntStream advertisingMediums = IntStream.empty();
     IntStream upgradeMediums = IntStream.empty();
 
@@ -85,10 +86,7 @@ public final class MediumSettingsFactory {
         upgradeMediums = null;
       }
       case MEDIUM_BT_ONLY -> upgradeMediums = IntStream.of(BLUETOOTH);
-      case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> {
-        lowPower = true;
-        upgradeMediums = IntStream.of(BLE);
-      }
+      case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> upgradeMediums = IntStream.of(BLE);
       case MEDIUM_WIFILAN_ONLY -> {
         autoUpgradeBandwidth = true;
         upgradeMediums = IntStream.of(WIFI_LAN);
@@ -121,7 +119,7 @@ public final class MediumSettingsFactory {
     builder
         .setAutoUpgradeBandwidth(autoUpgradeBandwidth)
         .setEnforceTopologyConstraints(enforceTopologyConstraints)
-        .setLowPower(lowPower);
+        .setPowerLevel(powerLevel);
 
     if (advertisingMediums != null) {
       builder.setAdvertisingMediums(advertisingMediums.toArray());
@@ -136,7 +134,7 @@ public final class MediumSettingsFactory {
 
   public static DiscoveryOptions getDiscoveryMediumOptions(int discoveryMedium) {
     boolean forwardUnrecognizedBluetoothDevices = false;
-    boolean lowPower = false;
+    int powerLevel = PowerLevel.HIGH_POWER;
     IntStream discoveryMediums = IntStream.empty();
 
     DiscoveryOptions.Builder builder = new DiscoveryOptions.Builder().setStrategy(STRATEGY);
@@ -157,7 +155,7 @@ public final class MediumSettingsFactory {
 
     builder
         .setForwardUnrecognizedBluetoothDevices(forwardUnrecognizedBluetoothDevices)
-        .setLowPower(lowPower);
+        .setPowerLevel(powerLevel);
 
     if (discoveryMedium != AUTO) {
       builder.setDiscoveryMediums(discoveryMediums.toArray());
