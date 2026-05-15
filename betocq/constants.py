@@ -106,9 +106,6 @@ TRANSFER_TIMEOUT_FUNC_TEST = datetime.timedelta(seconds=100)
 
 TARGET_CUJ_UNSET = 'unspecified'
 TARGET_CUJ_QUICK_START = 'quick_start'
-TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
-TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
-TARGET_CUJ_QUICK_SHARE = 'quick_share'
 TARGET_CUJ_AQT = 'aqt'
 
 MAX_FREQ_2G_MHZ = 2500
