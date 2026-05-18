@@ -17,42 +17,52 @@
 from mobly import base_suite
 from mobly import suite_runner
 
-from betocq.dct.compound_tests import scc_5g_all_wifi_sta_test
-from betocq.dct.directed_tests import scc_2g_wlan_sta_test
-from betocq.dct.directed_tests import scc_5g_wlan_sta_test
-from betocq.nearby_connection.directed_tests import scc_2g_wlan_sta_test as nc_scc_2g_wlan_sta_test
-from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
-from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test as nc_scc_5g_wlan_sta_test
+from betocq.nearby_connection.directed_tests import ble_performance_test
+from betocq.nearby_connection.directed_tests import bt_performance_test
+from betocq.nearby_connection.directed_tests import local_only_hotspot_test
+from betocq.nearby_connection.directed_tests import mcc_2g_wfd_ww_5g_sta_test
+from betocq.nearby_connection.directed_tests import mcc_5g_hotspot_dfs_5g_sta_test
+from betocq.nearby_connection.directed_tests import mcc_5g_wfd_dfs_5g_sta_test
+from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
+from betocq.nearby_connection.directed_tests import mcc_aware_sta_test
 
 
 class BetocqMetricsV2TestSuite(base_suite.BaseSuite):
-  """Add BetoCQ V2 metrics tests to run in sequence."""
+  """BetoCQ V2 metrics tests to run in sequence."""
 
   def setup_suite(self, config):
     """Add tests to the suite."""
     self.add_test_class(
-        nc_scc_2g_wlan_sta_test.Scc2gWlanStaTest,
+        ble_performance_test.BlePerformanceTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        scc_5g_wfd_sta_test.Scc5gWfdStaTest,
+        bt_performance_test.BtPerformanceTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        nc_scc_5g_wlan_sta_test.Scc5gWifiLanStaTest,
-        name_suffix='nc_v1',
+        local_only_hotspot_test.LocalOnlyHotspotTest,
+        name_suffix='nc',
     )
     self.add_test_class(
-        scc_2g_wlan_sta_test.Scc2gWlanStaTest,
-        name_suffix='dct',
+        mcc_aware_sta_test.MccAwareStaTest,
+        name_suffix='nc',
     )
     self.add_test_class(
-        scc_5g_wlan_sta_test.Scc5gWlanStaTest,
-        name_suffix='dct',
+        mcc_5g_hotspot_dfs_5g_sta_test.Mcc5gHotspotDfs5gStaTest,
+        name_suffix='nc',
     )
     self.add_test_class(
-        scc_5g_all_wifi_sta_test.Scc5gAllWifiStaTest,
-        name_suffix='dct_v1',
+        mcc_5g_wfd_dfs_5g_sta_test.Mcc5gWfdDfs5gStaTest,
+        name_suffix='nc',
+    )
+    self.add_test_class(
+        mcc_5g_wfd_non_dbs_2g_sta_test.Mcc5gWfdNonDbs2gStaTest,
+        name_suffix='nc',
+    )
+    self.add_test_class(
+        mcc_2g_wfd_ww_5g_sta_test.Mcc2gWfdWw5gStaTest,
+        name_suffix='nc',
     )
 
 

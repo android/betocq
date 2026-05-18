@@ -48,17 +48,17 @@ Expected results:
 
 import time
 
-from mobly import base_test
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
+from typing_extensions import override
 
 from betocq import constants
-from betocq import performance_test_base
 from betocq import setup_utils
-from betocq import test_result_utils
 from betocq.nearby_connection import nc_constants
-from betocq.nearby_connection import utils as nc_utils
+from betocq.nearby_connection import nc_performance_test_base
+from betocq.nearby_connection import nc_test_result_utils
+from betocq.nearby_connection import nc_utils_v2 as nc_utils
 
 
 TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
@@ -84,13 +84,21 @@ _FILE_TRANSFER_FAILURE_TIP = (
 )
 
 
-class MccAwareStaTest(performance_test_base.PerformanceTestBase):
+class MccAwareStaTest(nc_performance_test_base.NcPerformanceTestBase):
   """Test class for Aware MCC with the STAs connected to two 5G channels."""
 
   test_runtime: constants.NcTestRuntime
   wifi_info: constants.WifiInfo
 
+  @override
+  def get_success_rate(self, scenario_name: str) -> float:
+    """Returns the expected success rate target."""
+    del self, scenario_name  # Unused in this implementation.
+    return SUCCESS_RATE_TARGET
+
+  @override
   def setup_class(self):
+    """Sets up the test class and test runtime environment."""
     super().setup_class()
 
     self.wifi_info = constants.WifiInfo(
@@ -111,10 +119,6 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
         self, self.advertiser, self.test_parameters
     )
 
-    self.test_results.test_iterations_expected = TEST_ITERATION_NUM
-    self.test_results.success_rate_target = SUCCESS_RATE_TARGET
-    self.test_results.nc_test_runtime = self.test_runtime
-
     # Test specific device setup steps.
     utils.concurrent_exec(
         self._setup_android_device,
@@ -131,6 +135,7 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
+    """Configures snippets and settings for an Android device."""
     nc_utils.setup_android_device_for_nc_tests(
         ad,
         snippet_confs=[nc_utils.get_nearby_snippet_config(self.user_params)],
@@ -138,12 +143,12 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
-  def _assert_test_conditions(self):
+  def _assert_test_conditions(self) -> None:
     """Aborts the test class if any test condition is not met."""
     # Check WiFi AP.
     setup_utils.abort_if_any_5g_or_dfs_aps_not_ready(self.test_parameters)
 
-  @base_test.repeat(
+  @setup_utils.betocq_repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
   )
@@ -152,18 +157,18 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
     # Test Step: Connect discoverer to wifi sta.
     discoverer_connected = nc_utils.connect_ad_to_wifi_sta(
         self.discoverer,
-        self.wifi_info.discoverer_wifi_ssid,
-        self.wifi_info.discoverer_wifi_password,
-        self.current_test_result,
+        wifi_ssid=self.wifi_info.discoverer_wifi_ssid,
+        wifi_password=self.wifi_info.discoverer_wifi_password,
+        metrics=self.get_current_iteration_metrics(),
         is_discoverer=True,
     )
 
     # Test Step: Connect advertiser to wifi sta.
     advertiser_connected = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
-        self.wifi_info.advertiser_wifi_ssid,
-        self.wifi_info.advertiser_wifi_password,
-        self.current_test_result,
+        wifi_ssid=self.wifi_info.advertiser_wifi_ssid,
+        wifi_password=self.wifi_info.advertiser_wifi_password,
+        metrics=self.get_current_iteration_metrics(),
         is_discoverer=False,
     )
     if discoverer_connected or advertiser_connected:
@@ -173,23 +178,25 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
 
     # TODO: differentiate the discoverer and advertiser
     # STA frequency in the test result.
-    test_result_utils.set_and_assert_sta_frequency(
+    nc_test_result_utils.set_and_assert_sta_frequency(
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.WifiType.FREQ_5G,
+        prefix='discoverer_',
     )
 
-    test_result_utils.set_and_assert_sta_frequency(
+    nc_test_result_utils.set_and_assert_sta_frequency(
         self.advertiser,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.WifiType.FREQ_5G_DFS,
+        prefix='advertiser_',
     )
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        metrics=self.get_current_iteration_metrics(),
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
@@ -197,25 +204,26 @@ class MccAwareStaTest(performance_test_base.PerformanceTestBase):
 
     # Test Step: Transfer file on the established NC.
     try:
-      self.current_test_result.file_transfer_throughput_kbps = (
+      self.get_current_iteration_metrics().record(
+          'file_transfer_throughput_kbps',
           active_snippet.transfer_file(
               file_size_kb=_FILE_TRANSFER_SIZE_KB,
               timeout=_FILE_TRANSFER_TIMEOUT,
               payload_type=_PAYLOAD_TYPE,
               num_files=_FILE_TRANSFER_NUM,
-          )
+          ),
       )
     finally:
       nc_utils.handle_file_transfer_failure(
           active_snippet.test_failure_reason,
-          self.current_test_result,
+          self.get_current_iteration_metrics(),
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
       )
 
     # Check the throughput and run iperf if needed.
     if not self.test_parameters.skip_throughput_assertion:
-      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-          test_result=self.current_test_result,
+      nc_test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          metrics=self.get_current_iteration_metrics(),
           nc_test_runtime=self.test_runtime,
           low_throughput_tip=_THROUGHPUT_LOW_TIP,
       )

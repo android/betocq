@@ -34,17 +34,17 @@ Expected results:
 
 import logging
 
-from mobly import base_test
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
+from typing_extensions import override
 
 from betocq import constants
-from betocq import performance_test_base
 from betocq import setup_utils
-from betocq import test_result_utils
 from betocq.nearby_connection import nc_constants
-from betocq.nearby_connection import utils as nc_utils
+from betocq.nearby_connection import nc_performance_test_base
+from betocq.nearby_connection import nc_test_result_utils
+from betocq.nearby_connection import nc_utils_v2 as nc_utils
 
 
 THROUGHPUT_TARGET = nc_constants.CLASSIC_BT_MEDIUM_THROUGHPUT_BENCHMARK_MBPS
@@ -63,18 +63,26 @@ _THROUGHPUT_LOW_TIP = (
 
 
 _FILE_TRANSFER_FAILURE_TIP = (
-    'The classic Bluetooth connection might be broken, check related logs.'
-    f' {_THROUGHPUT_LOW_TIP}'
+    'The classic Bluetooth connection might be broken, check related logs. '
+    f'{_THROUGHPUT_LOW_TIP}'
 )
 
 
-class BtPerformanceTest(performance_test_base.PerformanceTestBase):
-  """Test class for the classic Bluetooth connection performance."""
+class BtPerformanceTest(nc_performance_test_base.NcPerformanceTestBase):
+  """Classic Bluetooth connection performance test."""
 
   test_runtime: constants.NcTestRuntime
   wifi_info: constants.WifiInfo
 
+  @override
+  def get_success_rate(self, scenario_name: str) -> float:
+    """Returns the expected success rate target."""
+    del self, scenario_name  # Unused in this implementation.
+    return SUCCESS_RATE_TARGET
+
+  @override
   def setup_class(self):
+    """Sets up the test class and test runtime environment."""
     super().setup_class()
 
     self.test_runtime = constants.NcTestRuntime(
@@ -85,10 +93,6 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
         country_code='US',
         wifi_info=None,
     )
-
-    self.test_results.test_iterations_expected = TEST_ITERATION_NUM
-    self.test_results.success_rate_target = SUCCESS_RATE_TARGET
-    self.test_results.nc_test_runtime = self.test_runtime
 
     # Test specific device setup steps.
     utils.concurrent_exec(
@@ -107,6 +111,7 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
+    """Configures snippets and settings for an Android device."""
     nc_utils.setup_android_device_for_nc_tests(
         ad,
         snippet_confs=[nc_utils.get_nearby_snippet_config(self.user_params)],
@@ -114,17 +119,16 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
-  @base_test.repeat(
+  @setup_utils.betocq_repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
   )
   def test_classic_bt_performance(self):
-    """Test the performance of the classic BT connetion."""
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        metrics=self.get_current_iteration_metrics(),
         connection_medium=self.test_runtime.connection_medium,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
@@ -135,25 +139,26 @@ class BtPerformanceTest(performance_test_base.PerformanceTestBase):
 
     # Test Step: Transfer file on the established NC.
     try:
-      self.current_test_result.file_transfer_throughput_kbps = (
+      self.get_current_iteration_metrics().record(
+          'file_transfer_throughput_kbps',
           active_snippet.transfer_file(
               file_size_kb=_FILE_TRANSFER_SIZE_KB,
               timeout=_FILE_TRANSFER_TIMEOUT,
               payload_type=_PAYLOAD_TYPE,
               num_files=_FILE_TRANSFER_NUM,
-          )
+          ),
       )
     finally:
       nc_utils.handle_file_transfer_failure(
           active_snippet.test_failure_reason,
-          self.current_test_result,
+          self.get_current_iteration_metrics(),
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
       )
 
     logging.info('NC speed target: %s', THROUGHPUT_TARGET)
     if not self.test_parameters.skip_throughput_assertion:
-      test_result_utils.assert_nc_throughput_meets_target(
-          test_result=self.current_test_result,
+      nc_test_result_utils.assert_nc_throughput_meets_target(
+          metrics=self.get_current_iteration_metrics(),
           nc_speed_min_mbps=THROUGHPUT_TARGET,
           low_throughput_tip=_THROUGHPUT_LOW_TIP,
       )
