@@ -31,7 +31,8 @@
                        com.google.android.nearby.mobly.snippet.betocore.BeToCoreSnippet,
                        com.google.android.nearby.mobly.snippet.betocore.GmsBeToCoreSnippet,
                        com.google.android.nearby.mobly.snippet.betocore.MainlineBeToCoreSnippet,
-                       com.google.android.nearby.mobly.snippet.betocore.OxideBeToCoreSnippet" />
+                       com.google.android.nearby.mobly.snippet.betocore.OxideBeToCoreSnippet,
+                       com.google.android.nearby.mobly.snippet.betocore.performancetest.BetoCoreLatencySnippet" />
     <provider
         android:name="androidx.core.content.FileProvider"
         android:authorities="com.google.android.nearby.mobly.snippet.betocore.fileprovider"
