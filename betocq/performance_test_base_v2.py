@@ -280,6 +280,20 @@ class PerformanceTestBase(base_test.BaseTestClass):
         'Test Name': completed_metrics.test_name,
         'properties': iteration_data,
     })
+    self.record_customized_single_test_iter_report(completed_metrics)
+
+  def record_customized_single_test_iter_report(
+      self, completed_metrics: metrics.MetricsCollector
+  ) -> None:
+    """Writes custom proto diagnostics to disk.
+
+    Subclasses should override this method.
+
+    Args:
+      completed_metrics: The metrics collector for the completed iteration.
+    """
+    del self  # Unused in base class.
+    del completed_metrics  # Unused in base class.
 
   def is_test_class_passed(self) -> bool:
     """Checks if every executed scenario meets its local success rate target.
