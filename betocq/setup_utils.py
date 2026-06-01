@@ -1840,15 +1840,26 @@ def turn_device_on(
     raise signals.TestFailure('Failed to turn the device on')
 
 
+def _get_p2p_lines(device: android_device.AndroidDevice) -> list[str]:
+  """Returns the p2p lines from the ip addr show output."""
+  out = device.adb.shell('ip addr show')
+  if isinstance(out, bytes):
+    out = out.decode('utf-8')
+  return [line for line in out.splitlines() if 'p2p' in line]
+
+
+def has_wfd_ip_setup(device: android_device.AndroidDevice) -> bool:
+  """Returns true if a wifi direct interface is up and has an IP address."""
+  p2p_lines = _get_p2p_lines(device)
+  return any('inet ' in line for line in p2p_lines)
+
+
 def verify_wfd_ip_setup(device: android_device.AndroidDevice) -> None:
   """Verifies that a wifi direct interface is up and has an IP address."""
   start_time = time.time()
   p2p_lines = []
   while time.time() - start_time < 30:
-    out = device.adb.shell('ip addr show')
-    if isinstance(out, bytes):
-      out = out.decode('utf-8')
-    p2p_lines = [line for line in out.splitlines() if 'p2p' in line]
+    p2p_lines = _get_p2p_lines(device)
     if any('inet ' in line for line in p2p_lines):
       device.log.info('p2p interface lines: %s', p2p_lines)
       return
