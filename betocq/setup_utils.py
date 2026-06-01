@@ -1854,6 +1854,19 @@ def has_wfd_ip_setup(device: android_device.AndroidDevice) -> bool:
   return any('inet ' in line for line in p2p_lines)
 
 
+def await_wfd_ip_state(
+    device: android_device.AndroidDevice,
+    expected_state: bool,
+) -> bool:
+  """Returns true if the wfd ip setup reaches the expected state."""
+  start_time = time.time()
+  while time.time() - start_time < 30:
+    if has_wfd_ip_setup(device) == expected_state:
+      return True
+    time.sleep(1)
+  return False
+
+
 def verify_wfd_ip_setup(device: android_device.AndroidDevice) -> None:
   """Verifies that a wifi direct interface is up and has an IP address."""
   start_time = time.time()
