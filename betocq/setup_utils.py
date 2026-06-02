@@ -1840,45 +1840,27 @@ def turn_device_on(
     raise signals.TestFailure('Failed to turn the device on')
 
 
-def _get_p2p_lines(device: android_device.AndroidDevice) -> list[str]:
-  """Returns the p2p lines from the ip addr show output."""
-  out = device.adb.shell('ip addr show')
-  if isinstance(out, bytes):
-    out = out.decode('utf-8')
-  return [line for line in out.splitlines() if 'p2p' in line]
-
-
-def has_wfd_ip_setup(device: android_device.AndroidDevice) -> bool:
-  """Returns true if a wifi direct interface is up and has an IP address."""
-  p2p_lines = _get_p2p_lines(device)
-  return any('inet ' in line for line in p2p_lines)
-
-
-def await_wfd_ip_state(
+def verify_wfd_ip_setup(
     device: android_device.AndroidDevice,
     expected_state: bool,
 ) -> bool:
-  """Returns true if the wfd ip setup reaches the expected state."""
-  start_time = time.time()
-  while time.time() - start_time < 30:
-    if has_wfd_ip_setup(device) == expected_state:
-      return True
-    time.sleep(1)
-  return False
-
-
-def verify_wfd_ip_setup(device: android_device.AndroidDevice) -> None:
-  """Verifies that a wifi direct interface is up and has an IP address."""
+  """Returns true if the wfd ip setup reaches the expected state within 30 seconds."""
   start_time = time.time()
   p2p_lines = []
   while time.time() - start_time < 30:
-    p2p_lines = _get_p2p_lines(device)
-    if any('inet ' in line for line in p2p_lines):
+    # Check the wfd ip setup state every 1 second.
+    out = device.adb.shell('ip addr show')
+    if isinstance(out, bytes):
+      out = out.decode('utf-8')
+    p2p_lines = [line for line in out.splitlines() if 'p2p' in line]
+    has_wfd_ip = any('inet ' in line for line in p2p_lines)
+
+    if has_wfd_ip == expected_state:
       device.log.info('p2p interface lines: %s', p2p_lines)
-      return
+      return True
     time.sleep(1)
   device.log.info('p2p interface lines after timeout: %s', p2p_lines)
-  asserts.fail('Wifi direct interface not fully configured with IP')
+  return False
 
 
 def enable_ble_for_devices(ads: list[android_device.AndroidDevice]) -> None:
