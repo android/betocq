@@ -17,14 +17,15 @@
 from mobly import base_suite
 from mobly import suite_runner
 
-from betocq.nearby_connection.directed_tests import ble_performance_test
-from betocq.nearby_connection.directed_tests import bt_performance_test
-from betocq.nearby_connection.directed_tests import local_only_hotspot_test
-from betocq.nearby_connection.directed_tests import mcc_2g_wfd_ww_5g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_5g_hotspot_dfs_5g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_5g_wfd_dfs_5g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_aware_sta_test
+from betocq.nearby_connection.directed_tests import scc_2g_wfd_sta_test
+from betocq.nearby_connection.directed_tests import scc_2g_wlan_sta_test
+from betocq.nearby_connection.directed_tests import scc_5g_aware_sta_test
+from betocq.nearby_connection.directed_tests import scc_5g_wfd_dbs_2g_sta_test
+from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
+from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test
+from betocq.nearby_connection.directed_tests import scc_dfs_5g_hotspot_sta_test
+from betocq.nearby_connection.directed_tests import scc_dfs_5g_wfd_sta_test
+from betocq.nearby_connection.directed_tests import scc_indoor_5g_wfd_sta_test
 
 
 class BetocqMetricsV2TestSuite(base_suite.BaseSuite):
@@ -33,35 +34,39 @@ class BetocqMetricsV2TestSuite(base_suite.BaseSuite):
   def setup_suite(self, config):
     """Add tests to the suite."""
     self.add_test_class(
-        ble_performance_test.BlePerformanceTest,
+        scc_2g_wfd_sta_test.Scc2gWfdStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        bt_performance_test.BtPerformanceTest,
+        scc_2g_wlan_sta_test.Scc2gWlanStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        local_only_hotspot_test.LocalOnlyHotspotTest,
+        scc_5g_aware_sta_test.Scc5gAwareStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        mcc_aware_sta_test.MccAwareStaTest,
+        scc_5g_wfd_dbs_2g_sta_test.Scc5gWfdDbs2gStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        mcc_5g_hotspot_dfs_5g_sta_test.Mcc5gHotspotDfs5gStaTest,
+        scc_5g_wfd_sta_test.Scc5gWfdStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        mcc_5g_wfd_dfs_5g_sta_test.Mcc5gWfdDfs5gStaTest,
+        scc_5g_wlan_sta_test.Scc5gWifiLanStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        mcc_5g_wfd_non_dbs_2g_sta_test.Mcc5gWfdNonDbs2gStaTest,
+        scc_dfs_5g_hotspot_sta_test.SccDfs5gHotspotStaTest,
         name_suffix='nc',
     )
     self.add_test_class(
-        mcc_2g_wfd_ww_5g_sta_test.Mcc2gWfdWw5gStaTest,
+        scc_dfs_5g_wfd_sta_test.SccDfs5gWfdStaTest,
+        name_suffix='nc',
+    )
+    self.add_test_class(
+        scc_indoor_5g_wfd_sta_test.SccIndoor5gWfdStaTest,
         name_suffix='nc',
     )
 

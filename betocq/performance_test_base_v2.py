@@ -25,6 +25,7 @@ import logging
 from mobly import asserts
 from mobly import base_test
 from mobly import records
+from mobly import signals
 from mobly.controllers.android_device_lib import adb
 from typing_extensions import override
 from betocq import setup_utils
@@ -117,43 +118,51 @@ class PerformanceTestBase(base_test.BaseTestClass):
     self.metrics_manager = metrics.MetricsManager(
         self.TAG, metric_registry=self._metric_registry
     )
-    super().setup_class()
-    self._scenario_configs = {}
+    try:
+      super().setup_class()
+      self._scenario_configs = {}
 
-    # 1. Auto-discover test methods and expected iterations
-    for attr_name in dir(self):
-      if attr_name.startswith('test_'):
+      for attr_name in dir(self):
+        if not attr_name.startswith('test_'):
+          continue
         func = getattr(self, attr_name)
-        if callable(func):
-          underlying_func = getattr(func, '__func__', func)
-          iterations = getattr(
-              underlying_func,
-              'expected_iterations',
-              getattr(underlying_func, '_repeat_count', 1),
-          )
-          self._scenario_configs[attr_name] = ScenarioConfig(
-              iterations=iterations,
-              target=self.get_success_rate(attr_name),
-          )
+        if not callable(func):
+          continue
 
-          # Initialize scenario-scoped metric collectors
-          collector = metrics.MetricsCollector(
-              attr_name, metric_registry=self._metric_registry
-          )
-          self.metrics_manager.scenario_metrics[attr_name] = collector
-          collector.record(
-              'success_rate_target', self.get_success_rate(attr_name)
-          )
-          self._record_scenario_setup_metrics(attr_name, collector)
+        underlying_func = getattr(func, '__func__', func)
+        iterations = getattr(
+            underlying_func,
+            'expected_iterations',
+            getattr(underlying_func, '_repeat_count', 1),
+        )
+        self._scenario_configs[attr_name] = ScenarioConfig(
+            iterations=iterations,
+            target=self.get_success_rate(attr_name),
+        )
 
-    # Record basic class level info
-    self.metrics_manager.class_metrics.record(
-        'test_script_version',
-        version.TEST_SCRIPT_VERSION,
-    )
-    self.metrics_manager.class_metrics.record('test_result', 'UNINITIALIZED')
+        # Initialize scenario-scoped metric collectors
+        collector = metrics.MetricsCollector(
+            attr_name, metric_registry=self._metric_registry
+        )
+        self.metrics_manager.scenario_metrics[attr_name] = collector
+        collector.record(
+            'success_rate_target', self.get_success_rate(attr_name)
+        )
+        self._record_scenario_setup_metrics(attr_name, collector)
 
-    self._record_class_setup_metadata(self.metrics_manager.class_metrics)
+      # Record basic class level info
+      self.metrics_manager.class_metrics.record(
+          'test_script_version',
+          version.TEST_SCRIPT_VERSION,
+      )
+      self.metrics_manager.class_metrics.record('test_result', 'UNINITIALIZED')
+
+      self._record_class_setup_metadata(self.metrics_manager.class_metrics)
+      self._framework_setup_class_completed = True
+    except signals.TestAbortClass:
+      logging.info('setup_class aborted, attempting to record metadata anyway.')
+      self._try_record_class_setup_metadata(self.metrics_manager.class_metrics)
+      raise
 
   def get_current_iteration_metrics(self) -> metrics.MetricsCollector:
     """Returns the metrics collector for the current iteration.
@@ -492,7 +501,15 @@ class PerformanceTestBase(base_test.BaseTestClass):
       self.metrics_manager.stop()
 
       # Subclass hook to record dynamic teardown metadata
-      self._record_class_teardown_metadata(self.metrics_manager.class_metrics)
+      if getattr(self, '_framework_setup_class_completed', False):
+        self._try_record_class_teardown_metadata(
+            self.metrics_manager.class_metrics
+        )
+      else:
+        logging.info(
+            'Framework setup_class did not complete, skipping teardown'
+            ' metadata.'
+        )
 
       # Verify if the entire class execution was bypassed intentionally.
       # If the number of skipped tests equals the total requested tests, it
@@ -647,6 +664,24 @@ class PerformanceTestBase(base_test.BaseTestClass):
       asserts.assert_true(self.is_test_class_passed(), final_result_message)
     finally:
       super().teardown_class()
+
+  def _try_record_class_setup_metadata(
+      self, class_metrics: metrics.MetricsCollector
+  ) -> None:
+    """Safely attempts to record class setup metadata, warning on failure."""
+    try:
+      self._record_class_setup_metadata(class_metrics)
+    except Exception:  # pylint: disable=broad-except
+      logging.warning('Failed to record metadata after abort.', exc_info=True)
+
+  def _try_record_class_teardown_metadata(
+      self, class_metrics: metrics.MetricsCollector
+  ) -> None:
+    """Safely attempts to record class teardown metadata, warning on failure."""
+    try:
+      self._record_class_teardown_metadata(class_metrics)
+    except Exception:  # pylint: disable=broad-except
+      logging.warning('Failed to record teardown metadata.', exc_info=True)
 
   # --- Abstract lifecycle hooks overridden by feature-specific subclasses ---
 

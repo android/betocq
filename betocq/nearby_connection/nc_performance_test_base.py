@@ -300,3 +300,21 @@ class NcPerformanceTestBase(
             else pids_changed_error
         )
         completed_metrics.record('result_message', new_message)
+
+  def _get_advertiser_sta_frequency(self) -> int:
+    """Gets the advertiser STA frequency from the current iteration metrics."""
+    sta_freq_metric = self.get_current_iteration_metrics().get(
+        'advertiser_sta_frequency'
+    )
+    return (
+        sta_freq_metric.value
+        if sta_freq_metric is not None
+        else constants.INVALID_INT
+    )
+
+  @override
+  def get_success_rate(self, scenario_name: str) -> float:
+    """Returns the expected success rate target."""
+    del self  # Unused in this implementation.
+    del scenario_name  # Unused in this implementation.
+    return constants.SUCCESS_RATE_TARGET
