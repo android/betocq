@@ -554,10 +554,12 @@ class MoblyPropsFormatter(MetricsFormatter):
       custom_formatters: dict[str, MoblyGroupFormatter] | None = None,
       group_order: Sequence[str] | None = None,
       index_prefix: bool = False,
+      include_scenario_metrics: bool = True,
   ) -> None:
     self.custom_formatters = custom_formatters or {}
     self.group_order = group_order or []
     self.index_prefix = index_prefix
+    self.include_scenario_metrics = include_scenario_metrics
 
   def _get_mobly_display_group(
       self, manager: MetricsManager, key: str
@@ -588,6 +590,71 @@ class MoblyPropsFormatter(MetricsFormatter):
       if m:
         return m.mobly_display_group
     return None
+
+  def _get_scenario_metric_values(
+      self, scenario_metrics: MetricsCollector
+  ) -> dict[str, Any]:
+    """Extracts metric values from a scenario collector, excluding certain aggregators."""
+    return {
+        k: m.value
+        for k, m in scenario_metrics.metrics.items()
+        if m.aggregator not in (
+            aggregators.AggregatorType.EXCLUDE_AGGREGATING,
+            aggregators.AggregatorType.EXCLUDE_ALL,
+        )
+    }
+
+  def _format_scenario_metrics(
+      self,
+      manager: MetricsManager,
+      scenario_aggregated: Mapping[str, dict[str, Any]],
+      class_data: dict[str, Any],
+      format_flat_set_fn,
+  ) -> dict[str, Any]:
+    """Formats scenario-specific metrics based on the number of scenarios."""
+    formatted_scenario_summary = collections.OrderedDict()
+
+    if not self.include_scenario_metrics:
+      return formatted_scenario_summary
+
+    if len(scenario_aggregated) <= 1:
+      # Single scenario (default): merge raw data and write flat,
+      # overwriting baseline.
+      flat_aggregated = {}
+      scenario_data = {}
+      for scenario_name, agg_data in scenario_aggregated.items():
+        flat_aggregated.update(agg_data)
+        if scenario_name in manager.scenario_metrics:
+          scenario_data.update(
+              self._get_scenario_metric_values(
+                  manager.scenario_metrics[scenario_name]
+              )
+          )
+
+      combined_data = class_data.copy()
+      combined_data.update(scenario_data)
+      combined_data.update(flat_aggregated)
+      formatted_scenario_summary.update(format_flat_set_fn(combined_data))
+    else:
+      # Multiple scenarios: merge raw data per-scenario and write
+      # scenario-prefixed summaries
+      for scenario_name, agg_data in scenario_aggregated.items():
+        scenario_data = {}
+        if scenario_name in manager.scenario_metrics:
+          scenario_data.update(
+              self._get_scenario_metric_values(
+                  manager.scenario_metrics[scenario_name]
+              )
+          )
+
+        combined_data = scenario_data.copy()
+        combined_data.update(agg_data)
+
+        formatted_agg = format_flat_set_fn(combined_data)
+        for k, v in formatted_agg.items():
+          formatted_scenario_summary[f'{scenario_name}_{k}'] = v
+
+    return formatted_scenario_summary
 
   def format(self, manager: MetricsManager) -> dict[str, Any]:
     """Formats metrics to match legacy Mobly properties."""
@@ -669,49 +736,10 @@ class MoblyPropsFormatter(MetricsFormatter):
     final_summary.update(formatted_class)
 
     # Consolidate and format scenario-specific metrics
-    if len(scenario_aggregated) <= 1:
-      # Single scenario (default): merge raw data and write flat,
-      # overwriting baseline.
-      flat_aggregated = {}
-      scenario_data = {}
-      for scenario_name, agg_data in scenario_aggregated.items():
-        flat_aggregated.update(agg_data)
-        if scenario_name in manager.scenario_metrics:
-          for k, m in manager.scenario_metrics[scenario_name].metrics.items():
-            if m.aggregator not in (
-                aggregators.AggregatorType.EXCLUDE_AGGREGATING,
-                aggregators.AggregatorType.EXCLUDE_ALL,
-            ):
-              scenario_data[k] = m.value
-
-      combined_data = {}
-      combined_data.update(class_data)
-      combined_data.update(scenario_data)
-      combined_data.update(flat_aggregated)
-
-      formatted_summary = format_flat_set(combined_data)
-      final_summary.update(formatted_summary)
-    else:
-      # Multiple scenarios: merge raw data per-scenario and write
-      # scenario-prefixed summaries
-      for scenario_name, agg_data in scenario_aggregated.items():
-        scenario_data = {}
-        if scenario_name in manager.scenario_metrics:
-          for k, m in manager.scenario_metrics[scenario_name].metrics.items():
-            if m.aggregator not in (
-                aggregators.AggregatorType.EXCLUDE_AGGREGATING,
-                aggregators.AggregatorType.EXCLUDE_ALL,
-            ):
-              scenario_data[k] = m.value
-
-        combined_data = {}
-        combined_data.update(class_data)
-        combined_data.update(scenario_data)
-        combined_data.update(agg_data)
-
-        formatted_agg = format_flat_set(combined_data)
-        for k, v in formatted_agg.items():
-          final_summary[f'{scenario_name}_{k}'] = v
+    formatted_scenario_summary = self._format_scenario_metrics(
+        manager, scenario_aggregated, class_data, format_flat_set
+    )
+    final_summary.update(formatted_scenario_summary)
 
     # Sanitize all values to make them safe for Mobly/YAML serialization
     sanitized_summary = {

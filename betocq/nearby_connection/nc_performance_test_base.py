@@ -15,9 +15,7 @@
 """Base test class for Nearby Connection performance tests with legacy metrics."""
 
 from collections.abc import Mapping
-import logging
 
-from mobly import records
 from typing_extensions import override
 
 from betocq import base_test
@@ -31,137 +29,50 @@ from betocq.nearby_connection import nc_group_formatters
 from betocq.nearby_connection import nc_metrics_registry
 
 
-class NcPerformanceTestBase(
-    performance_test_base_v2.PerformanceTestBase,
-    base_test.BaseTestClass,
-):
-  """Base test class for Nearby Connection performance tests with legacy metrics."""
-
-  def __init__(self, configs) -> None:
-    """Initializes the instance.
-
-    Args:
-      configs: The Mobly configs for the test.
-    """
-    super().__init__(configs)
-    self.is_using_gms_api = True
+class NcMetricsHelper(metrics_base.MetricsHelper):
+  """Metrics helper for Nearby Connection-specific metrics logic."""
 
   @override
-  def get_metric_registry(self) -> Mapping[str, metrics_base.MetricDefinition]:
-    return nc_metrics_registry.NC_METRICS_REGISTRY
-
-  @override
-  @property
-  def mobly_formatter(self) -> metrics_formatters.MoblyPropsFormatter:
-    """The configured MoblyPropsFormatter for legacy NC compatibility."""
-    custom_formatters = {
-        'test_config': metrics_formatters.MultiLineStringFormatter(
-            key_labels=[
-                ('device_source', 'device_source'),
-                ('device_target', 'device_target'),
-                ('target_build_id', 'target_build_id'),
-                ('target_model', 'target_model'),
-                ('target_gms_version', 'target_gms_version'),
-                ('target_wifi_chipset', 'target_wifi_chipset'),
-                ('wifi_ap_number', 'wifi_ap_number'),
-                ('country_code', 'country_code'),
-                (
-                    'advertising_discovery_medium',
-                    'advertising_discovery_medium',
-                ),
-                ('connection_medium', 'connection_medium'),
-                ('upgrade_medium_under_test', 'upgrade_medium'),
-                ('is_2g_only', 'is_2g_only'),
-                ('is_dbs_mode', 'is_dbs_mode'),
-                ('is_mcc_mode', 'is_mcc_mode'),
-                ('discoverer_wifi_ssid', 'discoverer_wifi_ssid'),
-                ('advertiser_wifi_ssid', 'advertiser_wifi_ssid'),
-            ],
-            output_key='test_config',
-        ),
-        'file_transfer_stats': (
-            nc_group_formatters.NcFileTransferStatsFormatter()
-        ),
-        'wifi_upgrade_stats': metrics_formatters.CounterFormatter(
-            metric_key='upgrade_medium', output_key='wifi_upgrade_stats'
-        ),
-        'prior_bt_connection_stats': metrics_formatters.StatsGroupFormatter(
-            config={
-                'prior_discovery_latency': {
-                    'count': 'discovery_count',
-                    'min': 'discovery_latency_min',
-                    'median': 'discovery_latency_med',
-                    'max': 'discovery_latency_max',
-                },
-                'prior_connection_latency': {
-                    'count': 'connection_count',
-                    'min': 'connection_latency_min',
-                    'median': 'connection_latency_med',
-                    'max': 'connection_latency_max',
-                },
-            },
-            output_key='prior_bt_connection_stats',
-            is_duration=True,
-            float_format='{:.2f}',
-        ),
-    }
-    group_order = [
-        'test_config',
-        'test_stats',
-        'file_transfer_stats',
-        'wifi_upgrade_stats',
-        'prior_bt_connection_stats',
-        'wifi_concurrency_mode',
-    ]
-    return metrics_formatters.MoblyPropsFormatter(
-        custom_formatters=custom_formatters,
-        group_order=group_order,
-        index_prefix=True,
-    )
-
-  # --- Feature-specific metrics hook overrides ---
-
-  @override
-  def _record_class_setup_metadata(
+  def record_class_setup_metadata(
       self, class_metrics: metrics_base.MetricsCollector
   ) -> None:
     """Records class setup metadata."""
     class_metrics.record(
         'device_source',
         setup_utils.get_device_attributes(
-            self.discoverer,
+            self.test.discoverer,
         ),
     )
     class_metrics.record(
         'device_target',
         setup_utils.get_device_attributes(
-            self.advertiser,
+            self.test.advertiser,
         ),
     )
     class_metrics.record(
         'target_build_id',
-        self.advertiser.build_info['build_id'],
+        self.test.advertiser.build_info['build_id'],
     )
     class_metrics.record(
         'target_model',
-        self.advertiser.model,
+        self.test.advertiser.model,
     )
     class_metrics.record(
         'target_gms_version',
-        setup_utils.dump_gms_version(self.advertiser),
+        setup_utils.dump_gms_version(self.test.advertiser),
     )
     class_metrics.record(
         'target_wifi_chipset',
-        getattr(self.advertiser, 'wifi_chipset', 'NA'),
+        getattr(self.test.advertiser, 'wifi_chipset', 'NA'),
     )
 
   @override
-  def _record_class_teardown_metadata(
+  def record_class_teardown_metadata(
       self, class_metrics: metrics_base.MetricsCollector
   ) -> None:
     """Records class teardown metadata."""
     device_specific_info = setup_utils.get_betocq_device_specific_info(
-        self.advertiser
+        self.test.advertiser
     )
     if (
         wifi_env_bssid_count := device_specific_info.get('wifi_env_bssid_count')
@@ -178,78 +89,59 @@ class NcPerformanceTestBase(
       )
 
   @override
-  def _record_scenario_teardown_metrics(
+  def record_scenario_teardown_metrics(
       self, scenario_name: str, metrics_collector: metrics_base.MetricsCollector
   ) -> None:
     """Records scenario teardown metrics."""
-    test_runtime = getattr(self, 'test_runtime', None)
-    if test_runtime:
-      metrics_collector.record_dataclass(
-          test_runtime,
-          exclude_fields=['advertiser', 'discoverer', 'wifi_info'],
+    test_runtime = getattr(self.test, 'test_runtime', None)
+    if not test_runtime:
+      return
+
+    metrics_collector.record_dataclass(
+        test_runtime,
+        exclude_fields=['advertiser', 'discoverer', 'wifi_info'],
+    )
+    wifi_info = getattr(test_runtime, 'wifi_info', None)
+    if not wifi_info:
+      return
+
+    metrics_collector.record_dataclass(
+        wifi_info,
+        name_mapping={
+            'is_mcc': 'is_mcc_mode',
+            'is_2g_d2d_wifi_medium': 'is_2g_only',
+        },
+        exclude_fields=[
+            'discoverer_wifi_password',
+            'advertiser_wifi_password',
+        ],
+    )
+
+    # Record concurrency mode dynamically
+    concurrency_mode = constants.WifiConcurrencyMode.UNKNOWN
+    d2d_type = getattr(wifi_info, 'd2d_type', None)
+    if d2d_type and constants.is_xcc_test(d2d_type):
+      for col in self.test.metrics_manager.iteration_collectors:
+        m = col.get('wifi_concurrency_mode')
+        if (
+            col.scenario_name == scenario_name
+            and m
+            and m.value != constants.WifiConcurrencyMode.UNKNOWN
+        ):
+          concurrency_mode = m.value
+          break
+    else:
+      concurrency_mode = constants.get_wifi_concurrency_mode_from_d2d_type(
+          d2d_type
       )
-      wifi_info = getattr(test_runtime, 'wifi_info', None)
-      if wifi_info:
-        metrics_collector.record_dataclass(
-            wifi_info,
-            name_mapping={
-                'is_mcc': 'is_mcc_mode',
-                'is_2g_d2d_wifi_medium': 'is_2g_only',
-            },
-            exclude_fields=[
-                'discoverer_wifi_password',
-                'advertiser_wifi_password',
-            ],
-        )
 
-        # Record concurrency mode dynamically
-        concurrency_mode = constants.WifiConcurrencyMode.UNKNOWN
-        d2d_type = getattr(wifi_info, 'd2d_type', None)
-        if d2d_type and constants.is_xcc_test(d2d_type):
-          for col in self.metrics_manager.iteration_collectors:
-            if col.scenario_name == scenario_name:
-              m = col.get('wifi_concurrency_mode')
-              if m and m.value != constants.WifiConcurrencyMode.UNKNOWN:
-                concurrency_mode = m.value
-                break
-        else:
-          concurrency_mode = constants.get_wifi_concurrency_mode_from_d2d_type(
-              d2d_type
-          )
-
-        metrics_collector.record(
-            'wifi_concurrency_mode',
-            concurrency_mode,
-        )
+    metrics_collector.record(
+        'wifi_concurrency_mode',
+        concurrency_mode,
+    )
 
   @override
-  def on_pass(self, record: records.TestResultRecord) -> None:
-    completed_metrics = self._get_active_collector(record)
-    if completed_metrics:
-      fail_reason = completed_metrics.get('active_nc_fail_reason')
-      if (
-          fail_reason
-          and hasattr(fail_reason.value, 'name')
-          and fail_reason.value.name not in ('SUCCESS', 'UNINITIALIZED')
-      ):
-        logging.warning(
-            'CRITICAL: Test returned normally but active_nc_fail_reason is set!'
-            ' (%s)',
-            fail_reason.value.name,
-        )
-        completed_metrics.record('mobly_iteration_result', 'FAIL')
-        self._record_post_test_diagnostics(False, completed_metrics)
-        self._record_single_test_iter_report(completed_metrics)
-        raise RuntimeError(
-            f'CRITICAL FRAMEWORK BUG: Test returned normally but'
-            f' active_nc_fail_reason is set to {fail_reason.value.name}. Helper'
-            f' functions must raise explicit exceptions on failure.'
-        )
-
-    super().on_pass(record)
-
-  @override
-  def _get_failed_iteration_details(
+  def get_failed_iteration_details(
       self, iter_num: int, collector: metrics_base.MetricsCollector
   ) -> str:
     """Gets detailed information for a failed iteration."""
@@ -277,7 +169,7 @@ class NcPerformanceTestBase(
     )
 
   @override
-  def _record_post_test_diagnostics(
+  def record_post_test_diagnostics(
       self, passed: bool, completed_metrics: metrics_base.MetricsCollector
   ) -> None:
     """Records diagnostics after a test iteration."""
@@ -290,7 +182,9 @@ class NcPerformanceTestBase(
         completed_metrics.record('result_message', 'PASS')
     else:
       # Check for GMS PID changes and prepend error to result_message
-      pids_changed_error = test_result_utils.check_gms_pids_changed(self.ads)
+      pids_changed_error = test_result_utils.check_gms_pids_changed(
+          self.test.ads
+      )
       if pids_changed_error:
         m = completed_metrics.get('result_message')
         message = m.value if m is not None else ''
@@ -300,6 +194,115 @@ class NcPerformanceTestBase(
             else pids_changed_error
         )
         completed_metrics.record('result_message', new_message)
+
+  @override
+  def verify_test_passed(
+      self, completed_metrics: metrics_base.MetricsCollector
+  ) -> None:
+    fail_reason = completed_metrics.get('active_nc_fail_reason')
+    if (
+        fail_reason
+        and hasattr(fail_reason.value, 'name')
+        and fail_reason.value.name not in ('SUCCESS', 'UNINITIALIZED')
+    ):
+      raise RuntimeError(
+          'CRITICAL FRAMEWORK BUG: Test returned normally but'
+          f' active_nc_fail_reason is set to {fail_reason.value.name}. Helper'
+          ' functions must raise explicit exceptions on failure.'
+      )
+
+  @override
+  def get_mobly_formatter(
+      self, include_scenario_metrics: bool
+  ) -> metrics_formatters.MoblyPropsFormatter:
+    if include_scenario_metrics:
+      custom_formatters = {
+          'test_config': metrics_formatters.MultiLineStringFormatter(
+              key_labels=[
+                  ('device_source', 'device_source'),
+                  ('device_target', 'device_target'),
+                  ('target_build_id', 'target_build_id'),
+                  ('target_model', 'target_model'),
+                  ('target_gms_version', 'target_gms_version'),
+                  ('target_wifi_chipset', 'target_wifi_chipset'),
+                  ('wifi_ap_number', 'wifi_ap_number'),
+                  ('country_code', 'country_code'),
+                  (
+                      'advertising_discovery_medium',
+                      'advertising_discovery_medium',
+                  ),
+                  ('connection_medium', 'connection_medium'),
+                  ('upgrade_medium_under_test', 'upgrade_medium'),
+                  ('is_2g_only', 'is_2g_only'),
+                  ('is_dbs_mode', 'is_dbs_mode'),
+                  ('is_mcc_mode', 'is_mcc_mode'),
+                  ('discoverer_wifi_ssid', 'discoverer_wifi_ssid'),
+                  ('advertiser_wifi_ssid', 'advertiser_wifi_ssid'),
+              ],
+              output_key='test_config',
+          ),
+          'file_transfer_stats': (
+              nc_group_formatters.NcFileTransferStatsFormatter()
+          ),
+          'wifi_upgrade_stats': metrics_formatters.CounterFormatter(
+              metric_key='upgrade_medium', output_key='wifi_upgrade_stats'
+          ),
+          'prior_bt_connection_stats': metrics_formatters.StatsGroupFormatter(
+              config={
+                  'prior_discovery_latency': {
+                      'count': 'discovery_count',
+                      'min': 'discovery_latency_min',
+                      'median': 'discovery_latency_med',
+                      'max': 'discovery_latency_max',
+                  },
+                  'prior_connection_latency': {
+                      'count': 'connection_count',
+                      'min': 'connection_latency_min',
+                      'median': 'connection_latency_med',
+                      'max': 'connection_latency_max',
+                  },
+              },
+              output_key='prior_bt_connection_stats',
+              is_duration=True,
+              float_format='{:.2f}',
+          ),
+      }
+      group_order = [
+          'test_config',
+          'test_stats',
+          'file_transfer_stats',
+          'wifi_upgrade_stats',
+          'prior_bt_connection_stats',
+          'wifi_concurrency_mode',
+      ]
+      return metrics_formatters.MoblyPropsFormatter(
+          custom_formatters=custom_formatters,
+          group_order=group_order,
+          index_prefix=True,
+          include_scenario_metrics=True,
+      )
+    else:
+      return metrics_formatters.MoblyPropsFormatter(
+          index_prefix=True,
+          include_scenario_metrics=False,
+      )
+
+
+class NcPerformanceTestBase(
+    performance_test_base_v2.PerformanceTestBase,
+    base_test.BaseTestClass,
+):
+  """Base test class for Nearby Connection performance tests with legacy metrics."""
+
+  metrics_helper_class = NcMetricsHelper
+
+  def __init__(self, configs) -> None:
+    super().__init__(configs)
+    self.is_using_gms_api = True
+
+  @override
+  def get_metric_registry(self) -> Mapping[str, metrics_base.MetricDefinition]:
+    return nc_metrics_registry.NC_METRICS_REGISTRY
 
   def _get_advertiser_sta_frequency(self) -> int:
     """Gets the advertiser STA frequency from the current iteration metrics."""
@@ -318,3 +321,20 @@ class NcPerformanceTestBase(
     del self  # Unused in this implementation.
     del scenario_name  # Unused in this implementation.
     return constants.SUCCESS_RATE_TARGET
+
+
+class NcFunctionTestBase(
+    performance_test_base_v2.FunctionTestBase,
+    base_test.BaseTestClass,
+):
+  """Base test class for Nearby Connection function tests with clean metrics."""
+
+  metrics_helper_class = NcMetricsHelper
+
+  def __init__(self, configs) -> None:
+    super().__init__(configs)
+    self.is_using_gms_api = True
+
+  @override
+  def get_metric_registry(self) -> Mapping[str, metrics_base.MetricDefinition]:
+    return nc_metrics_registry.NC_METRICS_REGISTRY

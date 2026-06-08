@@ -16,6 +16,7 @@
 
 from __future__ import annotations
 
+import abc
 from collections.abc import Mapping, Sequence
 import copy
 import dataclasses
@@ -189,9 +190,8 @@ class MetricsCollector:
     Args:
       obj: The dataclass instance to record metrics from.
       prefix: A prefix to add to each metric name.
-      name_mapping: A dictionary to map dataclass field/property names to
-        metric names. A value of None means the field/property should not be
-        recorded.
+      name_mapping: A dictionary to map dataclass field/property names to metric
+        names. A value of None means the field/property should not be recorded.
       mobly_display_group: An optional group name for Mobly display, applied to
         all metrics recorded from this dataclass.
       exclude_fields: A sequence of field names to exclude from recording.
@@ -246,9 +246,7 @@ class MetricsCollector:
         try:
           val = getattr(obj, key)
         except (AttributeError, TypeError):
-          logging.exception(
-              'Failed to fetch property %s from %s', key, obj
-          )
+          logging.exception('Failed to fetch property %s from %s', key, obj)
           continue
         if callable(val):
           continue
@@ -325,3 +323,129 @@ class MetricsManager:
   def stop(self) -> None:
     """Stops metrics collection and records end time."""
     self.end_time = datetime.datetime.now()
+
+
+class MetricsHelper(abc.ABC):
+  """Base class for custom metrics helpers.
+
+  Subclasses should override these methods to provide custom metrics logic
+  for their test modules.
+  """
+
+  def __init__(self, test_instance: Any) -> None:
+    """Initializes the metrics helper.
+
+    Args:
+      test_instance: The test instance using this helper.
+    """
+    self.test = test_instance
+
+  def record_class_setup_metadata(
+      self, class_metrics: MetricsCollector
+  ) -> None:
+    """Records class-level setup metadata.
+
+    Args:
+      class_metrics: The metrics collector for class-level metrics.
+    """
+    pass
+
+  def record_class_teardown_metadata(
+      self, class_metrics: MetricsCollector
+  ) -> None:
+    """Records class-level teardown metadata.
+
+    Args:
+      class_metrics: The metrics collector for class-level metrics.
+    """
+    pass
+
+  def record_scenario_setup_metrics(
+      self, scenario_name: str, metrics_collector: MetricsCollector
+  ) -> None:
+    """Records scenario-level setup metrics.
+
+    Args:
+      scenario_name: The name of the test scenario.
+      metrics_collector: The metrics collector for this scenario.
+    """
+    pass
+
+  def record_scenario_teardown_metrics(
+      self, scenario_name: str, metrics_collector: MetricsCollector
+  ) -> None:
+    """Records scenario-level teardown metrics.
+
+    Args:
+      scenario_name: The name of the test scenario.
+      metrics_collector: The metrics collector for this scenario.
+    """
+    pass
+
+  def record_post_test_diagnostics(
+      self, passed: bool, completed_metrics: MetricsCollector
+  ) -> None:
+    """Records diagnostics after a test iteration completes.
+
+    Args:
+      passed: Whether the test iteration passed.
+      completed_metrics: The metrics collector containing iteration results.
+    """
+    pass
+
+  def get_failed_iteration_details(
+      self, iter_num: int, collector: MetricsCollector
+  ) -> str:
+    """Returns detailed information for a failed iteration.
+
+    Args:
+      iter_num: The iteration number.
+      collector: The metrics collector containing iteration results.
+
+    Returns:
+      A string with detailed failure info.
+    """
+    del iter_num, collector
+    return ''
+
+  def verify_test_passed(self, completed_metrics: MetricsCollector) -> None:
+    """Verifies that a test that returned normally did not silently swallow a failure.
+
+    Subclasses should override this to perform safety checks and raise
+    RuntimeError if validation fails.
+
+    Args:
+      completed_metrics: The metrics collector containing iteration results.
+    """
+    del completed_metrics
+    pass
+
+  def get_mobly_formatter(self, include_scenario_metrics: bool) -> Any:
+    """Returns the formatter configured for this module.
+
+    Args:
+      include_scenario_metrics: Whether to include scenario-specific metrics.
+
+    Returns:
+      A MoblyPropsFormatter instance.
+    """
+    # pylint: disable=g-import-not-at-top
+    from betocq.metrics import formatters
+    # pylint: enable=g-import-not-at-top
+
+    return formatters.MoblyPropsFormatter(
+        index_prefix=True,
+        include_scenario_metrics=include_scenario_metrics,
+    )
+
+  def record_customized_single_test_iter_report(
+      self, completed_metrics: MetricsCollector
+  ) -> None:
+    """Writes custom diagnostics to disk.
+
+    Subclasses should override this method.
+
+    Args:
+      completed_metrics: The metrics collector for the completed iteration.
+    """
+    pass

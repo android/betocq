@@ -28,6 +28,7 @@ from mobly import records
 from mobly import signals
 from mobly.controllers.android_device_lib import adb
 from typing_extensions import override
+
 from betocq import setup_utils
 from betocq import version
 from betocq.metrics import formatters as metrics_formatters
@@ -61,11 +62,14 @@ def _is_scenario_passed(
 class PerformanceTestBase(base_test.BaseTestClass):
   """Base test class for nearby connection E2E performance tests."""
 
+  metrics_helper_class = metrics.MetricsHelper
+
   # Configuration parameters
 
   # instance variables
   metrics_manager: metrics.MetricsManager
   _scenario_configs: dict[str, ScenarioConfig]
+  metrics_helper: metrics.MetricsHelper
 
   def get_metric_registry(self) -> Mapping[str, metrics.MetricDefinition]:
     """Returns the domain-specific metric registry. Subclasses MUST override."""
@@ -78,29 +82,38 @@ class PerformanceTestBase(base_test.BaseTestClass):
       configs: Mobly configs for the test.
     """
     self._metric_registry = self.get_metric_registry()
-    self.is_using_gms_api = False
     iterations_override = configs.user_params.get('test_iterations_override')
     max_error_override = configs.user_params.get(
         'max_consecutive_error_override'
     )
 
     for attr_name in dir(self):
-      if attr_name.startswith('test_'):
-        func = getattr(self, attr_name)
-        if callable(func):
-          underlying_func = getattr(func, '__func__', func)
-          if iterations_override is not None:
-            setattr(underlying_func, '_repeat_count', int(iterations_override))
-            setattr(
-                underlying_func, 'expected_iterations', int(iterations_override)
-            )
-          if max_error_override is not None:
-            setattr(
-                underlying_func,
-                '_max_consecutive_error',
-                int(max_error_override),
-            )
+      if not attr_name.startswith('test_'):
+        continue
+      func = getattr(self, attr_name)
+      if not callable(func):
+        continue
+      underlying_func = getattr(func, '__func__', func)
+      # Only override if the test method was decorated with betocq_repeat
+      if not hasattr(underlying_func, 'expected_iterations'):
+        continue
+
+      if iterations_override is not None:
+        setattr(underlying_func, '_repeat_count', int(iterations_override))
+        setattr(
+            underlying_func,
+            'expected_iterations',
+            int(iterations_override),
+        )
+      if max_error_override is not None:
+        setattr(
+            underlying_func,
+            '_max_consecutive_error',
+            int(max_error_override),
+        )
     super().__init__(configs)
+    self.is_using_gms_api = False
+    self.metrics_helper = self.metrics_helper_class(self)
 
   def get_success_rate(self, scenario_name: str) -> float:
     """Returns the success rate target for a scenario.
@@ -148,7 +161,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
         collector.record(
             'success_rate_target', self.get_success_rate(attr_name)
         )
-        self._record_scenario_setup_metrics(attr_name, collector)
+        self.metrics_helper.record_scenario_setup_metrics(attr_name, collector)
 
       # Record basic class level info
       self.metrics_manager.class_metrics.record(
@@ -157,7 +170,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
       )
       self.metrics_manager.class_metrics.record('test_result', 'UNINITIALIZED')
 
-      self._record_class_setup_metadata(self.metrics_manager.class_metrics)
+      self.metrics_helper.record_class_setup_metadata(
+          self.metrics_manager.class_metrics
+      )
       self._framework_setup_class_completed = True
     except signals.TestAbortClass:
       logging.info('setup_class aborted, attempting to record metadata anyway.')
@@ -177,8 +192,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
   @property
   def mobly_formatter(self) -> metrics_formatters.MoblyPropsFormatter:
     """The configured MoblyPropsFormatter for this test class."""
-    del self  # Unused in base class.
-    return metrics_formatters.MoblyPropsFormatter(index_prefix=True)
+    return self.metrics_helper.get_mobly_formatter(
+        include_scenario_metrics=True
+    )
 
   @override
   def setup_test(self) -> None:
@@ -186,10 +202,12 @@ class PerformanceTestBase(base_test.BaseTestClass):
     # Strip Mobly repeat suffix if present
     parts = scenario_name.rsplit('_', 1)
     base_scenario_name = scenario_name
-    if (scenario_name not in self._scenario_configs
+    if (
+        scenario_name not in self._scenario_configs
         and len(parts) == 2
         and parts[1].isdigit()
-        and parts[0] in self._scenario_configs):
+        and parts[0] in self._scenario_configs
+    ):
       base_scenario_name = parts[0]
     self.metrics_manager.start_iteration(
         base_scenario_name, test_name=scenario_name
@@ -218,11 +236,24 @@ class PerformanceTestBase(base_test.BaseTestClass):
     logging.info('on_pass called for %s', record.test_name)
     completed_metrics = self._get_active_collector(record)
     if completed_metrics is not None:
+      try:
+        self.metrics_helper.verify_test_passed(completed_metrics)
+      except RuntimeError:
+        logging.warning(
+            'CRITICAL: Test returned normally but safety check failed!'
+        )
+        completed_metrics.record('mobly_iteration_result', 'FAIL')
+        self.metrics_helper.record_post_test_diagnostics(
+            False, completed_metrics
+        )
+        self._record_single_test_iter_report(completed_metrics)
+        raise
+
       completed_metrics.record('mobly_iteration_result', 'PASS')
       logging.info(
           'Recorded mobly_iteration_result=PASS for %s', record.test_name
       )
-      self._record_post_test_diagnostics(True, completed_metrics)
+      self.metrics_helper.record_post_test_diagnostics(True, completed_metrics)
 
       self._record_single_test_iter_report(completed_metrics)
     super().on_pass(record)
@@ -248,7 +279,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
       )
       try:
         self._record_device_thermals(completed_metrics)
-        self._record_post_test_diagnostics(False, completed_metrics)
+        self.metrics_helper.record_post_test_diagnostics(
+            False, completed_metrics
+        )
         self._record_single_test_iter_report(completed_metrics)
       except (ValueError, TypeError, KeyError, AttributeError):
         logging.exception('Diagnostics collection failed.')
@@ -289,20 +322,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
         'Test Name': completed_metrics.test_name,
         'properties': iteration_data,
     })
-    self.record_customized_single_test_iter_report(completed_metrics)
-
-  def record_customized_single_test_iter_report(
-      self, completed_metrics: metrics.MetricsCollector
-  ) -> None:
-    """Writes custom proto diagnostics to disk.
-
-    Subclasses should override this method.
-
-    Args:
-      completed_metrics: The metrics collector for the completed iteration.
-    """
-    del self  # Unused in base class.
-    del completed_metrics  # Unused in base class.
+    self.metrics_helper.record_customized_single_test_iter_report(
+        completed_metrics
+    )
 
   def is_test_class_passed(self) -> bool:
     """Checks if every executed scenario meets its local success rate target.
@@ -518,16 +540,17 @@ class PerformanceTestBase(base_test.BaseTestClass):
       # termination signal (or details string) to distinguish from unexpected
       # crashes.
       requested_tests = getattr(self.results, 'requested', [])
-      is_full_class_skipped = (
-          requested_tests and
-          len(self.results.skipped) == len(requested_tests)
-      )
+      is_full_class_skipped = requested_tests and len(
+          self.results.skipped
+      ) == len(requested_tests)
+      has_errors = len(getattr(self.results, 'error', [])) > 0
       logging.info('results: %s', self.results)
       logging.info('requested_tests: %s', requested_tests)
       logging.info('skipped_tests: %s', self.results.skipped)
       logging.info('is_full_class_skipped: %s', is_full_class_skipped)
+      logging.info('has_errors: %s', has_errors)
       intentional_skip_or_abort = False
-      if is_full_class_skipped:
+      if is_full_class_skipped and not has_errors:
         for r in self.results.skipped:
           logging.info('skipped record: %s', r.__dict__)
           result_str = getattr(r, 'result', '')
@@ -540,9 +563,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
             'Class setup intentionally bypassed via abort_if/skip_if. Bypassing'
             ' scenario assertions.'
         )
-        self.metrics_manager.class_metrics.record(
-            'test_result', 'SKIP'
-        )
+        self.metrics_manager.class_metrics.record('test_result', 'SKIP')
 
         legacy_summary = self.mobly_formatter.format(self.metrics_manager)
         self.record_data({'Test Class': self.TAG, 'properties': legacy_summary})
@@ -558,7 +579,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
           scenario_name,
           collector,
       ) in self.metrics_manager.scenario_metrics.items():
-        self._record_scenario_teardown_metrics(scenario_name, collector)
+        self.metrics_helper.record_scenario_teardown_metrics(
+            scenario_name, collector
+        )
         failed_count = 0
         failed_details = []
 
@@ -578,7 +601,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
                 f'{start_time_metric.value} ' if start_time_metric else ''
             )
 
-            detail_msg = self._get_failed_iteration_details(i, col)
+            detail_msg = self.metrics_helper.get_failed_iteration_details(
+                i, col
+            )
             if not detail_msg:
               result_message_metric = col.get('result_message')
               detail_msg = (
@@ -670,7 +695,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
   ) -> None:
     """Safely attempts to record class setup metadata, warning on failure."""
     try:
-      self._record_class_setup_metadata(class_metrics)
+      self.metrics_helper.record_class_setup_metadata(class_metrics)
     except Exception:  # pylint: disable=broad-except
       logging.warning('Failed to record metadata after abort.', exc_info=True)
 
@@ -679,41 +704,24 @@ class PerformanceTestBase(base_test.BaseTestClass):
   ) -> None:
     """Safely attempts to record class teardown metadata, warning on failure."""
     try:
-      self._record_class_teardown_metadata(class_metrics)
+      self.metrics_helper.record_class_teardown_metadata(class_metrics)
     except Exception:  # pylint: disable=broad-except
       logging.warning('Failed to record teardown metadata.', exc_info=True)
 
-  # --- Abstract lifecycle hooks overridden by feature-specific subclasses ---
 
-  def _record_scenario_setup_metrics(
-      self, scenario_name: str, metrics_collector: metrics.MetricsCollector
-  ) -> None:
-    """Subclasses override this to record scenario-specific metrics before execution."""
+class FunctionTestBase(PerformanceTestBase):
+  """Base test class for non-repeated function tests with clean metrics.
 
-  def _record_scenario_teardown_metrics(
-      self, scenario_name: str, metrics_collector: metrics.MetricsCollector
-  ) -> None:
-    """Subclasses override this to record scenario-specific metrics after execution."""
+  This class inherits from PerformanceTestBase but configures the formatter
+  to exclude scenario-specific metrics from the class-level Mobly properties,
+  as function tests are run only once and do not require aggregated statistics.
+  Instead, metrics are recorded only as per-test properties.
+  """
 
-  def _record_class_setup_metadata(
-      self, class_metrics: metrics.MetricsCollector
-  ) -> None:
-    """Subclasses override this to record custom class setup metadata."""
-
-  def _record_class_teardown_metadata(
-      self, class_metrics: metrics.MetricsCollector
-  ) -> None:
-    """Subclasses override this to record dynamic class metadata at teardown."""
-
-  def _get_failed_iteration_details(
-      self, iter_num: int, collector: metrics.MetricsCollector
-  ) -> str:
-    """Subclasses override this to return a detailed failure string for the iteration."""
-    del iter_num, collector
-    return ''
-
-  def _record_post_test_diagnostics(
-      self, passed: bool, metrics_collector: metrics.MetricsCollector
-  ) -> None:
-    """Subclasses override this to record custom diagnostics (success or failure)."""
-    pass
+  @property
+  @override
+  def mobly_formatter(self) -> metrics_formatters.MoblyPropsFormatter:
+    """The configured MoblyPropsFormatter for function tests."""
+    return self.metrics_helper.get_mobly_formatter(
+        include_scenario_metrics=False
+    )

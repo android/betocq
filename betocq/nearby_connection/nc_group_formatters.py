@@ -86,22 +86,32 @@ class NcFileTransferStatsFormatter(MoblyGroupFormatter):
         return round(v / 1024, 1)
       return v
 
-    stats = [
-        f"discovery_count: {disc.get('count')}",
-        f"discovery_latency_min: {to_sec(disc.get('min'))}",
-        f"discovery_latency_med: {to_sec(disc.get('median'))}",
-        f"discovery_latency_max: {to_sec(disc.get('max'))}",
-        f"connection_count: {conn.get('count')}",
-        f"connection_latency_min: {to_sec(conn.get('min'))}",
-        f"connection_latency_med: {to_sec(conn.get('median'))}",
-        f"connection_latency_max: {to_sec(conn.get('max'))}",
-        f"transfer_count: {transfer.get('count')}",
-        f"speed_mbps_min: {to_mb(transfer.get('min'))}",
-        f"speed_mbps_med: {to_mb(transfer.get('median'))}",
-        f"speed_mbps_max: {to_mb(transfer.get('max'))}",
-        f'benchmark_nc_speed_mbps: {benchmark_nc_speed_mbps}',
-        f'benchmark_iperf_speed_mbps: {benchmark_iperf_speed_mbps}',
-    ]
+    stats = []
+    if disc.get('count', 0) > 0:
+      stats.extend([
+          f"discovery_count: {disc.get('count')}",
+          f"discovery_latency_min: {to_sec(disc.get('min'))}",
+          f"discovery_latency_med: {to_sec(disc.get('median'))}",
+          f"discovery_latency_max: {to_sec(disc.get('max'))}",
+      ])
+    if conn.get('count', 0) > 0:
+      stats.extend([
+          f"connection_count: {conn.get('count')}",
+          f"connection_latency_min: {to_sec(conn.get('min'))}",
+          f"connection_latency_med: {to_sec(conn.get('median'))}",
+          f"connection_latency_max: {to_sec(conn.get('max'))}",
+      ])
+    if transfer.get('count', 0) > 0:
+      stats.extend([
+          f"transfer_count: {transfer.get('count')}",
+          f"speed_mbps_min: {to_mb(transfer.get('min'))}",
+          f"speed_mbps_med: {to_mb(transfer.get('median'))}",
+          f"speed_mbps_max: {to_mb(transfer.get('max'))}",
+      ])
+    if benchmark_nc_speed_mbps != 'NA':
+      stats.append(f'benchmark_nc_speed_mbps: {benchmark_nc_speed_mbps}')
+    if benchmark_iperf_speed_mbps != 'NA':
+      stats.append(f'benchmark_iperf_speed_mbps: {benchmark_iperf_speed_mbps}')
 
     if iperf.get('count', 0) > 0:
       stats.extend([
