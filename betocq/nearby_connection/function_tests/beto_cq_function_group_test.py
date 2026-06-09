@@ -25,28 +25,23 @@ Test steps:
   See docstring of each test function.
 """
 
-import collections
 import datetime
 import logging
 import time
 
 from mobly import asserts
 from mobly import test_runner
-from mobly import records
 from mobly import utils
 from mobly.controllers import android_device
 
-from betocq import base_test
 from betocq import constants
 from betocq import setup_utils
-from betocq import test_result_utils
+from betocq.metrics import metrics_base
 from betocq.nearby_connection import nc_constants
-from betocq.nearby_connection import utils as nc_utils
-
+from betocq.nearby_connection import nc_performance_test_base
+from betocq.nearby_connection import nc_utils_v2 as nc_utils
 
 _COUNTRY_CODE = 'US'
-# The number of decimal places of precision for reporting the speed (MB/s).
-_SPEED_MBPS_DECIMAL_PLACES = 3
 _BT_BLE_FILE_TRANSFER_FAILURE_TIP = (
     'The Bluetooth performance is really bad or unknown reason.'
 )
@@ -105,7 +100,7 @@ def _get_wifi_ssid_password(
 def _start_nearby_connection_and_transfer_file(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
-    test_result: test_result_utils.SingleTestResult,
+    metrics: metrics_base.MetricsCollector,
     upgrade_medium_under_test: constants.NearbyMedium,
     file_transfer_failure_tip: str,
     payload_type: constants.PayloadType,
@@ -125,7 +120,7 @@ def _start_nearby_connection_and_transfer_file(
   nearby_snippet = nc_utils.start_main_nearby_connection(
       advertiser,
       discoverer,
-      test_result,
+      metrics=metrics,
       upgrade_medium_under_test=upgrade_medium_under_test,
       medium_upgrade_type=constants.MediumUpgradeType.NON_DISRUPTIVE,
       connect_timeout=connect_timeout,
@@ -137,16 +132,19 @@ def _start_nearby_connection_and_transfer_file(
   # Test Step: Transfer file on the established NC.
   if do_file_transfer:
     try:
-      test_result.file_transfer_throughput_kbps = nearby_snippet.transfer_file(
-          file_size_kb=payload_size_kb,
-          timeout=payload_transfer_timeout,
-          payload_type=payload_type,
-          num_files=payload_num,
+      metrics.record(
+          'file_transfer_throughput_kbps',
+          nearby_snippet.transfer_file(
+              file_size_kb=payload_size_kb,
+              timeout=payload_transfer_timeout,
+              payload_type=payload_type,
+              num_files=payload_num,
+          ),
       )
     finally:
       nc_utils.handle_file_transfer_failure(
           nearby_snippet.test_failure_reason,
-          test_result,
+          metrics,
           file_transfer_failure_tip=file_transfer_failure_tip,
       )
 
@@ -163,21 +161,8 @@ def _start_nearby_connection_and_transfer_file(
       nearby_snippet.disconnect_endpoint()
 
 
-class BetoCqFunctionGroupTest(base_test.BaseTestClass):
+class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
   """The test class to group all function tests in one mobly test."""
-
-  # Result information on the test currently being executed.
-  current_test_result: test_result_utils.SingleTestResult
-  is_using_gms_api = True
-
-  # Store test results of all test cases.
-  _test_results: collections.OrderedDict[
-      str, test_result_utils.SingleTestResult
-  ]
-
-  def __init__(self, configs):
-    super().__init__(configs)
-    self._test_results = collections.OrderedDict()
 
   def setup_class(self):
     """Setup steps that will be performed before executing any test case."""
@@ -209,12 +194,6 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         skip_flag_override=self.test_parameters.skip_default_flag_override,
     )
 
-  def setup_test(self):
-    """Setup steps that will be performed before executing each test case."""
-    super().setup_test()
-    self.current_test_result = test_result_utils.SingleTestResult()
-    self._test_results[self.current_test_info.name] = self.current_test_result
-
   def test_bt_ble_function(self):
     """Test the NC with the BT/BLE medium only.
 
@@ -226,7 +205,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         upgrade_medium_under_test=constants.NearbyMedium.BT_ONLY,
         file_transfer_failure_tip=_BT_BLE_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.FILE,
@@ -247,8 +226,9 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     # Test Step: Connect discoverer and advertiser to wifi sta.
     wifi_ssid, wifi_password = _get_wifi_ssid_password(self.test_parameters)
     if not wifi_ssid:
-      self.current_test_result.set_active_nc_fail_reason(
-          constants.SingleTestFailureReason.AP_IS_NOT_CONFIGURED
+      self.get_current_iteration_metrics().record(
+          'active_nc_fail_reason',
+          constants.SingleTestFailureReason.AP_IS_NOT_CONFIGURED,
       )
       asserts.fail('Wifi AP must be specified.')
 
@@ -256,17 +236,17 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
     nc_utils.connect_ad_to_wifi_sta(
         self.discoverer,
-        wifi_ssid,
-        wifi_password,
-        self.current_test_result,
+        wifi_ssid=wifi_ssid,
+        wifi_password=wifi_password,
+        metrics=self.get_current_iteration_metrics(),
         is_discoverer=True,
     )
 
     nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
-        wifi_ssid,
-        wifi_password,
-        self.current_test_result,
+        wifi_ssid=wifi_ssid,
+        wifi_password=wifi_password,
+        metrics=self.get_current_iteration_metrics(),
         is_discoverer=False,
     )
 
@@ -276,7 +256,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.WIFILAN_ONLY,
         file_transfer_failure_tip=_WIFILAN_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.FILE,
@@ -302,7 +282,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
         file_transfer_failure_tip=_WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.FILE,
@@ -327,7 +307,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.UPGRADE_TO_WIFIHOTSPOT,
         file_transfer_failure_tip=_WIFI_HOTSPOT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.STREAM,
@@ -352,7 +332,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
         file_transfer_failure_tip=_WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.FILE,
@@ -377,7 +357,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT,
         file_transfer_failure_tip=_WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.STREAM,
@@ -402,7 +382,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.WIFIAWARE_ONLY,
         file_transfer_failure_tip=_WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.FILE,
@@ -427,7 +407,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         constants.NearbyMedium.WIFIAWARE_ONLY,
         file_transfer_failure_tip=_WIFI_AWARE_FILE_TRANSFER_FAILURE_TIP,
         payload_type=constants.PayloadType.STREAM,
@@ -449,17 +429,18 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
           'BT multiplex is not required for this CUJ -'
           f' {self.test_parameters.target_cuj_name}'
       )
-      self.current_test_result.set_active_nc_fail_reason(
+      self.get_current_iteration_metrics().record(
+          'active_nc_fail_reason',
           constants.SingleTestFailureReason.SKIPPED,
-          result_message=message,
       )
+      self.get_current_iteration_metrics().record('result_message', message)
       asserts.skip(message)
 
     # Test Step: Set up a prior BT connection.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        metrics=self.get_current_iteration_metrics(),
         test_parameters=self.test_parameters,
     )
 
@@ -467,7 +448,7 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
     _start_nearby_connection_and_transfer_file(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         upgrade_medium_under_test=constants.NearbyMedium.BT_ONLY,
         file_transfer_failure_tip=_BT_MULTIPLEX_CONNECTIONS_FAILURE_TIP,
         payload_type=constants.PayloadType.FILE,
@@ -480,81 +461,17 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
 
     prior_bt_snippet.disconnect_endpoint()
 
-  def teardown_test(self) -> None:
-    """Tears down and records results for current test case."""
-    self.current_test_result.end_test()
-    self.record_data({
-        'Test Name': self.current_test_info.name,
-        'properties': {
-            'result': self.current_test_result.result_message,
-        },
-    })
-    super().teardown_test()
-
-  def on_pass(self, record: records.TestResultRecord):
-    """Steps that will be performed when current test case passed."""
-    self.current_test_result.set_active_nc_fail_reason(
-        constants.SingleTestFailureReason.SUCCESS
-    )
-    self._record_single_test_case_report()
-    super().on_pass(record)
-
-  def on_fail(self, record: records.TestResultRecord):
-    """Steps that will be performed when current test case failed."""
-    # If any exception is raised in `setup_class`, `on_fail` will be invoked
-    # and we should not record any result because no test is executed.
-    if self._test_results:
-      test_result_utils.update_result_message_with_gms_check(self)
-      self._record_single_test_case_report()
-    super().on_fail(record)
-
-  def _record_single_test_case_report(self):
-    properties = {'result': self.current_test_result.result_message}
-    if self.current_test_result.file_transfer_throughput_kbps > 0:
-      # Convert the throughput to MB/s and record it as a property.
-      properties['speed_MBps'] = (
-          test_result_utils._float_to_str(
-              self.current_test_result.file_transfer_throughput_kbps / 1024,
-              _SPEED_MBPS_DECIMAL_PLACES,
-          )
-      )
-    self.record_data({
-        'Test Name': self.current_test_info.name,
-        'properties': properties,
-    })
-
-  def teardown_class(self):
-    """Tears down and records results for all test cases."""
-    if not self._test_results:
-      logging.info('Skipping teardown class.')
-      return
-
-    test_result_str = '\n'.join(
-        f'{test_name}: {test_result.result_message}'
-        for test_name, test_result in self._test_results.items()
-    )
-    test_summary = test_result_utils.gen_basic_test_summary(
-        self.discoverer, self.advertiser, test_result_str
-    )
-    test_summary_with_index = {}
-    for index, (k, v) in enumerate(test_summary.items()):
-      test_summary_with_index[f'{index:02}_{k}'] = v
-    self.record_data(
-        {'Test Class': self.TAG, 'properties': test_summary_with_index}
-    )
-
-    super().teardown_class()
-
   def _skip_if_wifi_hotspot_not_supported(self):
     # Check Direct capability because Hotspot is implemented using Direct in NC.
     if not setup_utils.is_wifi_direct_supported(
         self.advertiser
     ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
       message = 'Wifi Hotspot is not supported in the device'
-      self.current_test_result.set_active_nc_fail_reason(
+      self.get_current_iteration_metrics().record(
+          'active_nc_fail_reason',
           constants.SingleTestFailureReason.SKIPPED,
-          result_message=message,
       )
+      self.get_current_iteration_metrics().record('result_message', message)
       asserts.skip(message)
 
   def _skip_if_wifi_direct_not_supported(self):
@@ -562,10 +479,11 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         self.advertiser
     ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
       message = 'Wifi Direct is not supported in the device'
-      self.current_test_result.set_active_nc_fail_reason(
+      self.get_current_iteration_metrics().record(
+          'active_nc_fail_reason',
           constants.SingleTestFailureReason.SKIPPED,
-          result_message=message,
       )
+      self.get_current_iteration_metrics().record('result_message', message)
       asserts.skip(message)
 
   def _skip_if_wifi_aware_not_supported(self):
@@ -575,10 +493,11 @@ class BetoCqFunctionGroupTest(base_test.BaseTestClass):
         or not setup_utils.is_wifi_aware_available(self.discoverer)
     ):
       message = 'Aware test is disabled or aware is not available in the device'
-      self.current_test_result.set_active_nc_fail_reason(
+      self.get_current_iteration_metrics().record(
+          'active_nc_fail_reason',
           constants.SingleTestFailureReason.SKIPPED,
-          result_message=message,
       )
+      self.get_current_iteration_metrics().record('result_message', message)
       asserts.skip(message)
 
 

@@ -52,18 +52,17 @@ Expected results:
 
 import time
 
-from mobly import base_test
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
+from typing_extensions import override
 
 from betocq import constants
-from betocq import performance_test_base
 from betocq import setup_utils
-from betocq import test_result_utils
 from betocq.nearby_connection import nc_constants
-from betocq.nearby_connection import utils as nc_utils
-
+from betocq.nearby_connection import nc_performance_test_base
+from betocq.nearby_connection import nc_test_result_utils
+from betocq.nearby_connection import nc_utils_v2 as nc_utils
 
 TEST_ITERATION_NUM = nc_constants.MCC_PERFORMANCE_TEST_COUNT
 SUCCESS_RATE_TARGET = constants.SUCCESS_RATE_TARGET
@@ -89,11 +88,19 @@ _FILE_TRANSFER_FAILURE_TIP = (
 )
 
 
-class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
+class Mcc5gAllWifiNonDbs2gStaTest(
+    nc_performance_test_base.NcPerformanceTestBase
+):
   """Test class for CUJ MCC with 5G D2D medium and 2G STA test."""
 
   test_runtime: constants.NcTestRuntime
   wifi_info: constants.WifiInfo
+
+  @override
+  def get_success_rate(self, scenario_name: str) -> float:
+    del self  # Unused.
+    del scenario_name  # Unused.
+    return SUCCESS_RATE_TARGET
 
   def setup_class(self):
     super().setup_class()
@@ -115,10 +122,6 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
         country_code=_COUNTRY_CODE,
         wifi_info=self.wifi_info,
     )
-
-    self.test_results.test_iterations_expected = TEST_ITERATION_NUM
-    self.test_results.success_rate_target = SUCCESS_RATE_TARGET
-    self.test_results.nc_test_runtime = self.test_runtime
 
     # Test specific device setup steps.
     utils.concurrent_exec(
@@ -153,7 +156,7 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
         [self.advertiser], 'supports_dbs_sta_wfd', expected_value=False
     )
 
-  @base_test.repeat(
+  @setup_utils.betocq_repeat(
       count=TEST_ITERATION_NUM,
       max_consecutive_error=_MAX_CONSECUTIVE_ERROR,
   )
@@ -162,26 +165,26 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
     # Test Step: Connect discoverer to wifi sta in case WLAN is used.
     discoverer_sta_op = nc_utils.connect_ad_to_wifi_sta(
         self.discoverer,
-        self.wifi_info.discoverer_wifi_ssid,
-        self.wifi_info.discoverer_wifi_password,
-        self.current_test_result,
+        wifi_ssid=self.wifi_info.discoverer_wifi_ssid,
+        wifi_password=self.wifi_info.discoverer_wifi_password,
+        metrics=self.get_current_iteration_metrics(),
         is_discoverer=True,
     )
 
-    # Test Step: Set up a prior BT connection.
+    # Test Step: Set up a prior Nearby Connection through Bluetooth medium.
     prior_bt_snippet = nc_utils.start_prior_bt_nearby_connection(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        metrics=self.get_current_iteration_metrics(),
         test_parameters=self.test_parameters,
     )
 
     # Test Step: Connect advertiser to wifi sta.
     advertiser_sta_op = nc_utils.connect_ad_to_wifi_sta(
         self.advertiser,
-        self.wifi_info.advertiser_wifi_ssid,
-        self.wifi_info.advertiser_wifi_password,
-        self.current_test_result,
+        wifi_ssid=self.wifi_info.advertiser_wifi_ssid,
+        wifi_password=self.wifi_info.advertiser_wifi_password,
+        metrics=self.get_current_iteration_metrics(),
         is_discoverer=False,
     )
     if discoverer_sta_op or advertiser_sta_op:
@@ -189,36 +192,40 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
       # This is important especially for the transfer speed or WLAN test.
       time.sleep(self.test_parameters.target_post_wifi_connection_idle_time_sec)
 
-    test_result_utils.set_and_assert_sta_frequency(
+    nc_test_result_utils.set_and_assert_sta_frequency(
         self.advertiser,
-        self.current_test_result,
+        self.get_current_iteration_metrics(),
         self.wifi_info.sta_type,
+        prefix='advertiser_',
     )
 
     # Test Step: Set up a NC connection for file transfer.
     active_snippet = nc_utils.start_main_nearby_connection(
         self.advertiser,
         self.discoverer,
-        self.current_test_result,
+        metrics=self.get_current_iteration_metrics(),
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=constants.DEFAULT_SECOND_CONNECTION_TIMEOUTS,
         test_parameters=self.test_parameters,
     )
     upgraded_medium_name = None
-    upgrade_medium = self.current_test_result.quality_info.upgrade_medium
-    if upgrade_medium is not None:
-      upgraded_medium_name = upgrade_medium.name
+    upgrade_medium_metric = self.get_current_iteration_metrics().get(
+        'upgrade_medium'
+    )
+    upgraded_medium_name = (
+        upgrade_medium_metric.value if upgrade_medium_metric else None
+    )
 
-    if upgrade_medium in [
-        constants.NearbyConnectionMedium.WIFI_DIRECT,
-        constants.NearbyConnectionMedium.WIFI_HOTSPOT,
+    if upgraded_medium_name in [
+        constants.NearbyConnectionMedium.WIFI_DIRECT.name,
+        constants.NearbyConnectionMedium.WIFI_HOTSPOT.name,
     ]:
-      test_result_utils.set_and_assert_p2p_frequency(
+      nc_test_result_utils.set_and_assert_p2p_frequency(
           self.advertiser,
-          self.current_test_result,
-          self.wifi_info.is_mcc,
-          self.test_runtime.is_dbs_mode,
-          sta_frequency=self.current_test_result.sta_frequency,
+          self.get_current_iteration_metrics(),
+          is_mcc=self.wifi_info.is_mcc,
+          is_dbs_mode=self.test_runtime.is_dbs_mode,
+          sta_frequency=self._get_advertiser_sta_frequency(),
           additional_error_message=(
               'Check if the supports_dbs_sta_wfd is really false for the'
               ' target device. If yes, work with the chipset vendor to fix it.'
@@ -227,7 +234,7 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
 
     do_file_transfer = True
     if (
-        upgrade_medium == constants.NearbyMedium.WIFILAN_ONLY
+        upgraded_medium_name == constants.NearbyConnectionMedium.WIFI_LAN.name
         and not setup_utils.is_nc_wlan_file_transfer_flaky_issue_fixed(
             self.advertiser
         )
@@ -237,26 +244,27 @@ class Mcc5gAllWifiNonDbs2gStaTest(performance_test_base.PerformanceTestBase):
     if do_file_transfer:
       # Test Step: Transfer file on the established NC.
       try:
-        self.current_test_result.file_transfer_throughput_kbps = (
+        self.get_current_iteration_metrics().record(
+            'file_transfer_throughput_kbps',
             active_snippet.transfer_file(
                 file_size_kb=_FILE_TRANSFER_SIZE_KB,
                 timeout=_FILE_TRANSFER_TIMEOUT,
                 payload_type=_PAYLOAD_TYPE,
                 num_files=_FILE_TRANSFER_NUM,
-            )
+            ),
         )
       finally:
         nc_utils.handle_file_transfer_failure(
             active_snippet.test_failure_reason,
-            self.current_test_result,
+            self.get_current_iteration_metrics(),
             file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP.format(
                 upgraded_medium_name=upgraded_medium_name
             ),
         )
 
     if not self.test_parameters.skip_throughput_assertion:
-      test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
-          test_result=self.current_test_result,
+      nc_test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          metrics=self.get_current_iteration_metrics(),
           nc_test_runtime=self.test_runtime,
           low_throughput_tip=_THROUGHPUT_LOW_TIP.format(
               upgraded_medium_name=upgraded_medium_name
