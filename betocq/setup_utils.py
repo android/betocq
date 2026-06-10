@@ -1889,6 +1889,12 @@ def reset_wifi_and_enable_ble_for_devices(
     ad.log.info('Turning on WiFi and disconnecting from networks')
     try:
       ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+      wait_for_predicate(
+          lambda ad=ad: 'Wi-Fi is enabled'
+          in ad.adb.shell('cmd wifi status').decode('utf-8'),
+          timeout=datetime.timedelta(seconds=30),
+          interval=datetime.timedelta(seconds=1),
+      )
     except adb.AdbError as e:
       ad.log.warning('Failed to enable wifi via cmd: %s', e)
     try:
