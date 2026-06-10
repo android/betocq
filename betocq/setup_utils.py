@@ -1864,6 +1864,57 @@ def verify_wfd_ip_setup(
   return False
 
 
+def verify_aware_ip_setup(
+    device: android_device.AndroidDevice,
+    expected_state: bool,
+) -> bool:
+  """Returns true if the aware ip setup reaches the expected state within 30 seconds."""
+  start_time = time.time()
+  aware_lines = []
+  while time.time() - start_time < 30:
+    out = device.adb.shell('ip addr show')
+    if isinstance(out, bytes):
+      out = out.decode('utf-8')
+
+    in_aware_interface = False
+    has_aware_ip = False
+    aware_lines = []
+
+    for line in out.splitlines():
+      is_header = '<' in line and '>' in line
+
+      if is_header:
+        if 'aware' in line or 'nan' in line:
+          in_aware_interface = True
+          aware_lines.append(line)
+        else:
+          in_aware_interface = False
+
+      if in_aware_interface:
+        aware_lines.append(line)
+        if 'inet6 ' in line:
+          has_aware_ip = True
+
+    if has_aware_ip == expected_state:
+      device.log.info('aware interface lines: %s', aware_lines)
+      return True
+    time.sleep(1)
+  device.log.info('aware interface lines after timeout: %s', aware_lines)
+  return False
+
+
+def has_wifi_aware_feature(ad: android_device.AndroidDevice) -> bool:
+  """Checks if the device has the Wi-Fi Aware feature."""
+  try:
+    features = ad.adb.shell('pm list features')
+    if isinstance(features, bytes):
+      features = features.decode('utf-8')
+    return 'android.hardware.wifi.aware' in features
+  except Exception as e:  # pylint: disable=broad-except
+    ad.log.warning('Failed to check wifi aware feature: %s', e)
+    return False
+
+
 def enable_ble_for_devices(ads: list[android_device.AndroidDevice]) -> None:
   """Enables BLE on the given devices."""
   for ad in ads:
