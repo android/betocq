@@ -860,7 +860,8 @@ def wait_for_aware_pairing_supported(
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware is supported on the given device."""
   try:
-    return ad.nearby.wifiAwareIsAvailable()
+    features = ad.adb.shell('pm list features').decode('utf-8')
+    return 'android.hardware.wifi.aware' in features
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('Aware is not supported due to %s', e)
     return False
