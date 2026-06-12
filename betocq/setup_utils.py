@@ -1828,18 +1828,18 @@ def is_device_on(device: android_device.AndroidDevice) -> bool:
   return 'mWakefulness=Awake' in output.decode()
 
 
-def turn_device_on(
+def turn_screen_on(
     device: android_device.AndroidDevice,
     timeout: datetime.timedelta = datetime.timedelta(seconds=10),
 ) -> None:
-  """Turns the device on."""
+  """Turns the device screen on."""
   device.adb.shell('input keyevent KEYCODE_WAKEUP')
   if not wait_for_predicate(
       lambda: is_device_on(device),
       timeout=timeout,
       interval=datetime.timedelta(seconds=1),
   ):
-    raise signals.TestFailure('Failed to turn the device on')
+    raise signals.TestFailure('Failed to turn the device screen on')
 
 
 def turn_screen_off(
