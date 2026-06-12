@@ -1842,6 +1842,20 @@ def turn_device_on(
     raise signals.TestFailure('Failed to turn the device on')
 
 
+def turn_screen_off(
+    device: android_device.AndroidDevice,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=10),
+) -> None:
+  """Turns the device screen off."""
+  device.adb.shell('input keyevent KEYCODE_SLEEP')
+  if not wait_for_predicate(
+      lambda: not is_device_on(device),
+      timeout=timeout,
+      interval=datetime.timedelta(seconds=1),
+  ):
+    raise signals.TestFailure('Failed to turn the device screen off')
+
+
 def verify_wfd_ip_setup(
     device: android_device.AndroidDevice,
     expected_state: bool,
