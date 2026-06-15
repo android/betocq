@@ -22,7 +22,6 @@ from betocq import base_test
 from betocq import constants
 from betocq import performance_test_base_v2
 from betocq import setup_utils
-from betocq import test_result_utils
 from betocq.metrics import formatters as metrics_formatters
 from betocq.metrics import metrics_base
 from betocq.nearby_connection import nc_group_formatters
@@ -182,7 +181,7 @@ class NcMetricsHelper(metrics_base.MetricsHelper):
         completed_metrics.record('result_message', 'PASS')
     else:
       # Check for GMS PID changes and prepend error to result_message
-      pids_changed_error = test_result_utils.check_gms_pids_changed(
+      pids_changed_error = setup_utils.check_gms_pids_changed(
           self.test.ads
       )
       if pids_changed_error:

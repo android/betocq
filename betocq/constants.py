@@ -151,8 +151,9 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
-  # Whether to run all tests in the suite. abort_all should be replaced by
-  # a failure error.
+  # Whether to run all tests in the suite even the prerequisites are not met;
+  # Each test case should check the error, abort_all shouldn't be called, and
+  # should be replaced by a failure error.
   run_all_tests_in_suite: bool = False
   skip_throughput_assertion: bool = False
   is_wifi_chipset_model_mandatory: bool = True

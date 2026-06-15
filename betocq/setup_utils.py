@@ -2019,3 +2019,43 @@ def betocq_repeat(
     return base_test.repeat(count, max_consecutive_error)(func)
 
   return decorator
+
+
+def check_gms_pids_changed(
+    ads: Sequence[android_device.AndroidDevice],
+) -> str | None:
+  """Checks if GMS PIDs changed on any device during test.
+
+  Args:
+    ads: A sequence of android devices.
+
+  Returns:
+    An error message if GMS PIDs changed, None otherwise.
+  """
+  for ad in ads:
+    try:
+      gms_info = getattr(ad, 'gms_info', None)
+      if gms_info is None:
+        continue
+      current_gms_info = constants.GmsInfo()
+      current_gms_info.update_pids(ad)
+      if gms_info.has_valid_pids() and gms_info != current_gms_info:
+        ad.log.warning(
+            'Redo the test because GMS PIDs changed on device %s: %s -> %s',
+            ad.serial,
+            gms_info,
+            current_gms_info,
+        )
+        return (
+            f'GMS PIDs changed on device {ad.serial} during test'
+            f' ({gms_info} -> {current_gms_info}), GMS might have been'
+            ' killed or updated. This is very likely the cause of test'
+            ' failure. Please redo the test.'
+        )
+    except (adb.AdbError, ValueError):
+      ad.log.warning(
+          'Failed to get GMS PIDs from device %s',
+          ad.serial,
+          exc_info=True,
+      )
+  return None
