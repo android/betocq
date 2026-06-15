@@ -133,6 +133,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
     )
     try:
       super().setup_class()
+      self._class_metadata_recorded = False
       self._scenario_configs = {}
 
       for attr_name in dir(self):
@@ -170,9 +171,6 @@ class PerformanceTestBase(base_test.BaseTestClass):
       )
       self.metrics_manager.class_metrics.record('test_result', 'UNINITIALIZED')
 
-      self.metrics_helper.record_class_setup_metadata(
-          self.metrics_manager.class_metrics
-      )
       self._framework_setup_class_completed = True
     except signals.TestAbortClass:
       logging.info('setup_class aborted, attempting to record metadata anyway.')
@@ -215,6 +213,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
     self.get_current_iteration_metrics().record(
         'start_time', datetime.datetime.now()
     )
+    if not getattr(self, '_class_metadata_recorded', False):
+      self._try_record_class_setup_metadata(self.metrics_manager.class_metrics)
+      self._class_metadata_recorded = True
     super().setup_test()
 
   def teardown_test(self) -> None:
@@ -697,7 +698,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
     try:
       self.metrics_helper.record_class_setup_metadata(class_metrics)
     except Exception:  # pylint: disable=broad-except
-      logging.warning('Failed to record metadata after abort.', exc_info=True)
+      logging.warning('Failed to record class setup metadata.', exc_info=True)
 
   def _try_record_class_teardown_metadata(
       self, class_metrics: metrics.MetricsCollector
