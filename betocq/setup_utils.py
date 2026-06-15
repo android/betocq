@@ -838,6 +838,8 @@ def is_aware_pairing_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware pairing is supported on the given device."""
   try:
     # get the dumpsys output
+    # enable wifi if it is disabled.
+    ad.adb.shell('svc wifi enable')
     dumpsys_output = ad.adb.shell('dumpsys wifiaware').decode('utf-8')
     return 'isNanPairingSupported=true' in dumpsys_output
   except Exception as e:  # pylint: disable=broad-except
