@@ -177,6 +177,33 @@ def set_country_code(
     _do_set_country_code(ad, country_code)
 
 
+def _get_driver_country_code(ad: android_device.AndroidDevice) -> str | None:
+  """Gets the driver country code from dumpsys wifi.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    The driver country code, or None if the mDriverCountryCode is not found.
+  """
+  try:
+    out = ad.adb.shell('dumpsys wifi').decode('utf-8')
+    found_line = None
+    for line in out.splitlines():
+      if 'mDriverCountryCode' in line:
+        found_line = line
+        break
+    if found_line is not None:
+      match = re.search(r'mDriverCountryCode\s*[:=-]\s*(\S*)', found_line)
+      if match:
+        return match.group(1).strip('\'"')
+      return ''
+    return None
+  except adb.AdbError:
+    ad.log.exception('Failed to run dumpsys wifi')
+    return None
+
+
 def _do_set_country_code(
     ad: android_device.AndroidDevice,
     country_code: str,
@@ -197,6 +224,59 @@ def _do_set_country_code(
       toggle_airplane_mode(ad)
     ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
     ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+
+    if country_code == '00':
+      max_retries = 5
+      delay = 0.1
+      verified = False
+      driver_cc = None
+      for attempt in range(max_retries):
+        driver_cc = _get_driver_country_code(ad)
+        if driver_cc is None:
+          ad.log.warning('mDriverCountryCode is not available in dumpsys wifi')
+          break
+        if driver_cc == '00':
+          ad.log.info(
+              'Successfully verified mDriverCountryCode is 00 after %d'
+              ' attempts',
+              attempt + 1,
+          )
+          verified = True
+          break
+        if attempt < max_retries - 1:
+          ad.log.warning(
+              (
+                  'mDriverCountryCode is %s (expected 00), attempt %d, waiting'
+                  ' %ss to retry'
+              ),
+              driver_cc,
+              attempt + 1,
+              delay,
+          )
+          time.sleep(delay)
+          delay *= 2
+        else:
+          ad.log.warning(
+              'mDriverCountryCode is %s (expected 00), attempt %d (last'
+              ' attempt)',
+              driver_cc,
+              attempt + 1,
+          )
+
+      if driver_cc is None:
+        ad.log.warning(
+            'mDriverCountryCode is not available, skipping XY fallback.'
+        )
+      elif not verified:
+        ad.log.info(
+            (
+                'Failed to verify mDriverCountryCode as 00 (last seen: %s),'
+                ' trying XY'
+            ),
+            driver_cc,
+        )
+        _do_set_country_code(ad, 'XY')
+
     if force_telephony_cc:
       telephony_country_code = (
           ad.adb.shell('dumpsys wifi | grep mTelephonyCountryCode')
@@ -205,9 +285,7 @@ def _do_set_country_code(
       )
       ad.log.info('Telephony country code: %s', telephony_country_code)
   except adb.AdbError:
-    ad.log.exception(
-        'Failed to set country code on device %r.', ad.serial
-    )
+    ad.log.exception('Failed to set country code on device %r.', ad.serial)
 
 
 def enable_logs(ad: android_device.AndroidDevice) -> None:
@@ -827,11 +905,7 @@ def is_valid_wifi_5g_freq(freq: int) -> bool:
 
 def is_valid_wifi_5g_dfs_freq(freq: int) -> bool:
   """Checks if the frequency is a valid 5G DFS frequency."""
-  return (
-      constants.MIN_FREQ_5G_DFS_MHZ
-      <= freq
-      <= constants.MAX_FREQ_5G_DFS_MHZ
-  )
+  return constants.MIN_FREQ_5G_DFS_MHZ <= freq <= constants.MAX_FREQ_5G_DFS_MHZ
 
 
 def is_aware_pairing_supported(ad: android_device.AndroidDevice) -> bool:
@@ -1167,8 +1241,7 @@ def load_nearby_snippet(
       device_specific_dict[key_apk_installed] = True
   else:
     ad.log.warning(
-        ' apk path is not specified, '
-        'make sure it is installed in the device'
+        ' apk path is not specified, make sure it is installed in the device'
     )
   if not device_specific_dict.get('external_storage_permission_granted', False):
     ad.log.info('grant manage external storage permission')
@@ -1653,7 +1726,7 @@ def get_wifi_firmware_version(
   """Gets the Wi-Fi firmware version on the given device."""
   try:
     version = ad.adb.getprop('vendor.wlan.firmware.version')
-  except (adb.AdbError):
+  except adb.AdbError:
     ad.log.warning(
         'Failed to get Wi-Fi firmware version on device %r.',
         ad.serial,
@@ -1669,9 +1742,7 @@ def get_bt_firmware_version(
   """Gets the BT firmware version on the given device."""
   try:
     bt_dumpsys_output = (
-        ad.adb.shell(
-            'dumpsys android.hardware.bluetooth.IBluetoothHci/default'
-        )
+        ad.adb.shell('dumpsys android.hardware.bluetooth.IBluetoothHci/default')
         .strip()
         .decode('utf-8')
     )
@@ -1703,14 +1774,14 @@ def get_bt_firmware_version(
 
 
 def _extract_bt_firmware_version(
-    ad: android_device.AndroidDevice,
-    bt_dumpsys_output: str) -> str:
+    ad: android_device.AndroidDevice, bt_dumpsys_output: str
+) -> str:
   """Extracts Bluetooth controller firmware version from dumpsys output.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
-    bt_dumpsys_output: A string containing the output from the dumpsys
-      BT command.
+    bt_dumpsys_output: A string containing the output from the dumpsys BT
+      command.
 
   Returns:
       A string containing the firmware version, or None if not found.
@@ -1771,9 +1842,7 @@ def disable_package_verifiers(ad: android_device.AndroidDevice):
   """Disables package verifier and Play Protect for ADB installs."""
   try:
     if not ad.is_adb_root:
-      ad.log.info(
-          'Device is not rooted. Skipping disabling package verifiers.'
-      )
+      ad.log.info('Device is not rooted. Skipping disabling package verifiers.')
       return
     ad.log.info(
         'Device is in Root. Disabling package verifier and Play Protect for ADB'
@@ -1785,17 +1854,16 @@ def disable_package_verifiers(ad: android_device.AndroidDevice):
     )
     ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '1'])
   except adb.AdbError as e:
-    ad.log.error(f'Failed to disable package verifiers: {e} on '
-                 f'device {ad.serial}.')
+    ad.log.error(
+        f'Failed to disable package verifiers: {e} on device {ad.serial}.'
+    )
 
 
 def enable_package_verifiers(ad: android_device.AndroidDevice):
   """Reverts package verifier and Play Protect settings."""
   try:
     if not ad.is_adb_root:
-      ad.log.info(
-          'Device is not rooted. Skipping reverting package verifiers.'
-      )
+      ad.log.info('Device is not rooted. Skipping reverting package verifiers.')
       return
     ad.log.info(
         'Device is in Root. Reverting package verifier and Play Protect'
@@ -1807,8 +1875,9 @@ def enable_package_verifiers(ad: android_device.AndroidDevice):
     )
     ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '0'])
   except adb.AdbError as e:
-    ad.log.error(f'Failed to enable package verifiers: {e} on '
-                 f'device {ad.serial}.')
+    ad.log.error(
+        f'Failed to enable package verifiers: {e} on device {ad.serial}.'
+    )
 
 
 def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
