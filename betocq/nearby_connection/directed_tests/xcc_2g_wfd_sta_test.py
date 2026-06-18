@@ -57,7 +57,7 @@ from betocq import setup_utils
 from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import nc_performance_test_base
 from betocq.nearby_connection import nc_test_result_utils
-from betocq.nearby_connection import nc_utils_v2 as nc_utils
+from betocq.nearby_connection import utils as nc_utils
 
 
 # use the SCC test count as most devices should be in SCC mode, except the

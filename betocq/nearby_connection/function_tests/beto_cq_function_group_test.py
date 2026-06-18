@@ -39,7 +39,7 @@ from betocq import setup_utils
 from betocq.metrics import metrics_base
 from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import nc_performance_test_base
-from betocq.nearby_connection import nc_utils_v2 as nc_utils
+from betocq.nearby_connection import utils as nc_utils
 
 _COUNTRY_CODE = 'US'
 _BT_BLE_FILE_TRANSFER_FAILURE_TIP = (
