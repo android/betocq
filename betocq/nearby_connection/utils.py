@@ -39,6 +39,7 @@ def check_wifi_ap_status_in_setup_class(
     test_class: base_test.BaseTestClass,
     advertiser: android_device.AndroidDevice,
     test_parameters: constants.TestParameters,
+    supports_5g: bool = True,
 ) -> None:
   """Checks the WiFi AP status.
 
@@ -48,12 +49,18 @@ def check_wifi_ap_status_in_setup_class(
     test_class: The Mobly base test class instance.
     advertiser: The Android device acting as the Nearby Connection advertiser.
     test_parameters: The test parameters containing Wi-Fi SSID information.
+    supports_5g: Whether the device supports 5GHz band.
   """
   device_specific_info = setup_utils.get_betocq_device_specific_info(advertiser)
   if device_specific_info.get('is_wifi_ap_ready', False):
     advertiser.log.info(
         'WiFi AP status is already checked and ready, skip the check.'
     )
+    return
+
+  if test_parameters.use_programmable_ap:
+    return
+  if not test_parameters.abort_all_if_any_ap_not_ready:
     return
 
   wifi_ap_error_count = device_specific_info.get('wifi_ap_error_count', 0)
@@ -79,6 +86,22 @@ def check_wifi_ap_status_in_setup_class(
           error_class=constants.WifiApNotReadyError,
       )
 
+  wifi_2g_ssid = test_parameters.wifi_2g_ssid
+  wifi_5g_ssid = test_parameters.wifi_5g_ssid
+  wifi_dfs_5g_ssid = test_parameters.wifi_dfs_5g_ssid
+
+  if not wifi_2g_ssid:
+    _report_error('wifi_2g_ssid is not configured.')
+    return
+
+  if supports_5g:
+    if not wifi_5g_ssid or not wifi_dfs_5g_ssid:
+      _report_error(
+          'Device supports 5G but wifi_5g_ssid or wifi_dfs_5g_ssid is not'
+          ' configured.'
+      )
+      return
+
   if wifi_ap_error_count > 1:
     advertiser.log.warning(
         'WiFi AP status check failed %d times, skip the check and report the'
@@ -89,10 +112,6 @@ def check_wifi_ap_status_in_setup_class(
     return
 
   wifi_scan_results_list = setup_utils.check_wifi_env(advertiser)
-  if test_parameters.use_programmable_ap:
-    return
-  if not test_parameters.abort_all_if_any_ap_not_ready:
-    return
   if not wifi_scan_results_list:
     advertiser.log.warning(
         'WiFi scan results are not available, skip the ssid and frequency'
@@ -103,22 +122,25 @@ def check_wifi_ap_status_in_setup_class(
   freq_by_ssids = {
       result['SSID']: result['Frequency'] for result in wifi_scan_results_list
   }
-  wifi_2g_ssid = test_parameters.wifi_2g_ssid
-  wifi_5g_ssid = test_parameters.wifi_5g_ssid
-  wifi_dfs_5g_ssid = test_parameters.wifi_dfs_5g_ssid
   freq_2g = freq_by_ssids.get(wifi_2g_ssid)
-  freq_5g = freq_by_ssids.get(wifi_5g_ssid)
-  freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid)
+  freq_5g = freq_by_ssids.get(wifi_5g_ssid) if supports_5g else None
+  freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid) if supports_5g else None
 
-  if freq_2g is None or freq_5g is None or freq_5g_dfs is None:
+  missing_ap = False
+  if freq_2g is None:
+    missing_ap = True
+  if supports_5g and (freq_5g is None or freq_5g_dfs is None):
+    missing_ap = True
+
+  if missing_ap:
     logging.warning(
         'WiFi APs not detected in first scan: 2G:%s(%s), 5G:%s(%s), DFS:%s(%s).'
         ' Retrying...',
         wifi_2g_ssid,
         freq_2g,
-        wifi_5g_ssid,
+        wifi_5g_ssid if supports_5g else 'N/A',
         freq_5g,
-        wifi_dfs_5g_ssid,
+        wifi_dfs_5g_ssid if supports_5g else 'N/A',
         freq_5g_dfs,
     )
     wifi_scan_results_list = setup_utils.check_wifi_env(
@@ -131,32 +153,43 @@ def check_wifi_ap_status_in_setup_class(
           for result in wifi_scan_results_list
       }
       freq_2g = freq_by_ssids.get(wifi_2g_ssid)
-      freq_5g = freq_by_ssids.get(wifi_5g_ssid)
-      freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid)
+      freq_5g = freq_by_ssids.get(wifi_5g_ssid) if supports_5g else None
+      freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid) if supports_5g else None
 
-  if freq_2g is None or freq_5g is None or freq_5g_dfs is None:
+  missing_aps_msgs = []
+  if freq_2g is None:
+    missing_aps_msgs.append(f'2G: {wifi_2g_ssid} Not Detected')
+  if supports_5g:
+    if freq_5g is None:
+      missing_aps_msgs.append(f'5G: {wifi_5g_ssid} Not Detected')
+    if freq_5g_dfs is None:
+      missing_aps_msgs.append(f'DFS: {wifi_dfs_5g_ssid} Not Detected')
+
+  if missing_aps_msgs:
     _report_error(
-        'WiFi APs are not detected in the environment, they are: 2G:'
-        f' {wifi_2g_ssid} {"OK" if freq_2g else "Not Detected"}, 5G:'
-        f' {wifi_5g_ssid} {"OK" if freq_5g else "Not Detected"}, DFS:'
-        f' {wifi_dfs_5g_ssid} {"OK" if freq_5g_dfs else "Not Detected"}.'
-        ' Check your AP status, may reboot the AP if needed.',
+        'WiFi APs are not detected in the environment, they are: '
+        + ', '.join(missing_aps_msgs)
+        + '. Check your AP status, may reboot the AP if needed.'
     )
+    return
+
   if not setup_utils.is_valid_wifi_2g_freq(freq_2g):
     _report_error(
         f'2G AP - {wifi_2g_ssid}, frequency - {freq_2g} is not valid. Set'
         ' the AP channel, reboot the AP and try again.'
     )
-  if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
-    _report_error(
-        f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
-        ' the AP channel, reboot the AP and try again.'
-    )
-  if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
-    _report_error(
-        f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
-        ' valid. Set the AP channel, reboot the AP and try again.'
-    )
+  if supports_5g:
+    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
+      _report_error(
+          f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
+          ' the AP channel, reboot the AP and try again.'
+      )
+    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
+      _report_error(
+          f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
+          ' valid. Set the AP channel, reboot the AP and try again.'
+      )
+
   device_specific_info['is_wifi_ap_ready'] = True
   device_specific_info['wifi_ap_error_count'] = 0
 

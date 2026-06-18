@@ -92,9 +92,6 @@ class Scc5gAwareStaTest(nc_performance_test_base.NcPerformanceTestBase):
     self.setup_wifi_env(
         d2d_type=constants.WifiD2DType.SCC_5G, country_code=_COUNTRY_CODE
     )
-    nc_utils.check_wifi_ap_status_in_setup_class(
-        self, self.advertiser, self.test_parameters
-    )
     # Test configurations.
     self.wifi_info = constants.WifiInfo.from_test_parameters(
         d2d_type=constants.WifiD2DType.SCC_5G, params=self.test_parameters
@@ -121,6 +118,10 @@ class Scc5gAwareStaTest(nc_performance_test_base.NcPerformanceTestBase):
     )
     setup_utils.abort_if_wifi_aware_not_available(
         [self.discoverer, self.advertiser]
+    )
+
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters, supports_5g=True
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:

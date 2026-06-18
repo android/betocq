@@ -108,9 +108,6 @@ class Mcc5gAllWifiNonDbs2gStaTest(
         d2d_type=constants.WifiD2DType.MCC_5G_WFD_2G_STA,
         country_code=_COUNTRY_CODE,
     )
-    nc_utils.check_wifi_ap_status_in_setup_class(
-        self, self.advertiser, self.test_parameters
-    )
     self.wifi_info = constants.WifiInfo.from_test_parameters(
         d2d_type=constants.WifiD2DType.MCC_5G_WFD_2G_STA,
         params=self.test_parameters,
@@ -133,6 +130,10 @@ class Mcc5gAllWifiNonDbs2gStaTest(
     # Check device capabilities.
     setup_utils.abort_if_5g_band_not_supported(
         [self.discoverer, self.advertiser]
+    )
+
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters, supports_5g=True
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:

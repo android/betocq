@@ -115,9 +115,6 @@ class MccAwareStaTest(nc_performance_test_base.NcPerformanceTestBase):
         country_code='US',
         wifi_info=self.wifi_info,
     )
-    nc_utils.check_wifi_ap_status_in_setup_class(
-        self, self.advertiser, self.test_parameters
-    )
 
     # Test specific device setup steps.
     utils.concurrent_exec(
@@ -132,6 +129,10 @@ class MccAwareStaTest(nc_performance_test_base.NcPerformanceTestBase):
     )
     setup_utils.abort_if_wifi_aware_not_available(
         [self.discoverer, self.advertiser]
+    )
+
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters, supports_5g=True
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:

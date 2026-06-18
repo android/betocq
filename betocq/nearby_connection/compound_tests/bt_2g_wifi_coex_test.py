@@ -88,9 +88,6 @@ class Bt2gWifiCoexTest(nc_performance_test_base.NcPerformanceTestBase):
         d2d_type=constants.WifiD2DType.ANY_WFD_2G_STA,
         country_code=_COUNTRY_CODE,
     )
-    nc_utils.check_wifi_ap_status_in_setup_class(
-        self, self.advertiser, self.test_parameters
-    )
     self.wifi_info = constants.WifiInfo.from_test_parameters(
         d2d_type=constants.WifiD2DType.ANY_WFD_2G_STA,
         params=self.test_parameters,
@@ -110,6 +107,11 @@ class Bt2gWifiCoexTest(nc_performance_test_base.NcPerformanceTestBase):
         self._setup_android_device,
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=True,
+    )
+
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters,
+        supports_5g=setup_utils.is_5g_band_supported(self.advertiser)
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:

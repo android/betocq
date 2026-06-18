@@ -100,9 +100,6 @@ class XccWfdDfs5gStaTest(nc_performance_test_base.NcPerformanceTestBase):
         d2d_type=constants.WifiD2DType.XCC_5G_DFS_STA,
         country_code=_COUNTRY_CODE,
     )
-    nc_utils.check_wifi_ap_status_in_setup_class(
-        self, self.advertiser, self.test_parameters
-    )
     self.wifi_info = constants.WifiInfo.from_test_parameters(
         d2d_type=constants.WifiD2DType.XCC_5G_DFS_STA,
         params=self.test_parameters,
@@ -130,6 +127,10 @@ class XccWfdDfs5gStaTest(nc_performance_test_base.NcPerformanceTestBase):
     )
     setup_utils.abort_if_wifi_direct_not_supported(
         [self.discoverer, self.advertiser]
+    )
+
+    nc_utils.check_wifi_ap_status_in_setup_class(
+        self, self.advertiser, self.test_parameters, supports_5g=True
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:

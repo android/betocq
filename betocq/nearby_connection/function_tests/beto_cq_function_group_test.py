@@ -72,13 +72,22 @@ _WIFI_DIRECT_FILE_TRANSFER_FAILURE_TIP = (
 
 def _get_wifi_ssid_password(
     test_parameters: constants.TestParameters,
+    supports_5g: bool = True,
 ) -> tuple[str, str]:
   """Returns an available wifi SSID and password from test parameters."""
-  if test_parameters.wifi_ssid:
-    return (
-        test_parameters.wifi_ssid,
-        test_parameters.wifi_password,
-    )
+  if not supports_5g:
+    if test_parameters.wifi_2g_ssid:
+      return (
+          test_parameters.wifi_2g_ssid,
+          test_parameters.wifi_2g_password,
+      )
+    if test_parameters.wifi_ssid:
+      return (
+          test_parameters.wifi_ssid,
+          test_parameters.wifi_password,
+      )
+    return '', ''
+
   if test_parameters.wifi_5g_ssid:
     return (
         test_parameters.wifi_5g_ssid,
@@ -89,12 +98,17 @@ def _get_wifi_ssid_password(
         test_parameters.wifi_dfs_5g_ssid,
         test_parameters.wifi_dfs_5g_password,
     )
+  if test_parameters.wifi_ssid:
+    return (
+        test_parameters.wifi_ssid,
+        test_parameters.wifi_password,
+    )
   if test_parameters.wifi_2g_ssid:
     return (
         test_parameters.wifi_2g_ssid,
         test_parameters.wifi_2g_password,
     )
-  return ('', '')
+  return '', ''
 
 
 def _start_nearby_connection_and_transfer_file(
@@ -173,12 +187,22 @@ class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
         raise_on_exception=True,
     )
 
-    # Use 5G WiFi for function tests.
-    self.setup_wifi_env(
-        d2d_type=constants.WifiD2DType.SCC_5G, country_code=_COUNTRY_CODE
+    self.supports_5g = setup_utils.is_5g_band_supported(
+        self.advertiser
+    ) and setup_utils.is_5g_band_supported(self.discoverer)
+    d2d_type = (
+        constants.WifiD2DType.SCC_5G
+        if self.supports_5g
+        else constants.WifiD2DType.SCC_2G
     )
+    # Use 5G WiFi for function tests if supported by both devices, otherwise 2G.
+    self.setup_wifi_env(d2d_type=d2d_type, country_code=_COUNTRY_CODE)
+
     nc_utils.check_wifi_ap_status_in_setup_class(
-        self, self.advertiser, self.test_parameters
+        self,
+        self.advertiser,
+        self.test_parameters,
+        supports_5g=self.supports_5g,
     )
 
   def _setup_android_device(self, ad: android_device.AndroidDevice) -> None:
@@ -224,7 +248,9 @@ class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
       3. Tear down the connection.
     """
     # Test Step: Connect discoverer and advertiser to wifi sta.
-    wifi_ssid, wifi_password = _get_wifi_ssid_password(self.test_parameters)
+    wifi_ssid, wifi_password = _get_wifi_ssid_password(
+        self.test_parameters, supports_5g=self.supports_5g
+    )
     if not wifi_ssid:
       self.get_current_iteration_metrics().record(
           'active_nc_fail_reason',

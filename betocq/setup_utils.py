@@ -788,10 +788,17 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
 
 def is_5g_band_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if 5G band is supported on the given device."""
-  try:
-    return ad.nearby.wifiIs5GHzBandSupported()
-  except adb.AdbError:
-    return False
+  if hasattr(ad, 'services') and hasattr(ad.services, 'snippets'):
+    for client in ad.services.snippets._snippet_clients.values():  # pylint: disable=protected-access
+      if hasattr(client, 'wifiIs5GHzBandSupported'):
+        try:
+          return client.wifiIs5GHzBandSupported()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to check 5G support via snippet: %s', e)
+  raise RuntimeError(
+      'No snippet found supporting wifiIs5GHzBandSupported. '
+      'Ensure snippets are loaded before calling this check.'
+  )
 
 
 def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
