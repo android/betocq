@@ -31,11 +31,8 @@ from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import scc_2g_wlan_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test
-from betocq.nearby_connection.directed_tests import xcc_2g_wfd_sta_test
-from betocq.nearby_connection.directed_tests import xcc_hotspot_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import xcc_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import xcc_wfd_dfs_5g_sta_test
-from betocq.nearby_connection.directed_tests import xcc_wfd_ww_5g_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
 
 

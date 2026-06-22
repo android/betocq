@@ -26,9 +26,7 @@ from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 
 BETOCQ_NAME = 'BeToCQ'
-# TODO: Move these to component specific constants.
-NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
-NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
+
 
 SUCCESS_RATE_TARGET = 0.98
 BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
@@ -108,9 +106,6 @@ TRANSFER_TIMEOUT_FUNC_TEST = datetime.timedelta(seconds=100)
 
 TARGET_CUJ_UNSET = 'unspecified'
 TARGET_CUJ_QUICK_START = 'quick_start'
-TARGET_CUJ_NEARBY_CONNECTIONS_FUNCTION = 'nearby_connections_function'
-TARGET_CUJ_ESIM = 'setting_based_esim_transfer'
-TARGET_CUJ_QUICK_SHARE = 'quick_share'
 TARGET_CUJ_AQT = 'aqt'
 
 MAX_FREQ_2G_MHZ = 2500
@@ -156,8 +151,9 @@ class TestParameters:
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
   abort_all_if_any_ap_not_ready: bool = False
-  # Whether to run all tests in the suite. abort_all should be replaced by
-  # a failure error.
+  # Whether to run all tests in the suite even the prerequisites are not met;
+  # Each test case should check the error, abort_all shouldn't be called, and
+  # should be replaced by a failure error.
   run_all_tests_in_suite: bool = False
   skip_throughput_assertion: bool = False
   is_wifi_chipset_model_mandatory: bool = True
@@ -168,6 +164,10 @@ class TestParameters:
   # Ignore the indoor 5g test for China tri-band AP, as China tri-band AP only
   # can use UNII-3 band for 5G wifi, which is not supported by Japan devices.
   ignore_indoor_5g_test_for_china_triband_ap: bool = False
+  # The filename to export metrics as JSON. If empty, JSON export is skipped.
+  metrics_json_filename: str = ''
+  # The filename to export metrics as YAML. If empty, YAML export is skipped.
+  metrics_yaml_filename: str = ''
 
   @classmethod
   def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':

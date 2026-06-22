@@ -14,8 +14,11 @@
 
 """Utility functions for testing against Nearby Connection."""
 
+from __future__ import annotations
+
+from collections.abc import Sequence
 import logging
-from typing import Any, Sequence
+from typing import Any
 
 from mobly import base_test
 from mobly.controllers import android_device
@@ -24,15 +27,19 @@ from mobly.controllers.android_device_lib import snippet_client_v2
 from betocq import android_wifi_utils
 from betocq import constants
 from betocq import setup_utils
-from betocq import test_result_utils
+from betocq.metrics import metrics_base
 from betocq.nearby_connection import nc_constants
+from betocq.nearby_connection import nc_test_result_utils
 from betocq.nearby_connection import nearby_connection_wrapper
+
+MetricsCollector = metrics_base.MetricsCollector
 
 
 def check_wifi_ap_status_in_setup_class(
     test_class: base_test.BaseTestClass,
     advertiser: android_device.AndroidDevice,
     test_parameters: constants.TestParameters,
+    supports_5g: bool = True,
 ) -> None:
   """Checks the WiFi AP status.
 
@@ -42,12 +49,18 @@ def check_wifi_ap_status_in_setup_class(
     test_class: The Mobly base test class instance.
     advertiser: The Android device acting as the Nearby Connection advertiser.
     test_parameters: The test parameters containing Wi-Fi SSID information.
+    supports_5g: Whether the device supports 5GHz band.
   """
   device_specific_info = setup_utils.get_betocq_device_specific_info(advertiser)
   if device_specific_info.get('is_wifi_ap_ready', False):
     advertiser.log.info(
         'WiFi AP status is already checked and ready, skip the check.'
     )
+    return
+
+  if test_parameters.use_programmable_ap:
+    return
+  if not test_parameters.abort_all_if_any_ap_not_ready:
     return
 
   wifi_ap_error_count = device_specific_info.get('wifi_ap_error_count', 0)
@@ -73,6 +86,22 @@ def check_wifi_ap_status_in_setup_class(
           error_class=constants.WifiApNotReadyError,
       )
 
+  wifi_2g_ssid = test_parameters.wifi_2g_ssid
+  wifi_5g_ssid = test_parameters.wifi_5g_ssid
+  wifi_dfs_5g_ssid = test_parameters.wifi_dfs_5g_ssid
+
+  if not wifi_2g_ssid:
+    _report_error('wifi_2g_ssid is not configured.')
+    return
+
+  if supports_5g:
+    if not wifi_5g_ssid or not wifi_dfs_5g_ssid:
+      _report_error(
+          'Device supports 5G but wifi_5g_ssid or wifi_dfs_5g_ssid is not'
+          ' configured.'
+      )
+      return
+
   if wifi_ap_error_count > 1:
     advertiser.log.warning(
         'WiFi AP status check failed %d times, skip the check and report the'
@@ -83,10 +112,6 @@ def check_wifi_ap_status_in_setup_class(
     return
 
   wifi_scan_results_list = setup_utils.check_wifi_env(advertiser)
-  if test_parameters.use_programmable_ap:
-    return
-  if not test_parameters.abort_all_if_any_ap_not_ready:
-    return
   if not wifi_scan_results_list:
     advertiser.log.warning(
         'WiFi scan results are not available, skip the ssid and frequency'
@@ -97,27 +122,30 @@ def check_wifi_ap_status_in_setup_class(
   freq_by_ssids = {
       result['SSID']: result['Frequency'] for result in wifi_scan_results_list
   }
-  wifi_2g_ssid = test_parameters.wifi_2g_ssid
-  wifi_5g_ssid = test_parameters.wifi_5g_ssid
-  wifi_dfs_5g_ssid = test_parameters.wifi_dfs_5g_ssid
   freq_2g = freq_by_ssids.get(wifi_2g_ssid)
-  freq_5g = freq_by_ssids.get(wifi_5g_ssid)
-  freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid)
+  freq_5g = freq_by_ssids.get(wifi_5g_ssid) if supports_5g else None
+  freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid) if supports_5g else None
 
-  if freq_2g is None or freq_5g is None or freq_5g_dfs is None:
+  missing_ap = False
+  if freq_2g is None:
+    missing_ap = True
+  if supports_5g and (freq_5g is None or freq_5g_dfs is None):
+    missing_ap = True
+
+  if missing_ap:
     logging.warning(
         'WiFi APs not detected in first scan: 2G:%s(%s), 5G:%s(%s), DFS:%s(%s).'
         ' Retrying...',
         wifi_2g_ssid,
         freq_2g,
-        wifi_5g_ssid,
+        wifi_5g_ssid if supports_5g else 'N/A',
         freq_5g,
-        wifi_dfs_5g_ssid,
+        wifi_dfs_5g_ssid if supports_5g else 'N/A',
         freq_5g_dfs,
     )
     wifi_scan_results_list = setup_utils.check_wifi_env(
         advertiser,
-        wifi_scan_wait_time_sec=setup_utils.WIFI_SCAN_WAIT_TIME_SEC * 2
+        wifi_scan_wait_time_sec=setup_utils.WIFI_SCAN_WAIT_TIME_SEC * 2,
     )
     if wifi_scan_results_list:
       freq_by_ssids = {
@@ -125,32 +153,43 @@ def check_wifi_ap_status_in_setup_class(
           for result in wifi_scan_results_list
       }
       freq_2g = freq_by_ssids.get(wifi_2g_ssid)
-      freq_5g = freq_by_ssids.get(wifi_5g_ssid)
-      freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid)
+      freq_5g = freq_by_ssids.get(wifi_5g_ssid) if supports_5g else None
+      freq_5g_dfs = freq_by_ssids.get(wifi_dfs_5g_ssid) if supports_5g else None
 
-  if freq_2g is None or freq_5g is None or freq_5g_dfs is None:
+  missing_aps_msgs = []
+  if freq_2g is None:
+    missing_aps_msgs.append(f'2G: {wifi_2g_ssid} Not Detected')
+  if supports_5g:
+    if freq_5g is None:
+      missing_aps_msgs.append(f'5G: {wifi_5g_ssid} Not Detected')
+    if freq_5g_dfs is None:
+      missing_aps_msgs.append(f'DFS: {wifi_dfs_5g_ssid} Not Detected')
+
+  if missing_aps_msgs:
     _report_error(
-        'WiFi APs are not detected in the environment, they are: 2G:'
-        f' {wifi_2g_ssid} {"OK" if freq_2g else "Not Detected"}, 5G:'
-        f' {wifi_5g_ssid} {"OK" if freq_5g else "Not Detected"}, DFS:'
-        f' {wifi_dfs_5g_ssid} {"OK" if freq_5g_dfs else "Not Detected"}.'
-        f' Check your AP status, may reboot the AP if needed.',
+        'WiFi APs are not detected in the environment, they are: '
+        + ', '.join(missing_aps_msgs)
+        + '. Check your AP status, may reboot the AP if needed.'
     )
+    return
+
   if not setup_utils.is_valid_wifi_2g_freq(freq_2g):
     _report_error(
         f'2G AP - {wifi_2g_ssid}, frequency - {freq_2g} is not valid. Set'
-        f' the AP channel, reboot the AP and try again.'
-    )
-  if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
-    _report_error(
-        f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
         ' the AP channel, reboot the AP and try again.'
     )
-  if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
-    _report_error(
-        f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
-        ' valid. Set the AP channel, reboot the AP and try again.'
-    )
+  if supports_5g:
+    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
+      _report_error(
+          f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
+          ' the AP channel, reboot the AP and try again.'
+      )
+    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
+      _report_error(
+          f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
+          ' valid. Set the AP channel, reboot the AP and try again.'
+      )
+
   device_specific_info['is_wifi_ap_ready'] = True
   device_specific_info['wifi_ap_error_count'] = 0
 
@@ -161,7 +200,7 @@ def get_nearby_snippet_config(
   """Returns the snippet config for the first nearby snippet instance."""
   return constants.SnippetConfig(
       snippet_name='nearby',
-      package_name=constants.NEARBY_SNIPPET_PACKAGE_NAME,
+      package_name=nc_constants.NEARBY_SNIPPET_PACKAGE_NAME,
       apk_path=setup_utils.get_snippet_apk_path(user_params, 'nearby_snippet'),
   )
 
@@ -172,7 +211,7 @@ def get_nearby2_snippet_config(
   """Returns the snippet config for the second nearby snippet instance."""
   return constants.SnippetConfig(
       snippet_name='nearby2',
-      package_name=constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
+      package_name=nc_constants.NEARBY_SNIPPET_2_PACKAGE_NAME,
       apk_path=setup_utils.get_snippet_apk_path(
           user_params, 'nearby_snippet_2'
       ),
@@ -214,9 +253,7 @@ def setup_android_device_for_nc_tests(
     if not setup_utils.wifi_is_enabled(ad):
       ad.nearby.wifiEnable()
     setup_utils.reset_nearby_connection(ad)
-    device_specific_dict['wifi_fw'] = setup_utils.get_wifi_firmware_version(
-        ad
-    )
+    device_specific_dict['wifi_fw'] = setup_utils.get_wifi_firmware_version(ad)
     device_specific_dict['bt_fw'] = setup_utils.get_bt_firmware_version(ad)
     device_specific_dict['one_time_setup_done'] = True
 
@@ -231,11 +268,81 @@ def setup_android_device_for_nc_tests(
   ad.nearby.acquireUiAutomation()
 
 
+class LegacyTestResultAdapter:
+  """Adapter to coerce legacy SingleTestResult into MetricsCollector interface."""
+
+  def __init__(self, test_result: Any) -> None:
+    self.test_result = test_result
+
+  def record(
+      self,
+      key: str,
+      value: Any,
+  ) -> None:
+    """Records a metric using the legacy test result object.
+
+    Args:
+      key: The name of the metric to record.
+      value: The value of the metric.
+    """
+    if key == 'discoverer_sta_latency':
+      self.test_result.discoverer_sta_latency = value
+    elif key == 'advertiser_sta_latency':
+      self.test_result.advertiser_sta_latency = value
+    elif key == 'prior_nc_fail_reason':
+      self.test_result.set_prior_nc_fail_reason(value)
+    elif key == 'active_nc_fail_reason':
+      self.test_result.set_active_nc_fail_reason(value)
+    elif key == 'result_message':
+      self.test_result.result_message = value
+    # Quality info fields
+    elif key in (
+        'discovery_latency',
+        'connection_latency',
+        'upgrade_latency',
+        'connection_medium',
+        'upgrade_medium',
+        'medium_frequency',
+    ):
+      if key == 'discovery_latency':
+        self.test_result.quality_info.discovery_latency = value
+      elif key == 'connection_latency':
+        self.test_result.quality_info.connection_latency = value
+      elif key == 'upgrade_latency':
+        self.test_result.quality_info.medium_upgrade_latency = value
+      elif key == 'connection_medium':
+        self.test_result.quality_info.connection_medium = value
+      elif key == 'upgrade_medium':
+        self.test_result.quality_info.upgrade_medium = value
+      elif key == 'medium_frequency':
+        self.test_result.quality_info.medium_frequency = value
+    # Prior Quality info fields
+    elif key in ('prior_discovery_latency', 'prior_connection_latency'):
+      if key == 'prior_discovery_latency':
+        self.test_result.prior_nc_quality_info.discovery_latency = value
+      elif key == 'prior_connection_latency':
+        self.test_result.prior_nc_quality_info.connection_latency = value
+    else:
+      logging.warning(
+          'LegacyTestResultAdapter received an unknown key: %s with value %s.'
+          ' This metric will not be recorded.',
+          key,
+          value,
+      )
+
+
+def _coerce_metrics(metrics: Any) -> Any:
+  if hasattr(metrics, 'record'):
+    return metrics
+  return LegacyTestResultAdapter(metrics)
+
+
 def connect_ad_to_wifi_sta(
     ad: android_device.AndroidDevice,
+    *,
     wifi_ssid: str,
     wifi_password: str,
-    test_result: test_result_utils.SingleTestResult,
+    metrics: MetricsCollector | Any,
     is_discoverer: bool,
 ) -> bool:
   """Connects NC discoverer or advertiser to the given Wi-Fi STA.
@@ -244,7 +351,8 @@ def connect_ad_to_wifi_sta(
     ad: The device to connect to Wi-Fi STA.
     wifi_ssid: The Wi-Fi SSID.
     wifi_password: The Wi-Fi password.
-    test_result: The object to record test result and metrics.
+    metrics: The object to record test result and metrics. Can be a
+      MetricsCollector or a legacy test result object.
     is_discoverer: Whether the device is the NC discoverer. This is used for
       generating test failure reason and result summary info.
 
@@ -255,25 +363,23 @@ def connect_ad_to_wifi_sta(
   Raises:
     Exception: If an error occurs during the Wi-Fi connection process.
   """
+  metrics_collector = _coerce_metrics(metrics)
   try:
     wifi_info = ad.nearby.wifiGetConnectionInfo()
     current_wifi_ssid = wifi_info.get('SSID', '')
     if current_wifi_ssid == wifi_ssid:
-      ad.log.info(f'already connected to {wifi_ssid}')
+      ad.log.info('already connected to %s', wifi_ssid)
       return False
 
-    if (
-        current_wifi_ssid
-        and current_wifi_ssid != constants.WIFI_UNKNOWN_SSID
-    ):
+    if current_wifi_ssid and current_wifi_ssid != constants.WIFI_UNKNOWN_SSID:
       network_id = setup_utils.get_sta_network_id_from_wifi_info(wifi_info)
       if network_id != constants.INVALID_NETWORK_ID:
-        ad.log.info(f'disconnecting from {current_wifi_ssid})')
+        ad.log.info('disconnecting from %s)', current_wifi_ssid)
         ad.nearby.wifiRemoveNetwork(network_id)
       else:
         ad.log.warning(
-            f'No valid network id for {current_wifi_ssid}, try'
-            ' to remove all networks.'
+            'No valid network id for %s, try to remove all networks.',
+            current_wifi_ssid,
         )
         setup_utils.remove_disconnect_wifi_network(ad)
 
@@ -299,18 +405,22 @@ def connect_ad_to_wifi_sta(
           f'RSSI={rssi} of which is too high. Consider to move the device'
           ' away from the AP.'
       )
-      ad.log.info(high_rssi_tip)
+      ad.log.info(
+          'RSSI=%d of which is too high. Consider to move the device away from'
+          ' the AP.',
+          rssi,
+      )
       result_messages.append(high_rssi_tip)
-    test_result.set_active_nc_fail_reason(
-        fail_reason, result_message=' '.join(result_messages)
+    nc_test_result_utils.set_active_nc_fail_reason(
+        metrics_collector, fail_reason, result_message=' '.join(result_messages)
     )
     setup_utils.log_sta_event_list(ad)
     raise
 
   if is_discoverer:
-    test_result.discoverer_sta_latency = latency
+    metrics_collector.record('discoverer_sta_latency', latency)
   else:
-    test_result.advertiser_sta_latency = latency
+    metrics_collector.record('advertiser_sta_latency', latency)
   ad.log.info('connecting to wifi in %d s', round(latency.total_seconds()))
   new_wifi_info = ad.nearby.wifiGetConnectionInfo()
   ad.log.info(
@@ -325,10 +435,23 @@ def connect_ad_to_wifi_sta(
 def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
-    test_result: test_result_utils.SingleTestResult,
+    *,
+    metrics: MetricsCollector | Any,
     test_parameters: constants.TestParameters | None = None,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
-  """Starts a prior BT Nearby Connection."""
+  """Starts a prior BT Nearby Connection.
+
+  Args:
+    advertiser: The Android device acting as the Nearby Connection advertiser.
+    discoverer: The Android device acting as the Nearby Connection discoverer.
+    metrics: The object to record test result and metrics. Can be a
+      MetricsCollector or a legacy test result object.
+    test_parameters: Optional test parameters.
+
+  Returns:
+    A NearbyConnectionWrapper instance for the prior connection.
+  """
+  metrics_collector = _coerce_metrics(metrics)
   logging.info('Set up a prior BT connection.')
   prior_bt_snippet = _get_snippet(
       advertiser,
@@ -346,16 +469,27 @@ def start_prior_bt_nearby_connection(
         test_parameters=test_parameters,
     )
   finally:
-    test_result.prior_nc_quality_info = prior_bt_snippet.connection_quality_info
-    test_result.set_prior_nc_fail_reason(prior_bt_snippet.test_failure_reason)
+    q_info = prior_bt_snippet.connection_quality_info
+    metrics_collector.record(
+        'prior_discovery_latency', q_info.discovery_latency, aggregator='stats'
+    )
+    metrics_collector.record(
+        'prior_connection_latency',
+        q_info.connection_latency,
+        aggregator='stats',
+    )
+    nc_test_result_utils.set_prior_nc_fail_reason(
+        metrics_collector, prior_bt_snippet.test_failure_reason
+    )
   return prior_bt_snippet
 
 
 def start_main_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
-    test_result: test_result_utils.SingleTestResult,
+    *,
     upgrade_medium_under_test: constants.NearbyMedium,
+    metrics: MetricsCollector | Any,
     test_parameters: constants.TestParameters | None = None,
     connection_medium: constants.NearbyMedium = constants.NearbyMedium.BT_ONLY,
     connect_timeout: constants.ConnectionSetupTimeouts = constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
@@ -363,7 +497,25 @@ def start_main_nearby_connection(
     keep_alive_timeout_ms: int = nc_constants.KEEP_ALIVE_TIMEOUT_WIFI_MS,
     keep_alive_interval_ms: int = nc_constants.KEEP_ALIVE_INTERVAL_WIFI_MS,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
-  """Starts a main Nearby Connection which is used for file transfer."""
+  """Starts a main Nearby Connection which is used for file transfer.
+
+  Args:
+    advertiser: The Android device acting as the Nearby Connection advertiser.
+    discoverer: The Android device acting as the Nearby Connection discoverer.
+    upgrade_medium_under_test: The medium to test for connection upgrade.
+    metrics: The object to record test result and metrics. Can be a
+      MetricsCollector or a legacy test result object.
+    test_parameters: Optional test parameters.
+    connection_medium: The medium used for the initial connection.
+    connect_timeout: Timeouts for the connection setup stages.
+    medium_upgrade_type: The type of medium upgrade to perform.
+    keep_alive_timeout_ms: Keep alive timeout in milliseconds.
+    keep_alive_interval_ms: Keep alive interval in milliseconds.
+
+  Returns:
+    A NearbyConnectionWrapper instance for the main connection.
+  """
+  metrics_collector = _coerce_metrics(metrics)
   logging.info('Set up a nearby connection for file transfer.')
 
   active_snippet = _get_snippet(
@@ -385,7 +537,32 @@ def start_main_nearby_connection(
         test_parameters=test_parameters,
     )
   finally:
-    test_result.quality_info = active_snippet.connection_quality_info
+    # Record connection quality metrics
+    q_info = active_snippet.connection_quality_info
+    metrics_collector.record(
+        'discovery_latency', q_info.discovery_latency, aggregator='stats'
+    )
+    metrics_collector.record(
+        'connection_latency', q_info.connection_latency, aggregator='stats'
+    )
+    metrics_collector.record(
+        'upgrade_latency', q_info.medium_upgrade_latency, aggregator='stats'
+    )
+    metrics_collector.record(
+        'connection_medium',
+        q_info.connection_medium.name
+        if hasattr(q_info.connection_medium, 'name')
+        else q_info.connection_medium,
+    )
+    metrics_collector.record(
+        'upgrade_medium',
+        q_info.upgrade_medium.name
+        if hasattr(q_info.upgrade_medium, 'name')
+        else q_info.upgrade_medium,
+        aggregator='counter',
+    )
+    metrics_collector.record('medium_frequency', q_info.medium_frequency)
+
     fail_reason = active_snippet.test_failure_reason
     result_message = None
     if fail_reason == constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
@@ -397,23 +574,31 @@ def start_main_nearby_connection(
       )
 
     if fail_reason != constants.SingleTestFailureReason.SUCCESS:
-      test_result.set_active_nc_fail_reason(fail_reason, result_message)
+      nc_test_result_utils.set_active_nc_fail_reason(
+          metrics_collector, fail_reason, result_message
+      )
 
   return active_snippet
 
 
 def handle_file_transfer_failure(
     fail_reason: constants.SingleTestFailureReason,
-    test_result: test_result_utils.SingleTestResult,
+    metrics: MetricsCollector | Any,
     file_transfer_failure_tip: str,
-):
+) -> None:
   """Collects metrics and generates result message for file transfer failure."""
+  metrics_collector = _coerce_metrics(metrics)
   if fail_reason == constants.SingleTestFailureReason.SUCCESS:
     return
   result_message = None
   if fail_reason == constants.SingleTestFailureReason.FILE_TRANSFER_FAIL:
     result_message = file_transfer_failure_tip
-  test_result.set_active_nc_fail_reason(fail_reason, result_message)
+  nc_test_result_utils.set_active_nc_fail_reason(
+      metrics_collector, fail_reason, result_message
+  )
+  # do not assert fail here, run in the finally block to ensure metrics are
+  # recorded; the failure exception will be raised by the caller.
+  # asserts.fail(f'File transfer failed: {fail_reason.name} - {result_message}')
 
 
 def _get_snippet(

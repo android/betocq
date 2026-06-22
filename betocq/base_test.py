@@ -80,6 +80,7 @@ class BaseTestClass(base_test.BaseTestClass):
     self.is_using_gms_api = True
 
   def setup_class(self) -> None:
+    super().setup_class()
     if sys.version_info < (3, 12):
       setup_utils.report_error_on_setup_class(
           self,
@@ -101,6 +102,13 @@ class BaseTestClass(base_test.BaseTestClass):
         ad.role = ad.dimensions['role']
       if self.is_using_gms_api:
         ad.gms_info = constants.GmsInfo()
+
+    utils.concurrent_exec(
+        setup_utils.wait_for_device_root,
+        param_list=[[ad] for ad in self.ads],
+        raise_on_exception=True,
+    )
+
     try:
       self.discoverer = android_device.get_device(
           self.ads, role='source_device'
@@ -225,6 +233,7 @@ class BaseTestClass(base_test.BaseTestClass):
     )
 
   def setup_test(self):
+    super().setup_test()
     self.record_data({
         'Test Name': self.current_test_info.name,
         'properties': {
@@ -264,26 +273,35 @@ class BaseTestClass(base_test.BaseTestClass):
     setup_utils.clear_hermetic_overrides(ad)
 
   def teardown_test(self) -> None:
-    self._log_test_end_on_device(self.advertiser)
-    self._log_test_end_on_device(self.discoverer)
-    utils.concurrent_exec(
-        lambda d: d.services.create_output_excerpts_all(self.current_test_info),
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
+    try:
+      self._log_test_end_on_device(self.advertiser)
+      self._log_test_end_on_device(self.discoverer)
+      utils.concurrent_exec(
+          lambda d: d.services.create_output_excerpts_all(
+              self.current_test_info
+          ),
+          param_list=[[ad] for ad in self.ads],
+          raise_on_exception=True,
+      )
+    finally:
+      super().teardown_test()
 
   def teardown_class(self) -> None:
-    if self.__skipped_test_class:
-      logging.info('Skipping teardown class.')
-      return
+    try:
+      if self.__skipped_test_class:
+        logging.info('Skipping teardown class.')
+        return
 
-    utils.concurrent_exec(
-        self._teardown_device,
-        param_list=[[ad] for ad in self.ads],
-        raise_on_exception=True,
-    )
+      utils.concurrent_exec(
+          self._teardown_device,
+          param_list=[[ad] for ad in self.ads],
+          raise_on_exception=True,
+      )
+    finally:
+      super().teardown_class()
 
   def on_fail(self, record: records.TestResultRecord) -> None:
+    super().on_fail(record)
     if self.__skipped_test_class:
       logging.info('Skipping on_fail.')
       return
@@ -308,8 +326,16 @@ class BaseTestClass(base_test.BaseTestClass):
             )
         )
     ):
+      loaded_packages = set()
+      for ad in self.ads:
+        if hasattr(ad, 'loaded_snippet_packages'):
+          loaded_packages.update(ad.loaded_snippet_packages)
+      packages_str = (
+          ' or '.join(loaded_packages) if loaded_packages else 'the snippet'
+      )
+
       error_message = (
-          f'The following error happened during the'
+          'The following error happened during the'
           ' test:\n'
           f'{record.stacktrace}\n'
           'it could be one of the following issues:\n'
@@ -319,11 +345,8 @@ class BaseTestClass(base_test.BaseTestClass):
           ' store (Settings -> Network perferences) and retry the test;\n'
           '3. The test snippet might be killed by a security app or service'
           ' from the device, especially if this happens very frequently,'
-          ' check the logcat to verify if '
-          f' {constants.NEARBY_SNIPPET_PACKAGE_NAME} or'
-          f' {constants.NEARBY_SNIPPET_2_PACKAGE_NAME} or'
-          ' was killed; you should'
-          ' put them to the allowlist of the security app.\n'
+          f' check the logcat to verify if {packages_str} was killed; you'
+          ' should put them to the allowlist of the security app.\n'
           '4. The USB cable or port is not stable, change the USB cable or the'
           ' connection portal and try again;\n'
           '5. The "Play protect" in the play store might disable the test'
@@ -361,6 +384,7 @@ class BaseTestClass(base_test.BaseTestClass):
         logging.info('reach the max number of bug reports, skip the rest')
 
   def on_pass(self, record: records.TestResultRecord) -> None:
+    super().on_pass(record)
     # Ignore captured packets when the test passes.
     self._stop_packet_capture(ignore_packets=True)
 

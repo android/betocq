@@ -20,6 +20,9 @@ import enum
 
 from betocq import constants
 
+NEARBY_SNIPPET_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet'
+NEARBY_SNIPPET_2_PACKAGE_NAME = 'com.google.android.nearby.mobly.snippet.second'
+
 # MCC hotspot test is more flaky than other MCC tests due to the sync issue.
 MCC_HOTSPOT_TEST_SUCCESS_RATE_TARGET = 0.90
 

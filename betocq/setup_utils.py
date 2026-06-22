@@ -48,6 +48,7 @@ TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC = 2
 PH_FLAG_WRITE_WAIT_TIME_SEC = 3
 WIFI_DISCONNECTION_DELAY_SEC = 3
 ADB_RETRY_WAIT_TIME_SEC = 2
+_WAIT_FOR_DEVICE_TIMEOUT_SEC = 60
 
 _DISABLE_ENABLE_GMS_UPDATE_WAIT_TIME_SEC = 2
 
@@ -78,6 +79,7 @@ _WIFI_SCAN_PATTERN = re.compile(
         (\d+)            # Captures Frequency
         \s+
         [-\d()./:]+      # Matches RSSI (skipped)
+        (?:\([^)]*\)|[^\s(])*  # Matches optional suffix/per-chain RSSI in parentheses (skipped)
         \s+
         [\d.]+           # Matches Age (skipped)
         \s*
@@ -127,6 +129,19 @@ def get_snippet_apk_path(
   return apk_paths[0]
 
 
+def wait_for_device_root(ad: android_device.AndroidDevice) -> None:
+  """Robustly roots the device with wait_for_device calls."""
+  ad.log.info('Waiting for device to be online before rooting.')
+  ad.adb.wait_for_device(timeout=_WAIT_FOR_DEVICE_TIMEOUT_SEC)
+  if ad.is_adb_root:
+    ad.log.info('Device is already rooted.')
+    return
+  ad.log.info('Rooting device.')
+  ad.adb.root()
+  ad.log.info('Waiting for device to be online after rooting.')
+  ad.adb.wait_for_device(timeout=_WAIT_FOR_DEVICE_TIMEOUT_SEC)
+
+
 def set_country_code(
     ad: android_device.AndroidDevice,
     country_code: str,
@@ -162,6 +177,33 @@ def set_country_code(
     _do_set_country_code(ad, country_code)
 
 
+def _get_driver_country_code(ad: android_device.AndroidDevice) -> str | None:
+  """Gets the driver country code from dumpsys wifi.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    The driver country code, or None if the mDriverCountryCode is not found.
+  """
+  try:
+    out = ad.adb.shell('dumpsys wifi').decode('utf-8')
+    found_line = None
+    for line in out.splitlines():
+      if 'mDriverCountryCode' in line:
+        found_line = line
+        break
+    if found_line is not None:
+      match = re.search(r'mDriverCountryCode\s*[:=-]\s*(\S*)', found_line)
+      if match:
+        return match.group(1).strip('\'"')
+      return ''
+    return None
+  except adb.AdbError:
+    ad.log.exception('Failed to run dumpsys wifi')
+    return None
+
+
 def _do_set_country_code(
     ad: android_device.AndroidDevice,
     country_code: str,
@@ -182,6 +224,59 @@ def _do_set_country_code(
       toggle_airplane_mode(ad)
     ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
     ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+
+    if country_code == '00':
+      max_retries = 5
+      delay = 0.1
+      verified = False
+      driver_cc = None
+      for attempt in range(max_retries):
+        driver_cc = _get_driver_country_code(ad)
+        if driver_cc is None:
+          ad.log.warning('mDriverCountryCode is not available in dumpsys wifi')
+          break
+        if driver_cc == '00':
+          ad.log.info(
+              'Successfully verified mDriverCountryCode is 00 after %d'
+              ' attempts',
+              attempt + 1,
+          )
+          verified = True
+          break
+        if attempt < max_retries - 1:
+          ad.log.warning(
+              (
+                  'mDriverCountryCode is %s (expected 00), attempt %d, waiting'
+                  ' %ss to retry'
+              ),
+              driver_cc,
+              attempt + 1,
+              delay,
+          )
+          time.sleep(delay)
+          delay *= 2
+        else:
+          ad.log.warning(
+              'mDriverCountryCode is %s (expected 00), attempt %d (last'
+              ' attempt)',
+              driver_cc,
+              attempt + 1,
+          )
+
+      if driver_cc is None:
+        ad.log.warning(
+            'mDriverCountryCode is not available, skipping XY fallback.'
+        )
+      elif not verified:
+        ad.log.info(
+            (
+                'Failed to verify mDriverCountryCode as 00 (last seen: %s),'
+                ' trying XY'
+            ),
+            driver_cc,
+        )
+        _do_set_country_code(ad, 'XY')
+
     if force_telephony_cc:
       telephony_country_code = (
           ad.adb.shell('dumpsys wifi | grep mTelephonyCountryCode')
@@ -190,9 +285,7 @@ def _do_set_country_code(
       )
       ad.log.info('Telephony country code: %s', telephony_country_code)
   except adb.AdbError:
-    ad.log.exception(
-        'Failed to set country code on device %r.', ad.serial
-    )
+    ad.log.exception('Failed to set country code on device %r.', ad.serial)
 
 
 def enable_logs(ad: android_device.AndroidDevice) -> None:
@@ -695,10 +788,17 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
 
 def is_5g_band_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if 5G band is supported on the given device."""
-  try:
-    return ad.nearby.wifiIs5GHzBandSupported()
-  except adb.AdbError:
-    return False
+  if hasattr(ad, 'services') and hasattr(ad.services, 'snippets'):
+    for client in ad.services.snippets._snippet_clients.values():  # pylint: disable=protected-access
+      if hasattr(client, 'wifiIs5GHzBandSupported'):
+        try:
+          return client.wifiIs5GHzBandSupported()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to check 5G support via snippet: %s', e)
+  raise RuntimeError(
+      'No snippet found supporting wifiIs5GHzBandSupported. '
+      'Ensure snippets are loaded before calling this check.'
+  )
 
 
 def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
@@ -812,17 +912,15 @@ def is_valid_wifi_5g_freq(freq: int) -> bool:
 
 def is_valid_wifi_5g_dfs_freq(freq: int) -> bool:
   """Checks if the frequency is a valid 5G DFS frequency."""
-  return (
-      constants.MIN_FREQ_5G_DFS_MHZ
-      <= freq
-      <= constants.MAX_FREQ_5G_DFS_MHZ
-  )
+  return constants.MIN_FREQ_5G_DFS_MHZ <= freq <= constants.MAX_FREQ_5G_DFS_MHZ
 
 
 def is_aware_pairing_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware pairing is supported on the given device."""
   try:
     # get the dumpsys output
+    # enable wifi if it is disabled.
+    ad.adb.shell('svc wifi enable')
     dumpsys_output = ad.adb.shell('dumpsys wifiaware').decode('utf-8')
     return 'isNanPairingSupported=true' in dumpsys_output
   except Exception as e:  # pylint: disable=broad-except
@@ -845,7 +943,8 @@ def wait_for_aware_pairing_supported(
 def is_wifi_aware_available(ad: android_device.AndroidDevice) -> bool:
   """Checks if Aware is supported on the given device."""
   try:
-    return ad.nearby.wifiAwareIsAvailable()
+    features = ad.adb.shell('pm list features').decode('utf-8')
+    return 'android.hardware.wifi.aware' in features
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('Aware is not supported due to %s', e)
     return False
@@ -1149,8 +1248,7 @@ def load_nearby_snippet(
       device_specific_dict[key_apk_installed] = True
   else:
     ad.log.warning(
-        ' apk path is not specified, '
-        'make sure it is installed in the device'
+        ' apk path is not specified, make sure it is installed in the device'
     )
   if not device_specific_dict.get('external_storage_permission_granted', False):
     ad.log.info('grant manage external storage permission')
@@ -1158,6 +1256,9 @@ def load_nearby_snippet(
     device_specific_dict['external_storage_permission_granted'] = True
 
   ad.load_snippet(config.snippet_name, config.package_name)
+  if not hasattr(ad, 'loaded_snippet_packages'):
+    ad.loaded_snippet_packages = set()
+  ad.loaded_snippet_packages.add(config.package_name)
 
 
 def unload_nearby_snippet(
@@ -1169,6 +1270,8 @@ def unload_nearby_snippet(
   key_apk_installed = config.package_name + '_installed'
   try:
     ad.unload_snippet(config.snippet_name)
+    if hasattr(ad, 'loaded_snippet_packages'):
+      ad.loaded_snippet_packages.discard(config.package_name)
     if device_specific_dict.get(key_apk_installed, False):
       ad.log.info('try to uninstall snippet_apk')
       apk_utils.uninstall(ad, config.package_name)
@@ -1368,7 +1471,17 @@ def abort_if_any_5g_or_dfs_aps_not_ready(
 def abort_if_5g_band_not_supported(
     ads: list[android_device.AndroidDevice],
 ) -> None:
-  """Skips test class if any device does not support 5G band."""
+  """Skips test class if any device does not support 5G band.
+
+  Note: We explicitly prefer asserts.abort_class_if over asserts.skip_if here.
+  In Sponge's data model, setup fixtures cannot natively report a skipped state.
+  Raising TestSkip during setup_class causes Sponge to mark setup as an ERROR.
+  Configuring ResultStore to map TestAbortClass to a clean skip natively allows
+  us to bypass the suite without implementing complex deferred-skipping logic.
+
+  Args:
+    ads: A list of AndroidDevice instances.
+  """
   for ad in ads:
     asserts.abort_class_if(
         not is_5g_band_supported(ad),
@@ -1379,7 +1492,17 @@ def abort_if_5g_band_not_supported(
 def abort_if_5g_band_supported(
     ads: list[android_device.AndroidDevice],
 ) -> None:
-  """Aborts test class if any device supports 5G band."""
+  """Aborts test class if any device supports 5G band.
+
+  Note: We explicitly prefer asserts.abort_class_if over asserts.skip_if here.
+  In Sponge's data model, setup fixtures cannot natively report a skipped state.
+  Raising TestSkip during setup_class causes Sponge to mark setup as an ERROR.
+  Configuring ResultStore to map TestAbortClass to a clean skip natively allows
+  us to bypass the suite without implementing complex deferred-skipping logic.
+
+  Args:
+    ads: A list of AndroidDevice instances.
+  """
   for ad in ads:
     asserts.abort_class_if(
         is_5g_band_supported(ad),
@@ -1610,7 +1733,7 @@ def get_wifi_firmware_version(
   """Gets the Wi-Fi firmware version on the given device."""
   try:
     version = ad.adb.getprop('vendor.wlan.firmware.version')
-  except (adb.AdbError):
+  except adb.AdbError:
     ad.log.warning(
         'Failed to get Wi-Fi firmware version on device %r.',
         ad.serial,
@@ -1626,9 +1749,7 @@ def get_bt_firmware_version(
   """Gets the BT firmware version on the given device."""
   try:
     bt_dumpsys_output = (
-        ad.adb.shell(
-            'dumpsys android.hardware.bluetooth.IBluetoothHci/default'
-        )
+        ad.adb.shell('dumpsys android.hardware.bluetooth.IBluetoothHci/default')
         .strip()
         .decode('utf-8')
     )
@@ -1660,14 +1781,14 @@ def get_bt_firmware_version(
 
 
 def _extract_bt_firmware_version(
-    ad: android_device.AndroidDevice,
-    bt_dumpsys_output: str) -> str:
+    ad: android_device.AndroidDevice, bt_dumpsys_output: str
+) -> str:
   """Extracts Bluetooth controller firmware version from dumpsys output.
 
   Args:
     ad: AndroidDevice, Mobly Android Device.
-    bt_dumpsys_output: A string containing the output from the dumpsys
-      BT command.
+    bt_dumpsys_output: A string containing the output from the dumpsys BT
+      command.
 
   Returns:
       A string containing the firmware version, or None if not found.
@@ -1728,9 +1849,7 @@ def disable_package_verifiers(ad: android_device.AndroidDevice):
   """Disables package verifier and Play Protect for ADB installs."""
   try:
     if not ad.is_adb_root:
-      ad.log.info(
-          'Device is not rooted. Skipping disabling package verifiers.'
-      )
+      ad.log.info('Device is not rooted. Skipping disabling package verifiers.')
       return
     ad.log.info(
         'Device is in Root. Disabling package verifier and Play Protect for ADB'
@@ -1742,17 +1861,16 @@ def disable_package_verifiers(ad: android_device.AndroidDevice):
     )
     ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '1'])
   except adb.AdbError as e:
-    ad.log.error(f'Failed to disable package verifiers: {e} on '
-                 f'device {ad.serial}.')
+    ad.log.error(
+        f'Failed to disable package verifiers: {e} on device {ad.serial}.'
+    )
 
 
 def enable_package_verifiers(ad: android_device.AndroidDevice):
   """Reverts package verifier and Play Protect settings."""
   try:
     if not ad.is_adb_root:
-      ad.log.info(
-          'Device is not rooted. Skipping reverting package verifiers.'
-      )
+      ad.log.info('Device is not rooted. Skipping reverting package verifiers.')
       return
     ad.log.info(
         'Device is in Root. Reverting package verifier and Play Protect'
@@ -1764,5 +1882,256 @@ def enable_package_verifiers(ad: android_device.AndroidDevice):
     )
     ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '0'])
   except adb.AdbError as e:
-    ad.log.error(f'Failed to enable package verifiers: {e} on '
-                 f'device {ad.serial}.')
+    ad.log.error(
+        f'Failed to enable package verifiers: {e} on device {ad.serial}.'
+    )
+
+
+def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
+  """Returns true if the device is a cuttlefish emulator."""
+  return device.build_info['hardware'] == 'cutf_cvm'
+
+
+def unlock_screen(device: android_device.AndroidDevice):
+  """Unlocks the screen on a device if locked."""
+  if is_cuttlefish(device):
+    device.adb.shell('wm dismiss-keyguard')
+  else:
+    device.adb.shell('input keyevent KEYCODE_MENU')
+
+
+def is_device_on(device: android_device.AndroidDevice) -> bool:
+  """Returns true if the device is on."""
+  output = device.adb.shell(['dumpsys', 'power', '|', 'grep', 'mWakefulness'])
+  return 'mWakefulness=Awake' in output.decode()
+
+
+def turn_screen_on(
+    device: android_device.AndroidDevice,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=10),
+) -> None:
+  """Turns the device screen on."""
+  device.adb.shell('input keyevent KEYCODE_WAKEUP')
+  if not wait_for_predicate(
+      lambda: is_device_on(device),
+      timeout=timeout,
+      interval=datetime.timedelta(seconds=1),
+  ):
+    raise signals.TestFailure('Failed to turn the device screen on')
+
+
+def turn_screen_off(
+    device: android_device.AndroidDevice,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=10),
+) -> None:
+  """Turns the device screen off."""
+  device.adb.shell('input keyevent KEYCODE_SLEEP')
+  if not wait_for_predicate(
+      lambda: not is_device_on(device),
+      timeout=timeout,
+      interval=datetime.timedelta(seconds=1),
+  ):
+    raise signals.TestFailure('Failed to turn the device screen off')
+
+
+def verify_wfd_ip_setup(
+    device: android_device.AndroidDevice,
+    expected_state: bool,
+) -> bool:
+  """Returns true if the wfd ip setup reaches the expected state within 30 seconds."""
+  start_time = time.time()
+  p2p_lines = []
+  while time.time() - start_time < 30:
+    # Check the wfd ip setup state every 1 second.
+    out = device.adb.shell('ip addr show')
+    if isinstance(out, bytes):
+      out = out.decode('utf-8')
+    p2p_lines = [line for line in out.splitlines() if 'p2p' in line]
+    has_wfd_ip = any('inet ' in line for line in p2p_lines)
+
+    if has_wfd_ip == expected_state:
+      device.log.info('p2p interface lines: %s', p2p_lines)
+      return True
+    time.sleep(1)
+  device.log.info('p2p interface lines after timeout: %s', p2p_lines)
+  return False
+
+
+def verify_aware_ip_setup(
+    device: android_device.AndroidDevice,
+    expected_state: bool,
+) -> bool:
+  """Returns true if the aware ip setup reaches the expected state within 30 seconds."""
+  start_time = time.time()
+  aware_lines = []
+  while time.time() - start_time < 30:
+    out = device.adb.shell('ip addr show')
+    if isinstance(out, bytes):
+      out = out.decode('utf-8')
+
+    in_aware_interface = False
+    has_aware_ip = False
+    aware_lines = []
+
+    for line in out.splitlines():
+      is_header = '<' in line and '>' in line
+
+      if is_header:
+        if 'aware' in line or 'nan' in line:
+          in_aware_interface = True
+          aware_lines.append(line)
+        else:
+          in_aware_interface = False
+
+      if in_aware_interface:
+        aware_lines.append(line)
+        if 'inet6 ' in line:
+          has_aware_ip = True
+
+    if has_aware_ip == expected_state:
+      device.log.info('aware interface lines: %s', aware_lines)
+      return True
+    time.sleep(1)
+  device.log.info('aware interface lines after timeout: %s', aware_lines)
+  return False
+
+
+def has_wifi_aware_feature(ad: android_device.AndroidDevice) -> bool:
+  """Checks if the device has the Wi-Fi Aware feature."""
+  try:
+    features = ad.adb.shell('pm list features')
+    if isinstance(features, bytes):
+      features = features.decode('utf-8')
+    return 'android.hardware.wifi.aware' in features
+  except Exception as e:  # pylint: disable=broad-except
+    ad.log.warning('Failed to check wifi aware feature: %s', e)
+    return False
+
+
+def enable_ble_for_devices(ads: list[android_device.AndroidDevice]) -> None:
+  """Enables BLE on the given devices."""
+  for ad in ads:
+    ad.log.info('Turning on BLE')
+    try:
+      ad.adb.shell('svc bluetooth enable')
+    except adb.AdbError as e:
+      ad.log.warning('Failed to enable bluetooth via svc: %s', e)
+
+
+def reset_wifi_and_enable_ble_for_devices(
+    ads: list[android_device.AndroidDevice],
+) -> None:
+  """Enables BLE and resets WiFi (turns off, turns on, and disconnects networks) for the given devices."""
+  enable_ble_for_devices(ads)
+  for ad in ads:
+    ad.log.info('Turning off WiFi')
+    try:
+      ad.adb.shell('cmd wifi set-wifi-enabled disabled')
+      time.sleep(2)
+    except adb.AdbError as e:
+      ad.log.warning('Failed to disable wifi via cmd: %s', e)
+    ad.log.info('Turning on WiFi and disconnecting from networks')
+    try:
+      ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+      wait_for_predicate(
+          lambda ad=ad: 'Wifi is enabled'
+          in ad.adb.shell('cmd wifi status').decode('utf-8'),
+          timeout=datetime.timedelta(seconds=30),
+          interval=datetime.timedelta(seconds=1),
+      )
+    except adb.AdbError as e:
+      ad.log.warning('Failed to enable wifi via cmd: %s', e)
+    try:
+      ad.adb.shell('cmd wifi disconnect')
+    except adb.AdbError as e:
+      ad.log.warning('Failed to disconnect wifi via cmd: %s', e)
+
+
+def get_device_attributes(ad: android_device.AndroidDevice) -> str:
+  """Gets device attributes for debugging."""
+  device_specific_info = get_betocq_device_specific_info(ad)
+  wifi_fw = device_specific_info.get('wifi_fw', '')
+  if not wifi_fw:
+    wifi_fw = get_wifi_firmware_version(ad)
+  bt_fw = device_specific_info.get('bt_fw', '')
+  if not bt_fw:
+    bt_fw = get_bt_firmware_version(ad)
+
+  return '\n'.join((
+      f'serial: {getattr(ad, "serial", "NA")}',
+      f'model: {getattr(ad, "model", "NA")}',
+      (
+          f'android_version: {getattr(ad, "android_version", "NA")}\n'
+          f'build_info: {getattr(ad, "build_info", "NA")}'
+      ),
+      f'gms_version: {dump_gms_version(ad)}',
+      f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
+      f'wifi_fw: {wifi_fw}',
+      f'bt_fw: {bt_fw}',
+      f'support_aware: {is_wifi_aware_available(ad)}',
+      f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
+      (
+          'enable_sta_dfs_channel_for_peer_network:'
+          f' {getattr(ad, "enable_sta_dfs_channel_for_peer_network", "NA")}'
+      ),
+      (
+          'enable_sta_indoor_channel_for_peer_network:'
+          f' {getattr(ad, "enable_sta_indoor_channel_for_peer_network", "NA")}'
+      ),
+      f'max_num_streams: {getattr(ad, "max_num_streams", "NA")}',
+      f'max_num_streams_dbs: {getattr(ad, "max_num_streams_dbs", "NA")}',
+      f'max_phy_rate_5g_mbps: {getattr(ad, "max_phy_rate_5g_mbps", "NA")}',
+      f'max_phy_rate_2g_mbps: {getattr(ad, "max_phy_rate_2g_mbps", "NA")}',
+  ))
+
+
+def betocq_repeat(
+    count: int, *, max_consecutive_error: int = 2
+) -> Callable[..., Any]:
+  """Decorator to wrap Mobly repeat and attach metadata for dynamic discovery."""
+
+  def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
+    func.expected_iterations = count
+    return base_test.repeat(count, max_consecutive_error)(func)
+
+  return decorator
+
+
+def check_gms_pids_changed(
+    ads: Sequence[android_device.AndroidDevice],
+) -> str | None:
+  """Checks if GMS PIDs changed on any device during test.
+
+  Args:
+    ads: A sequence of android devices.
+
+  Returns:
+    An error message if GMS PIDs changed, None otherwise.
+  """
+  for ad in ads:
+    try:
+      gms_info = getattr(ad, 'gms_info', None)
+      if gms_info is None:
+        continue
+      current_gms_info = constants.GmsInfo()
+      current_gms_info.update_pids(ad)
+      if gms_info.has_valid_pids() and gms_info != current_gms_info:
+        ad.log.warning(
+            'Redo the test because GMS PIDs changed on device %s: %s -> %s',
+            ad.serial,
+            gms_info,
+            current_gms_info,
+        )
+        return (
+            f'GMS PIDs changed on device {ad.serial} during test'
+            f' ({gms_info} -> {current_gms_info}), GMS might have been'
+            ' killed or updated. This is very likely the cause of test'
+            ' failure. Please redo the test.'
+        )
+    except (adb.AdbError, ValueError):
+      ad.log.warning(
+          'Failed to get GMS PIDs from device %s',
+          ad.serial,
+          exc_info=True,
+      )
+  return None

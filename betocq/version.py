@@ -38,3 +38,5 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 # '2.6.3': ('Fix some bugs.')
 # '2.6.4': 'Replace the SCC 2G WFD STA test with XCC 2G WFD STA test.'
 # '2.6.5': 'Reduce the test cases for AQT and fix some bugs.'
+# '3.0.0': ('Migrate the tests to the new performance test framework; Unify'
+#          'the metrics collection and fix some bugs.')
