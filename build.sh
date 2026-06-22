@@ -35,5 +35,8 @@ if [ ! -z "$FILES_TO_CLEAN" ]; then
     done
 fi
 
+# uncomment to release to pypi
+# twine upload --repository-url https://us-python.pkg.dev/oss-exit-gate-prod/betocq--pypi dist/*
+
 # Exit with the original build status code
 exit $BUILD_STATUS

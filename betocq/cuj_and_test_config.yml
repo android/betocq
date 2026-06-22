@@ -62,6 +62,12 @@ TestBeds:
   <<: *controllers
   TestParams:
       <<: *test-params
+- Name: Quickstart
+  <<: *controllers
+  TestParams:
+      <<: *test-params
+      target_cuj_name: "quick_start"
+# Aqt and AqtDebug are used for GTS testing.
 - Name: Aqt
   # Don't change the following parameters, otherwise the test may fail.
   <<: *non_specified_controllers
@@ -83,39 +89,7 @@ TestBeds:
       skip_bug_report: False
       abort_all_if_any_ap_not_ready: True
       skip_default_flag_override: False
-- Name: Quickstart
-  <<: *controllers
+- Name: LocalDev
+  <<: *non_specified_controllers
   TestParams:
       <<: *test-params
-      target_cuj_name: "quick_start"
-- Name: Quickshare
-  <<: *controllers
-  TestParams:
-      <<: *test-params
-      target_cuj_name: "quick_share"
-      run_ble_performance_test: True
-- Name: EsimTransfer
-  <<: *controllers
-  TestParams:
-      <<: *test-params
-      target_cuj_name: "setting_based_esim_transfer"
-- Name: QuickstartFunction
-  Controllers:
-    <<: *controllers
-  TestParams:
-      <<: *test-params
-      target_cuj_name: "quick_start"
-- Name: NearbyConnectionsFunction
-  <<: *controllers
-  TestParams:
-    <<: *test-params
-    target_cuj_name: "nearby_connections_function"
-    requires_3p_api_test: True
-    connect_to_wifi_before_test: True
-    run_ble_performance_test: False
-- Name: QuickshareFunctionTest
-  Controllers:
-    <<: *controllers
-  TestParams:
-      <<: *test-params
-      target_cuj_name: "quick_share"
