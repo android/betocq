@@ -1,53 +1,26 @@
 # Better Together Connectivity Quality (BeToCQ) Test Suite
 
-Better Together Connectivity Quality (BeToCQ) is a new test tool built by
-Android to test the cross-device connectivity performance that isn't covered
-by the existing Android tests.
+Better Together Connectivity Quality (BeToCQ) is a diagnostic and benchmarking test framework developed by the Android team to evaluate cross-device connectivity performance not covered by standard Android test suites.
 
-This tool is built on the top of the Nearby Connections API. Under Nearby
-Connections, it has Android connectivity stack including Bluetooth, Wi-Fi, NFC,
-and UWB technologies.
+This tool is built on top of the Nearby Connections API, which utilizes the Android connectivity stack including Bluetooth, Wi-Fi, NFC, and UWB technologies.
 
-BeToCQ is designed to catch connectivity software and hardware performance
-issues by measuring detailed quality signals including the discovery, connection
-latency, transfer speed, and overall success rate.
+BeToCQ is designed to identify device-to-device (D2D) software and hardware performance bottlenecks by measuring detailed quality signals, including discovery latency, connection latency, transfer speed, and overall connection success rate.
 
-Depending on the device capabilities, the test takes two to six hours to
-complete.
+Depending on the device capabilities, the test suite takes two to six hours to complete.
 
-## Test types
+## Test Types and Validation Targets
 
-BeToCQ consists of three parts:
+BeToCQ suites consist of three test categories:
 
-- Function test
+*   **Function test**: Ensures hardware and software readiness for each radio technology.
+*   **Directed test**: Measures performance of each wireless medium against expectations. To discover radio concurrency issues, sometimes multiple mediums are enabled simultaneously during the test.
+    *   The function and directed tests are the foundational tests running with fixed wireless mediums. This helps isolate issues to an individual medium, making the debugging process more straightforward.
+*   **Critical user journey (CUJ) test**: Tests real-world use cases. Unlike function and directed tests, CUJ tests use multiple radios in a dynamic way. Debugging is typically more complex in CUJ tests, so they are executed after the foundational tests have passed.
+    *   CUJ tests are implemented in the `compound_test` directory and are dynamically configured based on the CUJ requirements.
 
-  The function test ensures hardware and software readiness for each radio
-  technology.
-
-- Directed test
-
-  The directed test measures performance of each wireless medium against
-  expectations. To discover the radio concurrency issue, sometimes multiple
-  mediums are enabled at the same time during the test.
-
-  The function and direct tests are the foundational tests running with
-  fixed wireless mediums. This helps isolate the issue to an individual medium
-  and makes the debugging process more straightforward.
-
-- Critical user journey (CUJ) test
-
-  The CUJ test tests the real use case. Different from function and
-  directed test, the CUJ test can use multiple radios in a more dynamic way. So the
-  debugging is typically more difficult in CUJ tests. That's why CUJ tests run as
-  the last step when the other tests have already passed.
-
-  CUJ test are implemented as the test cases defined in the `compound_test`
-  directory, and are dynamically configured based on the CUJ requirements. The
-  term `compound_test` refers to the fact that it uses multiple radios in a
-  dynamic way.
-
-  The test suite currently supports three CUJs: Quick Start, Quick Share, and eSIM
-  transfer. We plan to add more CUJs in later releases.
+The public BeToCQ release supports the following validation targets:
+*   **Quick Start**: Android device onboarding CUJ (validated via `betocq_onboarding_test_suite`).
+*   **AQT (Android Connectivity Quality Test)**: Streamlined tests executed within the GTS interactive context for GTS scale validation (validated via `betocq_aqt_test_suite`).
 
 ## Device capabilities
 
@@ -142,22 +115,22 @@ the following list of test cases:
    <td>US</td>
   </tr>
   <tr>
-   <td>Mcc2gWfdIndoor5gStaTest</td>
+   <td>Mcc2gWfdWw5gStaTest</td>
    <td>WFD</td>
    <td>5180</td>
-   <td>JP</td>
+   <td>00</td>
   </tr>
   <tr>
    <td>Mcc5gHotspotDfs5gStaTest</td>
    <td>Hotspot</td>
    <td>5260</td>
-   <td>GB</td>
+   <td>US</td>
   </tr>
   <tr>
    <td>Mcc5gWfdDfs5gStaTest</td>
    <td>WFD</td>
    <td>5260</td>
-   <td>GB</td>
+   <td>US</td>
   </tr>
   <tr>
    <td>Scc2gWfdStaTest</td>
@@ -184,7 +157,7 @@ the following list of test cases:
    <td>US</td>
   </tr>
   <tr>
-   <td>Scc5GAllWifiStaTest</td>
+   <td>Scc5gAllWifiStaTest</td>
    <td>All Wi-Fi mediums</td>
    <td>5180</td>
    <td>US</td>
@@ -318,7 +291,8 @@ source venv/bin/activate
 
 On Windows:
 ```
-python -m venv venv                                                                                                                                                                                               
+python -m venv venv
+
 venv\Scripts\activate
 ```
 
@@ -376,12 +350,12 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
     -  Specify `wifi_ssid` and `wifi_password` for each Wi-Fi channel:
 
         ```
-          wifi_2g_ssid: "NETGEAR62-2G"
-          wifi_2g_password: "yourpassword"
-          wifi_5g_ssid: "NETGEAR62-5G-1"
-          wifi_5g_password: "yourpassword"
-          wifi_dfs_5g_ssid: "ASUS_5G"
-          wifi_dfs_5g_password: "yourpassword"
+          wifi_2g_ssid: "betocq-2g-ap"
+          wifi_2g_password: "betocq-2g-ap"
+          wifi_5g_ssid: "betocq-5g-ap"
+          wifi_5g_password: "betocq-5g-ap"
+          wifi_dfs_5g_ssid: "betocq-5g-dfs-ap"
+          wifi_dfs_5g_password: "betocq-5g-dfs-ap"
         ```
 
         Where:
@@ -397,7 +371,7 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
     - Split the test into two runs if the required channels can't be supported
       at the same time:
       
-      **Note**: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available.
+      **Note**: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available; 5G or 5G DFS APs are required only if the device support 5G.
 
       1. In the first run, define 2G and 5G SSID but leave the 5G DFS SSID to an empty
          string `""` so that the 5G DFS test cases are skipped.
@@ -444,13 +418,21 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
 Follow instructions in [`results_uploader`](https://github.com/android/mobly-android-partner-tools) to get the test results.
 
 ### Run the test
-Run the following command to run the test.
 
-```
-mobly_runner betocq_test_suite -tb CUJ_name -i -c cuj_and_test_config.yml -u [-- your-test-label]
-```
+Depending on your validation target, execute the appropriate test suite command:
 
-Note that `CUJ_name` is one of the supported CUJ tests listed in `cuj_and_test_config.yml`, e.g., "Quickstart".
+*   **To run the Quick Start (Onboarding) validation:**
+    ```bash
+    mobly_runner betocq_onboarding_test_suite -tb Quickstart -i -c cuj_and_test_config.yml [-u] [-- your-test-label]
+    ```
+
+*   **To run the AQT (GTS - only for debugging, refer to GTS instructions for
+    formal submission) :**
+    ```bash
+    mobly_runner betocq_aqt_test_suite -tb Aqt -i -c cuj_and_test_config.yml
+    ```
+
+*Note: The `-u` flag is optional and is used to upload results if you have configured the `results_uploader`.*
 
 
 ### Debugging test failures
