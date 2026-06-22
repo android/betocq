@@ -1,4 +1,10 @@
 # BetoCQ test suite release history
+## 3.0.0 (06/22/2026)
+### New
+* Migrate the tests to the new performance test framework
+### Bug fixes
+* Fix the issue for testing 2G only devcies
+
 ## 2.6.5 (04/22/2026)
 ### New
 * Reduce the test cases for AQT and fix some bugs

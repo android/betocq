@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "betocq"
-version = "2.6.5"
+version = "3.0.0"
 description = "Better Together Connectivity Quality test suite."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [project.scripts]
-betocq_test_suite = "betocq.nearby_connection.betocq_test_suite:main"
+betocq_onboarding_test_suite = "betocq.nearby_connection.betocq_onboarding_test_suite:main"
 betocq_auto_test_suite = "betocq.nearby_connection.betocq_android_auto_test_suite:main"
 betocq_aqt_test_suite = "betocq.nearby_connection.betocq_aqt_test_suite:main"
 
