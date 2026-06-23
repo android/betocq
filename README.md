@@ -16,7 +16,7 @@ BeToCQ suites consist of three test categories:
 *   **Directed test**: Measures performance of each wireless medium against expectations. To discover radio concurrency issues, sometimes multiple mediums are enabled simultaneously during the test.
     *   The function and directed tests are the foundational tests running with fixed wireless mediums. This helps isolate issues to an individual medium, making the debugging process more straightforward.
 *   **Critical user journey (CUJ) test**: Tests real-world use cases. Unlike function and directed tests, CUJ tests use multiple radios in a dynamic way. Debugging is typically more complex in CUJ tests, so they are executed after the foundational tests have passed.
-    *   CUJ tests are implemented in the `compound_test` directory and are dynamically configured based on the CUJ requirements.
+    *   CUJ tests are implemented in the `compound_tests` directory and are dynamically configured based on the CUJ requirements.
 
 The public BeToCQ release supports the following validation targets:
 *   **Quick Start**: Android device onboarding CUJ (validated via `betocq_onboarding_test_suite`).
@@ -371,7 +371,7 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
     - Split the test into two runs if the required channels can't be supported
       at the same time:
       
-      **Note**: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available; 5G or 5G DFS APs are required only if the device support 5G.
+      **Note**: For betocq_aqt_test_suite, this is not allowed, all 2G, 5G and 5G DFS APs should be available; 5G or 5G DFS APs are required only if the device supports 5G.
 
       1. In the first run, define 2G and 5G SSID but leave the 5G DFS SSID to an empty
          string `""` so that the 5G DFS test cases are skipped.
@@ -427,7 +427,7 @@ Depending on your validation target, execute the appropriate test suite command:
     ```
 
 *   **To run the AQT (GTS - only for debugging, refer to GTS instructions for
-    formal submission) :**
+    formal submission):**
     ```bash
     mobly_runner betocq_aqt_test_suite -tb Aqt -i -c cuj_and_test_config.yml
     ```
