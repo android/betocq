@@ -1892,12 +1892,54 @@ def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
   return device.build_info['hardware'] == 'cutf_cvm'
 
 
-def unlock_screen(device: android_device.AndroidDevice):
+def is_screen_locked(device: android_device.AndroidDevice) -> bool:
+  """Returns True if the screen is locked."""
+  try:
+    window_dumpsys = device.adb.shell(['dumpsys', 'window'])
+    window_dumpsys = window_dumpsys.decode('utf-8', errors='ignore')
+    if (
+        'mShowingLockscreen=true' in window_dumpsys
+        or 'mDreamingLockscreen=true' in window_dumpsys
+    ):
+      return True
+
+    window_policy = device.adb.shell(['dumpsys', 'window', 'policy'])
+    window_policy = window_policy.decode('utf-8', errors='ignore')
+    if 'showing=true' in window_policy:
+      return True
+
+    activity_dumpsys = device.adb.shell(['dumpsys', 'activity', 'top'])
+    activity_dumpsys = activity_dumpsys.decode('utf-8', errors='ignore')
+    if 'mKgShowing=true' in activity_dumpsys or 'Keyguard' in activity_dumpsys:
+      return True
+
+    return False
+  except Exception as e:  # pylint: disable=broad-except
+    device.log.warning('Failed to check if screen is locked: %s', e)
+    return False
+
+
+def unlock_screen(
+    device: android_device.AndroidDevice,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=10),
+):
   """Unlocks the screen on a device if locked."""
+  if not is_screen_locked(device):
+    device.log.info('Screen is already unlocked.')
+    return
+
+  device.log.info('Screen is locked. Attempting to unlock.')
   if is_cuttlefish(device):
     device.adb.shell('wm dismiss-keyguard')
   else:
     device.adb.shell('input keyevent KEYCODE_MENU')
+
+  if not wait_for_predicate(
+      lambda: not is_screen_locked(device),
+      timeout=timeout,
+      interval=datetime.timedelta(seconds=1),
+  ):
+    raise signals.TestFailure('Failed to unlock the device screen')
 
 
 def is_device_on(device: android_device.AndroidDevice) -> bool:
