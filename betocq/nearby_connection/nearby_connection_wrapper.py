@@ -79,21 +79,21 @@ class NearbyConnectionWrapper:
 
     self._advertiser_connection_lifecycle_callback: (
         callback_handler_v2.CallbackHandlerV2
-    ) = None
+    ) = None  # pyrefly: ignore[bad-assignment]
     self._discoverer_endpoint_discovery_callback: (
         callback_handler_v2.CallbackHandlerV2
-    ) = None
+    ) = None  # pyrefly: ignore[bad-assignment]
     self._discoverer_connection_lifecycle_callback: (
         callback_handler_v2.CallbackHandlerV2
-    ) = None
+    ) = None  # pyrefly: ignore[bad-assignment]
     self._advertiser_payload_callback: callback_handler_v2.CallbackHandlerV2 = (
-        None
+        None  # pyrefly: ignore[bad-assignment]
     )
     self._discoverer_payload_callback: callback_handler_v2.CallbackHandlerV2 = (
-        None
+        None  # pyrefly: ignore[bad-assignment]
     )
-    self._advertiser_endpoint_id: str = None
-    self._discoverer_endpoint_id: str = None
+    self._advertiser_endpoint_id: str = None  # pyrefly: ignore[bad-assignment]
+    self._discoverer_endpoint_id: str = None  # pyrefly: ignore[bad-assignment]
 
   def start_advertising(self) -> None:
     """Starts Nearby Connection advertising."""
@@ -344,10 +344,10 @@ class NearbyConnectionWrapper:
         )
 
     discoverer_connection_medium = constants.NearbyConnectionMedium(
-        discoverer_medium_connection_event.data['medium']
+        discoverer_medium_connection_event.data['medium']  # pyrefly: ignore[missing-attribute]
     )
     is_connection_medium_high_quality = (
-        discoverer_medium_connection_event.data['isHighBwQuality']
+        discoverer_medium_connection_event.data['isHighBwQuality']  # pyrefly: ignore[missing-attribute]
     )
 
     if discoverer_connection_medium == (
@@ -546,7 +546,7 @@ class NearbyConnectionWrapper:
     )
     # Start discovery.
     self.start_discovery(
-        timeout=timeouts.discovery_timeout,
+        timeout=timeouts.discovery_timeout,  # pyrefly: ignore[bad-argument-type]
         enable_target_discovery=enable_target_discovery,
     )
 
@@ -556,7 +556,7 @@ class NearbyConnectionWrapper:
     )
     self.request_connection(
         medium_upgrade_type=medium_upgrade_type,
-        timeout=timeouts.connection_init_timeout,
+        timeout=timeouts.connection_init_timeout,  # pyrefly: ignore[bad-argument-type]
         keep_alive_timeout_ms=keep_alive_timeout_ms,
         keep_alive_interval_ms=keep_alive_interval_ms,
     )
@@ -568,7 +568,7 @@ class NearbyConnectionWrapper:
     self.test_failure_reason = (
         constants.SingleTestFailureReason.TARGET_ACCEPT_CONNECTION
     )
-    self.accept_connection(timeout=timeouts.connection_result_timeout)
+    self.accept_connection(timeout=timeouts.connection_result_timeout)  # pyrefly: ignore[bad-argument-type]
 
     # Stop advertising.
     self.stop_advertising()

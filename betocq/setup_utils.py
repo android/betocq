@@ -419,7 +419,7 @@ def connect_to_wifi_sta_till_success(
   ad.log.info('Start connecting to wifi STA/AP')
   wifi_connect_start = datetime.datetime.now()
   if not wifi_password:
-    wifi_password = None
+    wifi_password = None  # pyrefly: ignore[bad-assignment]
   connect_to_wifi(
       ad, wifi_ssid, wifi_password, num_retries=_WIFI_CONNECT_RETRY_TIMES
   )
@@ -1257,7 +1257,7 @@ def load_nearby_snippet(
 
   ad.load_snippet(config.snippet_name, config.package_name)
   if not hasattr(ad, 'loaded_snippet_packages'):
-    ad.loaded_snippet_packages = set()
+    ad.loaded_snippet_packages = set()  # pyrefly: ignore[missing-attribute]
   ad.loaded_snippet_packages.add(config.package_name)
 
 
@@ -2133,7 +2133,7 @@ def betocq_repeat(
   """Decorator to wrap Mobly repeat and attach metadata for dynamic discovery."""
 
   def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-    func.expected_iterations = count
+    func.expected_iterations = count  # pyrefly: ignore[missing-attribute]
     return base_test.repeat(count, max_consecutive_error)(func)
 
   return decorator

@@ -131,7 +131,7 @@ class NcMetricsHelper(metrics_base.MetricsHelper):
           break
     else:
       concurrency_mode = constants.get_wifi_concurrency_mode_from_d2d_type(
-          d2d_type
+          d2d_type  # pyrefly: ignore[bad-argument-type]
       )
 
     metrics_collector.record(
@@ -275,7 +275,7 @@ class NcMetricsHelper(metrics_base.MetricsHelper):
           'wifi_concurrency_mode',
       ]
       return metrics_formatters.MoblyPropsFormatter(
-          custom_formatters=custom_formatters,
+          custom_formatters=custom_formatters,  # pyrefly: ignore[bad-argument-type]
           group_order=group_order,
           index_prefix=True,
           include_scenario_metrics=True,
