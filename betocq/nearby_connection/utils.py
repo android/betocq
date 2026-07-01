@@ -173,18 +173,18 @@ def check_wifi_ap_status_in_setup_class(
     )
     return
 
-  if not setup_utils.is_valid_wifi_2g_freq(freq_2g):
+  if not setup_utils.is_valid_wifi_2g_freq(freq_2g):  # pyrefly: ignore[bad-argument-type]
     _report_error(
         f'2G AP - {wifi_2g_ssid}, frequency - {freq_2g} is not valid. Set'
         ' the AP channel, reboot the AP and try again.'
     )
   if supports_5g:
-    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
+    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):  # pyrefly: ignore[bad-argument-type]
       _report_error(
           f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
           ' the AP channel, reboot the AP and try again.'
       )
-    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
+    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):  # pyrefly: ignore[bad-argument-type]
       _report_error(
           f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
           ' valid. Set the AP channel, reboot the AP and try again.'

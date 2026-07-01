@@ -41,7 +41,7 @@ _CUTTLEFISH_VIRTUALIZATION_TYPE = 6
 
 
 def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
-  ad.android_version = int(ad.adb.getprop('ro.build.version.release'))
+  ad.android_version = int(ad.adb.getprop('ro.build.version.release'))  # pyrefly: ignore[missing-attribute]
 
   if not os.path.isfile(_CONFIG_EXTERNAL_PATH):
     return
@@ -68,8 +68,8 @@ class BaseTestClass(base_test.BaseTestClass):
   def __init__(self, configs):
     super().__init__(configs)
     self.ads: list[android_device.AndroidDevice] = []
-    self.advertiser: android_device.AndroidDevice = None
-    self.discoverer: android_device.AndroidDevice = None
+    self.advertiser: android_device.AndroidDevice = None  # pyrefly: ignore[bad-assignment]
+    self.discoverer: android_device.AndroidDevice = None  # pyrefly: ignore[bad-assignment]
     self.test_parameters: constants.TestParameters = (
         constants.TestParameters.from_user_params(self.user_params)
     )
@@ -99,9 +99,9 @@ class BaseTestClass(base_test.BaseTestClass):
       )
     for ad in self.ads:
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
-        ad.role = ad.dimensions['role']
+        ad.role = ad.dimensions['role']  # pyrefly: ignore[missing-attribute]
       if self.is_using_gms_api:
-        ad.gms_info = constants.GmsInfo()
+        ad.gms_info = constants.GmsInfo()  # pyrefly: ignore[missing-attribute]
 
     utils.concurrent_exec(
         setup_utils.wait_for_device_root,
@@ -124,8 +124,8 @@ class BaseTestClass(base_test.BaseTestClass):
       self.advertiser, self.discoverer = self.ads
     # use the wifi chipset model from the test parameters if it is not empty.
     if self.test_parameters.wifi_chipset_model:
-      self.advertiser.wifi_chipset = self.test_parameters.wifi_chipset_model
-      self.discoverer.wifi_chipset = self.test_parameters.wifi_chipset_model
+      self.advertiser.wifi_chipset = self.test_parameters.wifi_chipset_model  # pyrefly: ignore[missing-attribute]
+      self.discoverer.wifi_chipset = self.test_parameters.wifi_chipset_model  # pyrefly: ignore[missing-attribute]
     self.advertiser.debug_tag = '{serial}({model})'.format(
         serial=self.advertiser.serial,
         model=self.advertiser.adb.getprop('ro.product.model'),

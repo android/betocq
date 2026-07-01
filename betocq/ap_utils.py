@@ -54,12 +54,12 @@ def start_wifi(
 
   if wifi_channel == constants.PROGRAMMABLE_AP_CHANNEL_2G:
     test_parameters.wifi_2g_ssid = ssid
-    test_parameters.wifi_2g_password = password
+    test_parameters.wifi_2g_password = password  # pyrefly: ignore[bad-assignment]
   elif wifi_channel == constants.PROGRAMMABLE_AP_CHANNEL_5G:
     test_parameters.wifi_5g_ssid = ssid
-    test_parameters.wifi_5g_password = password
+    test_parameters.wifi_5g_password = password  # pyrefly: ignore[bad-assignment]
   elif wifi_channel == constants.PROGRAMMABLE_AP_CHANNEL_5G_DFS:
     test_parameters.wifi_dfs_5g_ssid = ssid
-    test_parameters.wifi_dfs_5g_password = password
+    test_parameters.wifi_dfs_5g_password = password  # pyrefly: ignore[bad-assignment]
   else:
     raise ValueError(f'Unknown WiFi channel: {wifi_channel}')

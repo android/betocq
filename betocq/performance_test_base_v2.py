@@ -129,7 +129,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   def setup_class(self) -> None:
     self.metrics_manager = metrics.MetricsManager(
-        self.TAG, metric_registry=self._metric_registry
+        self.TAG, metric_registry=self._metric_registry  # pyrefly: ignore[bad-argument-type]
     )
     try:
       super().setup_class()
