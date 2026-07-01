@@ -196,8 +196,8 @@ def _wait_for_data_connected(
 ) -> bool:
   """Returns True if data is connected before timeout, False otherwise."""
   start_time = time.monotonic()
-  timeout = start_time + timeout.total_seconds()
-  while time.monotonic() < timeout:
+  timeout = start_time + timeout.total_seconds()  # pyrefly: ignore[bad-assignment]
+  while time.monotonic() < timeout:  # pyrefly: ignore[unsupported-operation]
     if _is_data_connected(ad):
       return True
   return False
