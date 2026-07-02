@@ -521,7 +521,11 @@ class PerformanceTestBase(base_test.BaseTestClass):
   @override
   def teardown_class(self) -> None:
     try:
-      self.metrics_manager.stop()
+      if getattr(self, 'metrics_manager', None) is None:
+        logging.info(
+            'metrics_manager is missing, returning early from teardown_class.'
+        )
+        return
 
       # Subclass hook to record dynamic teardown metadata
       if getattr(self, '_framework_setup_class_completed', False):
