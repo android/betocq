@@ -186,6 +186,10 @@ class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=True,
     )
+    # Skip WiFi environment check for AQT CUJ as it is checked later in the
+    # test.
+    if self.test_parameters.target_cuj_name != constants.TARGET_CUJ_AQT:
+      setup_utils.check_wifi_env(self.advertiser)
 
     self.supports_5g = setup_utils.is_5g_band_supported(
         self.advertiser
