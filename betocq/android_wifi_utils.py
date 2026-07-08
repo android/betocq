@@ -29,7 +29,7 @@ _WAIT_FOR_CONNECTION = datetime.timedelta(seconds=30)
 _SAVED_WIFI_LIST_PATTERN = re.compile(
     r'(?P<id>\d+)\s+(?P<ssid>.*)\s+(?P<security>.*)'
 )
-_SSID_PATTERN = re.compile(rb'Wifi is connected to "(?P<ssid>.*?)"')
+_SSID_PATTERN = re.compile(rb'Wifi is connected to "(?P<ssid>.*?)"\n')
 
 
 @dataclasses.dataclass(frozen=True)
