@@ -19,7 +19,7 @@ import dataclasses
 import datetime
 import enum
 import logging
-from typing import Any
+from typing import Any, Self
 
 from mobly import signals
 from mobly.controllers import android_device
@@ -170,7 +170,7 @@ class TestParameters:
   metrics_yaml_filename: str = ''
 
   @classmethod
-  def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
+  def from_user_params(cls, user_params: dict[str, Any]) -> Self:
     """convert the parameters from the testbed to the test parameter."""
 
     # Convert G3 user int parameter in str format to int.
