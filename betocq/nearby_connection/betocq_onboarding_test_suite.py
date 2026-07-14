@@ -26,34 +26,24 @@ from mobly import suite_runner
 
 from betocq import constants
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
-from betocq.nearby_connection.compound_tests import mcc_5g_all_wifi_non_dbs_2g_sta_test
-from betocq.nearby_connection.compound_tests import scc_2g_all_wifi_sta_test
-from betocq.nearby_connection.compound_tests import scc_5g_all_wifi_dbs_2g_sta_test
-from betocq.nearby_connection.compound_tests import scc_5g_all_wifi_sta_test
 from betocq.nearby_connection.directed_tests import ble_performance_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
-from betocq.nearby_connection.directed_tests import mcc_2g_wfd_ww_5g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_5g_hotspot_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_aware_sta_test
-from betocq.nearby_connection.directed_tests import scc_2g_wfd_sta_test
-from betocq.nearby_connection.directed_tests import scc_2g_wlan_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_aware_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test
-from betocq.nearby_connection.directed_tests import scc_dfs_5g_hotspot_sta_test
 from betocq.nearby_connection.directed_tests import scc_dfs_5g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_indoor_5g_wfd_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
-
 
 _SUITE_NAME = 'NC'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '2'
+_SUITE_VERSION = '3'
 # LINT.ThenChange()
 
 
@@ -74,17 +64,13 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     self.add_test_class(beto_cq_function_group_test.BetoCqFunctionGroupTest)
 
     # Directed test cases:
+    self.add_test_class(ble_performance_test.BlePerformanceTest)
     self.add_test_class(bt_performance_test.BtPerformanceTest)
-    self.add_test_class(mcc_5g_hotspot_dfs_5g_sta_test.Mcc5gHotspotDfs5gStaTest)
     self.add_test_class(mcc_5g_wfd_dfs_5g_sta_test.Mcc5gWfdDfs5gStaTest)
     self.add_test_class(mcc_5g_wfd_non_dbs_2g_sta_test.Mcc5gWfdNonDbs2gStaTest)
-    self.add_test_class(scc_2g_wfd_sta_test.Scc2gWfdStaTest)
-    self.add_test_class(scc_2g_wlan_sta_test.Scc2gWlanStaTest)
     self.add_test_class(scc_5g_wfd_dbs_2g_sta_test.Scc5gWfdDbs2gStaTest)
-    self.add_test_class(mcc_2g_wfd_ww_5g_sta_test.Mcc2gWfdWw5gStaTest)
     self.add_test_class(scc_5g_wfd_sta_test.Scc5gWfdStaTest)
     self.add_test_class(scc_5g_wlan_sta_test.Scc5gWifiLanStaTest)
-    self.add_test_class(scc_dfs_5g_hotspot_sta_test.SccDfs5gHotspotStaTest)
     self.add_test_class(scc_dfs_5g_wfd_sta_test.SccDfs5gWfdStaTest)
     self.add_test_class(scc_indoor_5g_wfd_sta_test.SccIndoor5gWfdStaTest)
     # Optional Aware test cases that will be run only when explicitly selected:
@@ -92,20 +78,8 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
       self.add_test_class(scc_5g_aware_sta_test.Scc5gAwareStaTest)
       self.add_test_class(mcc_aware_sta_test.MccAwareStaTest)
 
-    # Optional BLE test cases that will be run only when explicitly selected:
-    if test_parameters.run_ble_performance_test:
-      self.add_test_class(ble_performance_test.BlePerformanceTest)
-
     # Compound test cases:
     self.add_test_class(bt_2g_wifi_coex_test.Bt2gWifiCoexTest)
-    self.add_test_class(
-        mcc_5g_all_wifi_non_dbs_2g_sta_test.Mcc5gAllWifiNonDbs2gStaTest
-    )
-    self.add_test_class(scc_2g_all_wifi_sta_test.Scc2gAllWifiStaTest)
-    self.add_test_class(
-        scc_5g_all_wifi_dbs_2g_sta_test.Scc5gAllWifiDbs2gStaTest
-    )
-    self.add_test_class(scc_5g_all_wifi_sta_test.Scc5gAllWifiStaTest)
 
 
 # LINT.ThenChange(:suite_version)
