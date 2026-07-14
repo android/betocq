@@ -63,6 +63,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
   """Base test class for nearby connection E2E performance tests."""
 
   metrics_helper_class = metrics.MetricsHelper
+  script_version: str = version.TEST_SCRIPT_VERSION
 
   # Configuration parameters
 
@@ -167,7 +168,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
       # Record basic class level info
       self.metrics_manager.class_metrics.record(
           'test_script_version',
-          version.TEST_SCRIPT_VERSION,
+          self.script_version,
       )
       self.metrics_manager.class_metrics.record('test_result', 'UNINITIALIZED')
 
