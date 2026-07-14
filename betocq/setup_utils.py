@@ -1988,8 +1988,17 @@ def verify_wfd_ip_setup(
     out = device.adb.shell('ip addr show')
     if isinstance(out, bytes):
       out = out.decode('utf-8')
-    p2p_lines = [line for line in out.splitlines() if 'p2p' in line]
-    has_wfd_ip = any('inet ' in line for line in p2p_lines)
+    in_p2p_interface = False
+    has_wfd_ip = False
+    p2p_lines = []
+    for line in out.splitlines():
+      is_header = '<' in line and '>' in line
+      if is_header:
+        in_p2p_interface = 'p2p' in line
+      if in_p2p_interface:
+        p2p_lines.append(line)
+        if 'inet ' in line or 'inet6 ' in line:
+          has_wfd_ip = True
 
     if has_wfd_ip == expected_state:
       device.log.info('p2p interface lines: %s', p2p_lines)
