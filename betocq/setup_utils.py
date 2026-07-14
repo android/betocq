@@ -638,6 +638,7 @@ def restart_gms(ad: android_device.AndroidDevice) -> None:
       ' in the test.'
   )
   ad.adb.shell('am force-stop com.google.android.gms')
+  time.sleep(5)
 
 
 def disable_gms_auto_updates(ad: android_device.AndroidDevice) -> None:
