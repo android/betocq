@@ -144,7 +144,6 @@ class TestParameters:
 
   # Optional test cases disabled by default.
   run_aware_test: bool = False
-  run_ble_performance_test: bool = False
   requires_bt_multiplex: bool = False
   allow_unrooted_device: bool = False
   do_nc_wlan_file_transfer_test: bool = True
