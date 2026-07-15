@@ -2060,31 +2060,21 @@ def has_wifi_aware_feature(ad: android_device.AndroidDevice) -> bool:
     return False
 
 
-def toggle_off_on_bluetooth(
-    ads: list[android_device.AndroidDevice],
-) -> None:
-  """Resets Bluetooth on the given devices."""
-  for ad in ads:
-    ad.log.info('Resetting BLE (turning off and on)')
-    try:
-      ad.adb.shell('svc bluetooth disable')
-    except adb.AdbError as e:
-      ad.log.warning('Failed to disable bluetooth via svc: %s', e)
-  time.sleep(2)
+def enable_ble_for_devices(ads: list[android_device.AndroidDevice]) -> None:
+  """Enables BLE on the given devices."""
   for ad in ads:
     ad.log.info('Turning on BLE')
     try:
       ad.adb.shell('svc bluetooth enable')
     except adb.AdbError as e:
       ad.log.warning('Failed to enable bluetooth via svc: %s', e)
-  time.sleep(3)
 
 
-def reset_wifi_and_bluetooth_for_devices(
+def reset_wifi_and_enable_ble_for_devices(
     ads: list[android_device.AndroidDevice],
 ) -> None:
-  """Resets Bluetooth and WiFi (turns off, turns on, and disconnects networks) for the given devices."""
-  toggle_off_on_bluetooth(ads)
+  """Enables BLE and resets WiFi (turns off, turns on, and disconnects networks) for the given devices."""
+  enable_ble_for_devices(ads)
   for ad in ads:
     ad.log.info('Turning off WiFi')
     try:
