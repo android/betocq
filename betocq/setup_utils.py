@@ -1926,7 +1926,8 @@ def unlock_screen(
 ):
   """Unlocks the screen on a device if locked."""
   if not is_screen_locked(device):
-    device.log.info('Screen is already unlocked.')
+    device.log.info('Screen is already unlocked. Resetting inactivity timer.')
+    device.adb.shell('input keyevent KEYCODE_WAKEUP')
     return
 
   device.log.info('Screen is locked. Attempting to unlock.')
