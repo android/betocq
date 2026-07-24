@@ -15,6 +15,7 @@
 """Base test class for Nearby Connection performance tests with legacy metrics."""
 
 from collections.abc import Mapping
+import logging
 
 from typing_extensions import override
 
@@ -76,12 +77,14 @@ class NcMetricsHelper(metrics_base.MetricsHelper):
     if (
         wifi_env_bssid_count := device_specific_info.get('wifi_env_bssid_count')
     ) is not None:
-      wifi_ap_number = 0
-      if (
-          isinstance(wifi_env_bssid_count, str)
-          and wifi_env_bssid_count.isdigit()
-      ):
+      try:
         wifi_ap_number = int(wifi_env_bssid_count)
+      except (ValueError, TypeError):
+        wifi_ap_number = 0
+        logging.warning(
+            'Failed to convert wifi_env_bssid_count to int: %s',
+            wifi_env_bssid_count,
+        )
       class_metrics.record(
           'wifi_ap_number',
           wifi_ap_number,
