@@ -26,7 +26,6 @@ from mobly import suite_runner
 
 from betocq import constants
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
-from betocq.nearby_connection.directed_tests import ble_performance_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
@@ -64,7 +63,6 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     self.add_test_class(beto_cq_function_group_test.BetoCqFunctionGroupTest)
 
     # Directed test cases:
-    self.add_test_class(ble_performance_test.BlePerformanceTest)
     self.add_test_class(bt_performance_test.BtPerformanceTest)
     self.add_test_class(mcc_5g_wfd_dfs_5g_sta_test.Mcc5gWfdDfs5gStaTest)
     self.add_test_class(mcc_5g_wfd_non_dbs_2g_sta_test.Mcc5gWfdNonDbs2gStaTest)
