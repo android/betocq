@@ -53,6 +53,8 @@ def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
       ad.log.warning(f'{ad} Model {ad.model} is not supported in config file')
       return
     for key, value in rule.items():
+      if key == 'wifi_chipset' and isinstance(value, str):
+        value = value.upper()
       ad.log.debug('Setting capability %s to %s', repr(key), repr(value))
       setattr(ad, key, value)
 
@@ -97,7 +99,9 @@ class BaseTestClass(base_test.BaseTestClass):
           abort_all=not self.test_parameters.run_all_tests_in_suite,
           error_class=constants.DeviceRegistrationError,
       )
+
     for ad in self.ads:
+      self._log_class_start_on_device(ad)
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']  # pyrefly: ignore[missing-attribute]
       if self.is_using_gms_api:
@@ -124,8 +128,16 @@ class BaseTestClass(base_test.BaseTestClass):
       self.advertiser, self.discoverer = self.ads
     # use the wifi chipset model from the test parameters if it is not empty.
     if self.test_parameters.wifi_chipset_model:
-      self.advertiser.wifi_chipset = self.test_parameters.wifi_chipset_model  # pyrefly: ignore[missing-attribute]
-      self.discoverer.wifi_chipset = self.test_parameters.wifi_chipset_model  # pyrefly: ignore[missing-attribute]
+      setattr(
+          self.advertiser,
+          'wifi_chipset',
+          self.test_parameters.wifi_chipset_model.upper(),
+      )
+      setattr(
+          self.discoverer,
+          'wifi_chipset',
+          self.test_parameters.wifi_chipset_model.upper(),
+      )
     self.advertiser.debug_tag = '{serial}({model})'.format(
         serial=self.advertiser.serial,
         model=self.advertiser.adb.getprop('ro.product.model'),
@@ -170,7 +182,9 @@ class BaseTestClass(base_test.BaseTestClass):
       )
     if self.test_parameters.is_wifi_chipset_model_mandatory:
       if not self.test_parameters.wifi_chipset_model:
-        if not self.advertiser.wifi_chipset or not self.discoverer.wifi_chipset:
+        if not getattr(self.advertiser, 'wifi_chipset', '') or not getattr(
+            self.discoverer, 'wifi_chipset', ''
+        ):
           setup_utils.report_error_on_setup_class(
               self,
               'wifi_chipset is empty in the config file',
@@ -264,6 +278,20 @@ class BaseTestClass(base_test.BaseTestClass):
         f'TEST END: {self.current_test_info.name}',
     )
 
+  def _log_class_start_on_device(
+      self, ad: android_device.AndroidDevice
+  ) -> None:
+    setup_utils.log_message_to_logcat(
+        ad,
+        f'CLASS START: {self.__class__.__name__}',
+    )
+
+  def _log_class_end_on_device(self, ad: android_device.AndroidDevice) -> None:
+    setup_utils.log_message_to_logcat(
+        ad,
+        f'CLASS END: {self.__class__.__name__}',
+    )
+
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
     # run it before clear_hermetic_overrides to make sure the GMS restart will
@@ -298,6 +326,8 @@ class BaseTestClass(base_test.BaseTestClass):
           raise_on_exception=True,
       )
     finally:
+      for ad in self.ads:
+        self._log_class_end_on_device(ad)
       super().teardown_class()
 
   def on_fail(self, record: records.TestResultRecord) -> None:
