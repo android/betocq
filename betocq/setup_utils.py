@@ -70,8 +70,6 @@ NEARBY_LOG_TAGS = [
     'NearbySetup',
 ]
 
-_UNKNOWN_BT_FIRMWARE_VERSION = 'unknown'
-
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
         ([0-9a-f:]{17})  # Captures BSSID
@@ -1744,108 +1742,6 @@ def get_wifi_firmware_version(
   return version
 
 
-def get_bt_firmware_version(
-    ad: android_device.AndroidDevice,
-) -> str:
-  """Gets the BT firmware version on the given device."""
-  try:
-    bt_dumpsys_output = (
-        ad.adb.shell('dumpsys android.hardware.bluetooth.IBluetoothHci/default')
-        .strip()
-        .decode('utf-8')
-    )
-  except (adb.AdbError, ValueError):
-    ad.log.warning(
-        'Failed to get BT firmware version on device %r.',
-        ad.serial,
-        exc_info=True,
-    )
-    return _UNKNOWN_BT_FIRMWARE_VERSION
-
-  if not bt_dumpsys_output:
-    ad.log.warning(
-        'BT IBluetoothHci dumpsys output is empty on device %r.',
-        ad.serial,
-    )
-    return _UNKNOWN_BT_FIRMWARE_VERSION
-
-  try:
-    version = _extract_bt_firmware_version(ad, bt_dumpsys_output)
-  except (TypeError, ValueError):
-    ad.log.warning(
-        'Failed to extract BT firmware version on device %r.',
-        ad.serial,
-        exc_info=True,
-    )
-    return _UNKNOWN_BT_FIRMWARE_VERSION
-  return version
-
-
-def _extract_bt_firmware_version(
-    ad: android_device.AndroidDevice, bt_dumpsys_output: str
-) -> str:
-  """Extracts Bluetooth controller firmware version from dumpsys output.
-
-  Args:
-    ad: AndroidDevice, Mobly Android Device.
-    bt_dumpsys_output: A string containing the output from the dumpsys BT
-      command.
-
-  Returns:
-      A string containing the firmware version, or None if not found.
-  """
-  lines = bt_dumpsys_output.splitlines()
-  header_keywords = [
-      'Firmware Version',
-      'Firmware Information',
-      'Firmware Info',
-      'Firmware Ver',
-      'FW Version',
-      'FW Information',
-      'FW Info',
-      'FW Ver',
-  ]
-
-  for i, line in enumerate(lines):
-    line_lower = line.lower()
-    for lower_keyword in [keyword.lower() for keyword in header_keywords]:
-      if lower_keyword in line_lower:
-        # The firmware version is expected on the next non-empty line
-        # after the header and its separator line.
-        for j in range(i + 1, len(lines)):
-          next_line = lines[j].strip()
-          if not next_line:  # Skip empty lines
-            continue
-
-          # Skip separator lines
-          if (
-              '====' in next_line
-              or '----' in next_line
-              or '****' in next_line
-              or '════' in next_line
-              or next_line.startswith('╠══')
-          ):
-            ad.log.info('Skip separator line: %s', next_line)
-            continue
-
-          # Attempt to extract the version string
-          # Remove potential leading characters like '║' and extra spaces
-          match = re.search(r'^(?:║\s*)?(?P<version>.+)$', next_line)
-          if match:
-            version = match.group('version').strip()
-            ad.log.info('version: %s', version)
-            # Basic check to ensure it looks like a version string
-            if (
-                'FW' in version
-                or 'Firmware' in version
-                or re.search(r'[0-9a-fA-F]{6,}', version)
-            ):
-              return version
-          break  # Stop searching after checking the line(s) below the header
-        break  # Move to the next line in the dumpsys output
-  return _UNKNOWN_BT_FIRMWARE_VERSION
-
-
 def disable_package_verifiers(ad: android_device.AndroidDevice):
   """Disables package verifier and Play Protect for ADB installs."""
   try:
@@ -2106,9 +2002,6 @@ def get_device_attributes(ad: android_device.AndroidDevice) -> str:
   wifi_fw = device_specific_info.get('wifi_fw', '')
   if not wifi_fw:
     wifi_fw = get_wifi_firmware_version(ad)
-  bt_fw = device_specific_info.get('bt_fw', '')
-  if not bt_fw:
-    bt_fw = get_bt_firmware_version(ad)
 
   return '\n'.join((
       f'serial: {getattr(ad, "serial", "NA")}',
@@ -2120,7 +2013,6 @@ def get_device_attributes(ad: android_device.AndroidDevice) -> str:
       f'gms_version: {dump_gms_version(ad)}',
       f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
       f'wifi_fw: {wifi_fw}',
-      f'bt_fw: {bt_fw}',
       f'support_aware: {is_wifi_aware_available(ad)}',
       f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
       (

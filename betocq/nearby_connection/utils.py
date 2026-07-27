@@ -254,7 +254,6 @@ def setup_android_device_for_nc_tests(
       ad.nearby.wifiEnable()
     setup_utils.reset_nearby_connection(ad)
     device_specific_dict['wifi_fw'] = setup_utils.get_wifi_firmware_version(ad)
-    device_specific_dict['bt_fw'] = setup_utils.get_bt_firmware_version(ad)
     device_specific_dict['one_time_setup_done'] = True
 
   if country_code != device_specific_dict.get('wifi_country_code', ''):
