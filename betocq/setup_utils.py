@@ -93,6 +93,10 @@ def get_betocq_device_specific_info(
     ad: android_device.AndroidDevice,
 ) -> dict[str, Any]:
   """Gets the device specific info from the class attribute."""
+  if ad is None:
+    raise ValueError(
+        'AndroidDevice instance is None; device lost or not initialized.'
+    )
   # Check if the class attribute exists. If not, create it as an empty dict.
   if not hasattr(android_device.AndroidDevice, 'betocq_customized_device_info'):
     setattr(android_device.AndroidDevice, 'betocq_customized_device_info', {})

@@ -197,6 +197,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   @override
   def setup_test(self) -> None:
+    if self.current_test_info is None:
+      raise ValueError('current_test_info is None')
     scenario_name = self.current_test_info.name
     # Strip Mobly repeat suffix if present
     parts = scenario_name.rsplit('_', 1)
@@ -702,8 +704,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
     """Safely attempts to record class setup metadata, warning on failure."""
     try:
       self.metrics_helper.record_class_setup_metadata(class_metrics)
-    except Exception:  # pylint: disable=broad-except
-      logging.warning('Failed to record class setup metadata.', exc_info=True)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.warning('Failed to record class setup metadata: %s', e)
 
   def _try_record_class_teardown_metadata(
       self, class_metrics: metrics.MetricsCollector
@@ -711,8 +713,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
     """Safely attempts to record class teardown metadata, warning on failure."""
     try:
       self.metrics_helper.record_class_teardown_metadata(class_metrics)
-    except Exception:  # pylint: disable=broad-except
-      logging.warning('Failed to record teardown metadata.', exc_info=True)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.warning('Failed to record teardown metadata: %s', e)
 
 
 class FunctionTestBase(PerformanceTestBase):
