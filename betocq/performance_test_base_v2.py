@@ -197,7 +197,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   @override
   def setup_test(self) -> None:
-    scenario_name = self.current_test_info.name  # pytype: disable=attribute-error
+    scenario_name = self.current_test_info.name
     # Strip Mobly repeat suffix if present
     parts = scenario_name.rsplit('_', 1)
     base_scenario_name = scenario_name

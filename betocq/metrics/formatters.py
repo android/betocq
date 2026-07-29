@@ -97,7 +97,7 @@ class CrossPlatformFileLock:
           self.fd = open(self.lockfile, 'a')
         if os.name == 'nt':
           self.fd.seek(0)
-          msvcrt.locking(self.fd.fileno(), msvcrt.LK_NBLCK, 1)  # pytype: disable=module-attr
+          msvcrt.locking(self.fd.fileno(), msvcrt.LK_NBLCK, 1)
         else:
           fcntl.flock(self.fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         return self
@@ -119,7 +119,7 @@ class CrossPlatformFileLock:
       try:
         if os.name == 'nt':
           self.fd.seek(0)
-          msvcrt.locking(self.fd.fileno(), msvcrt.LK_UNLCK, 1)  # pytype: disable=module-attr
+          msvcrt.locking(self.fd.fileno(), msvcrt.LK_UNLCK, 1)
         else:
           fcntl.flock(self.fd.fileno(), fcntl.LOCK_UN)
       except (IOError, OSError):
