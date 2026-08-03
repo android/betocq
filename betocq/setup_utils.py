@@ -2006,13 +2006,15 @@ def get_device_attributes(ad: android_device.AndroidDevice) -> str:
   if not wifi_fw:
     wifi_fw = get_wifi_firmware_version(ad)
 
+  if not hasattr(ad, 'android_version'):
+    setattr(
+        ad, 'android_version', int(ad.adb.getprop('ro.build.version.release'))
+    )
   return '\n'.join((
       f'serial: {getattr(ad, "serial", "NA")}',
       f'model: {getattr(ad, "model", "NA")}',
-      (
-          f'android_version: {getattr(ad, "android_version", "NA")}\n'
-          f'build_info: {getattr(ad, "build_info", "NA")}'
-      ),
+      f'android_version: {ad.android_version}',
+      f'build_info: {getattr(ad, "build_info", "NA")}',
       f'gms_version: {dump_gms_version(ad)}',
       f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
       f'wifi_fw: {wifi_fw}',
