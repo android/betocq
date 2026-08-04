@@ -854,7 +854,7 @@ class NcTestRuntime:
   discoverer: android_device.AndroidDevice
   upgrade_medium_under_test: NearbyMedium
   connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
-  country_code: str = 'US'
+  country_code: str = ''
   is_dbs_mode: bool = False
   advertising_discovery_medium: NearbyMedium = NearbyMedium.BLE_ONLY
   wifi_info: WifiInfo | None = None

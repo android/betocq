@@ -221,7 +221,7 @@ def get_nearby2_snippet_config(
 def setup_android_device_for_nc_tests(
     ad: android_device.AndroidDevice,
     snippet_confs: Sequence[constants.SnippetConfig],
-    country_code: str,
+    country_code: str = '',
     skip_flag_override: bool = False,
 ) -> None:
   """Performs general Android device setup steps for NC tests."""
@@ -256,7 +256,9 @@ def setup_android_device_for_nc_tests(
     device_specific_dict['wifi_fw'] = setup_utils.get_wifi_firmware_version(ad)
     device_specific_dict['one_time_setup_done'] = True
 
-  if country_code != device_specific_dict.get('wifi_country_code', ''):
+  if country_code and country_code != device_specific_dict.get(
+      'wifi_country_code', ''
+  ):
     setup_utils.set_country_code(ad, country_code)
     device_specific_dict['wifi_country_code'] = country_code
 

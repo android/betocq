@@ -195,7 +195,7 @@ class BaseTestClass(base_test.BaseTestClass):
     """Asserts the test conditions for all devices."""
 
   def setup_wifi_env(
-      self, d2d_type: constants.WifiD2DType, country_code: str
+      self, d2d_type: constants.WifiD2DType, country_code: str = ''
   ):
     """Sets up the WiFi environment with given d2d type and country code.
 
@@ -208,6 +208,9 @@ class BaseTestClass(base_test.BaseTestClass):
       d2d_type: The Wi-Fi D2D type.
       country_code: The country code of the test.
     """
+    if not country_code:
+      country_code = 'US'
+
     if d2d_type == constants.WifiD2DType.MCC_5G_AND_5G_DFS_STA and (
         self.test_parameters.use_programmable_ap
         or self.test_parameters.use_sniffer
