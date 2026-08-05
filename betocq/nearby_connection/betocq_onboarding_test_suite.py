@@ -29,8 +29,7 @@ from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_dfs_5g_sta_test
 from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
-from betocq.nearby_connection.directed_tests import mcc_aware_sta_test
-from betocq.nearby_connection.directed_tests import scc_5g_aware_sta_test
+
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test
@@ -42,7 +41,7 @@ _SUITE_NAME = 'NC'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '3'
+_SUITE_VERSION = '4'
 # LINT.ThenChange()
 
 
@@ -54,10 +53,6 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     """Add all BetoCQ tests to the suite."""
     self.user_params['suite_name'] = _SUITE_NAME
     self.user_params['suite_version'] = _SUITE_VERSION
-
-    test_parameters = constants.TestParameters.from_user_params(
-        config.user_params
-    )
 
     # Function tests cases.
     self.add_test_class(beto_cq_function_group_test.BetoCqFunctionGroupTest)
@@ -71,10 +66,6 @@ class BetoCqPerformanceTestSuite(base_suite.BaseSuite):
     self.add_test_class(scc_5g_wlan_sta_test.Scc5gWifiLanStaTest)
     self.add_test_class(scc_dfs_5g_wfd_sta_test.SccDfs5gWfdStaTest)
     self.add_test_class(scc_indoor_5g_wfd_sta_test.SccIndoor5gWfdStaTest)
-    # Optional Aware test cases that will be run only when explicitly selected:
-    if test_parameters.run_aware_test:
-      self.add_test_class(scc_5g_aware_sta_test.Scc5gAwareStaTest)
-      self.add_test_class(mcc_aware_sta_test.MccAwareStaTest)
 
     # Compound test cases:
     self.add_test_class(bt_2g_wifi_coex_test.Bt2gWifiCoexTest)
