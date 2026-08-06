@@ -454,6 +454,7 @@ class BaseTestClass(base_test.BaseTestClass):
         self.advertiser.model,
     ]
     run_identifier = '-'.join(run_identifier_items)
+    self.user_params['combined_suite_name'] = suite_name
     self.record_data({
         'properties': {
             'suite_name': f'[{suite_name}]',
