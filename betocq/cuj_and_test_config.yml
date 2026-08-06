@@ -78,6 +78,7 @@ TestBeds:
       skip_bug_report: True
       abort_all_if_any_ap_not_ready: True
       skip_default_flag_override: False
+      metrics_json_filename: "GtsBetocqAqtTests.reportlog.json"
 - Name: AqtDebug
   # Don't change the following parameters, otherwise the test may fail.
   # This testbed is for debugging purpose only.
@@ -89,7 +90,9 @@ TestBeds:
       skip_bug_report: False
       abort_all_if_any_ap_not_ready: True
       skip_default_flag_override: False
+      metrics_json_filename: "GtsBetocqAqtTests.reportlog.json"
 - Name: LocalDev
   <<: *non_specified_controllers
   TestParams:
       <<: *test-params
+      local_test: True
