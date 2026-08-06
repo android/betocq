@@ -29,7 +29,7 @@ _WAIT_FOR_CONNECTION = datetime.timedelta(seconds=30)
 _SAVED_WIFI_LIST_PATTERN = re.compile(
     r'(?P<id>\d+)\s+(?P<ssid>.*)\s+(?P<security>.*)'
 )
-_SSID_PATTERN = re.compile(rb'Wifi is connected to "(?P<ssid>.*?)"')
+_SSID_PATTERN = re.compile(rb'Wifi is connected to "(?P<ssid>.*?)"\n')
 
 
 @dataclasses.dataclass(frozen=True)
@@ -196,8 +196,8 @@ def _wait_for_data_connected(
 ) -> bool:
   """Returns True if data is connected before timeout, False otherwise."""
   start_time = time.monotonic()
-  timeout = start_time + timeout.total_seconds()
-  while time.monotonic() < timeout:
+  timeout = start_time + timeout.total_seconds()  # pyrefly: ignore[bad-assignment]
+  while time.monotonic() < timeout:  # pyrefly: ignore[unsupported-operation]
     if _is_data_connected(ad):
       return True
   return False

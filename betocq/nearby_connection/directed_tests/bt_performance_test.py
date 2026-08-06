@@ -90,7 +90,6 @@ class BtPerformanceTest(nc_performance_test_base.NcPerformanceTestBase):
         discoverer=self.discoverer,
         connection_medium=constants.NearbyMedium.BT_ONLY,
         upgrade_medium_under_test=constants.NearbyMedium.BT_ONLY,
-        country_code='US',
         wifi_info=None,
     )
 

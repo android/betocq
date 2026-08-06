@@ -21,6 +21,7 @@ from collections import abc
 from collections.abc import Mapping, Sequence
 import contextlib
 import datetime
+import enum
 import json
 import logging
 import os
@@ -80,6 +81,46 @@ def _get_base_scenario_name(name: str) -> str:
   return name
 
 
+def _bucket_metrics(metrics: dict[str, Any]) -> dict[str, Any]:
+  """Buckets metrics into numeric, boolean, and text types."""
+  numeric_metrics = {}
+  boolean_metrics = {}
+  text_metrics = {}
+  for k, v in metrics.items():
+    if isinstance(v, bool):
+      boolean_metrics[k] = v
+    elif isinstance(v, enum.Enum):
+      text_metrics[k] = v.name
+    elif isinstance(v, (int, float)):
+      if 'throughput' in k and '_kbps' in k:
+        # Note: BeToCQ historically uses '_kbps' to denote Kilobytes per second
+        # (KB/s). We convert to MegaBytes per second (MBps).
+        new_key = k.replace('_kbps', '_mbps')
+        numeric_metrics[new_key] = float(v) / 1024.0
+      else:
+        numeric_metrics[k] = float(v)
+    else:
+      text_metrics[k] = str(v)
+  return {
+      'numeric_metrics': numeric_metrics,
+      'boolean_metrics': boolean_metrics,
+      'text_metrics': text_metrics,
+  }
+
+
+def _flatten_aggregated_data(agg_data: dict[str, Any]) -> dict[str, Any]:
+  """Flattens nested dictionary from aggregators."""
+  flattened = {}
+  for k, v in agg_data.items():
+    if isinstance(v, dict):
+      for sub_k, sub_v in v.items():
+        suffix = 'med' if sub_k == 'median' else sub_k
+        flattened[f'{k}_{suffix}'] = sub_v
+    else:
+      flattened[k] = v
+  return flattened
+
+
 class CrossPlatformFileLock:
   """Atomic file locking supported across Linux, Mac, and Windows."""
 
@@ -97,7 +138,7 @@ class CrossPlatformFileLock:
           self.fd = open(self.lockfile, 'a')
         if os.name == 'nt':
           self.fd.seek(0)
-          msvcrt.locking(self.fd.fileno(), msvcrt.LK_NBLCK, 1)  # pytype: disable=module-attr
+          msvcrt.locking(self.fd.fileno(), msvcrt.LK_NBLCK, 1)  # pyrefly: ignore[missing-attribute, unbound-name]
         else:
           fcntl.flock(self.fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
         return self
@@ -119,7 +160,7 @@ class CrossPlatformFileLock:
       try:
         if os.name == 'nt':
           self.fd.seek(0)
-          msvcrt.locking(self.fd.fileno(), msvcrt.LK_UNLCK, 1)  # pytype: disable=module-attr
+          msvcrt.locking(self.fd.fileno(), msvcrt.LK_UNLCK, 1)  # pyrefly: ignore[missing-attribute, unbound-name]
         else:
           fcntl.flock(self.fd.fileno(), fcntl.LOCK_UN)
       except (IOError, OSError):
@@ -135,7 +176,7 @@ class CrossPlatformFileLock:
 def _locked_update_file(
     file_path: str,
     update_key: str,
-    update_data: dict[str, Any],
+    update_data: Any,
     *,
     is_yaml: bool,
 ) -> None:
@@ -158,7 +199,14 @@ def _locked_update_file(
       )
 
     global_dict = global_dict or {}
-    global_dict[update_key] = update_data
+    if (
+        update_key in global_dict
+        and isinstance(global_dict[update_key], dict)
+        and isinstance(update_data, dict)
+    ):
+      global_dict[update_key].update(update_data)
+    else:
+      global_dict[update_key] = update_data
 
     tmp_file = file_path + '.tmp'
     try:
@@ -190,8 +238,46 @@ def export_manager_to_files(
     json_file_path = os.path.join(global_log_path, json_filename)
     logging.info('Writing global JSON metrics to %s', json_file_path)
     _locked_update_file(
-        json_file_path, manager.test_class_tag, current_dict, is_yaml=False
+        json_file_path,
+        'test_classes',
+        {manager.test_class_tag: current_dict},
+        is_yaml=False,
     )
+
+    # Also set top level fields if available in user_params
+    result_store_link = user_params.get('result_store_link', 'PLACEHOLDER')
+    _locked_update_file(
+        json_file_path, 'result_store_link', result_store_link, is_yaml=False
+    )
+
+    combined_suite_name = user_params.get('combined_suite_name')
+    if combined_suite_name:
+      _locked_update_file(
+          json_file_path, 'suite_name', str(combined_suite_name), is_yaml=False
+      )
+
+    test_script_version = user_params.get('test_script_version')
+    if not test_script_version:
+      # Try to get from manager
+      ver_metric = manager.class_metrics.get('test_script_version')
+      if ver_metric:
+        test_script_version = ver_metric.value
+    if test_script_version:
+      _locked_update_file(
+          json_file_path,
+          'test_script_version',
+          str(test_script_version),
+          is_yaml=False,
+      )
+
+    wifi_chipset_metric = manager.class_metrics.get('target_wifi_chipset')
+    if wifi_chipset_metric:
+      _locked_update_file(
+          json_file_path,
+          'wifi_chipset',
+          str(wifi_chipset_metric.value),
+          is_yaml=False,
+      )
 
   yaml_filename = user_params.get('metrics_yaml_filename')
   if yaml_filename and isinstance(yaml_filename, str):
@@ -265,17 +351,34 @@ class JsonFormatter(MetricsFormatter):
 
     scenarios = {}
     for scenario_name, agg_data in aggregated.items():
+      # Flatten aggregated data
+      flattened_agg = _flatten_aggregated_data(agg_data)
+
+      bucketed_agg = _bucket_metrics(flattened_agg)
+
+      # Extract hero metric (already converted to MBps by _bucket_metrics)
+      hero_metric_val_mbps = bucketed_agg['numeric_metrics'].get(
+          'file_transfer_throughput_mbps_med'
+      )
+      if hero_metric_val_mbps is None:
+        hero_metric_val_mbps = bucketed_agg['numeric_metrics'].get(
+            'file_transfer_throughput_med'
+        )
+
       scenario_iters = []
       for col in manager.iteration_collectors:
         if col.scenario_name == scenario_name:
+          iter_metrics = {
+              k: m.value
+              for k, m in col.metrics.items()
+              if m.aggregator != aggregators.AggregatorType.EXCLUDE_ALL
+          }
+          bucketed_iter = _bucket_metrics(iter_metrics)
           scenario_iters.append({
               'test_name': col.test_name,
-              'metrics': {
-                  k: m.value
-                  for k, m in col.metrics.items()
-                  if m.aggregator != aggregators.AggregatorType.EXCLUDE_ALL
-              },
+              **bucketed_iter,
           })
+
       scenario_metrics = {}
       if scenario_name in manager.scenario_metrics:
         scenario_metrics = {
@@ -283,12 +386,34 @@ class JsonFormatter(MetricsFormatter):
             for k, m in manager.scenario_metrics[scenario_name].metrics.items()
             if m.aggregator != aggregators.AggregatorType.EXCLUDE_ALL
         }
+      bucketed_scenario_metrics = _bucket_metrics(scenario_metrics)
 
-      scenarios[scenario_name] = {
-          'scenario_metrics': scenario_metrics,
-          'aggregated_metrics': agg_data,
+      # Merge bucketed metrics
+      merged_numeric = {
+          **bucketed_scenario_metrics['numeric_metrics'],
+          **bucketed_agg['numeric_metrics'],
+      }
+      merged_boolean = {
+          **bucketed_scenario_metrics['boolean_metrics'],
+          **bucketed_agg['boolean_metrics'],
+      }
+      merged_text = {
+          **bucketed_scenario_metrics['text_metrics'],
+          **bucketed_agg['text_metrics'],
+      }
+
+      scenario_dict: dict[str, Any] = {
+          'numeric_metrics': merged_numeric,
+          'boolean_metrics': merged_boolean,
+          'text_metrics': merged_text,
           'iterations': scenario_iters,
       }
+      if hero_metric_val_mbps is not None:
+        scenario_dict['file_transfer_throughput_med'] = float(
+            hero_metric_val_mbps
+        )
+
+      scenarios[scenario_name] = scenario_dict
     return scenarios
 
   def to_dict(self, manager: MetricsManager) -> dict[str, Any]:
@@ -302,7 +427,7 @@ class JsonFormatter(MetricsFormatter):
             ),
         },
         'class_metrics': {
-            k: m.value
+            k: str(m.value)
             for k, m in manager.class_metrics.metrics.items()
             if m.aggregator != aggregators.AggregatorType.EXCLUDE_ALL
         },

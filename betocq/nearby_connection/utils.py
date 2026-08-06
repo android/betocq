@@ -173,18 +173,18 @@ def check_wifi_ap_status_in_setup_class(
     )
     return
 
-  if not setup_utils.is_valid_wifi_2g_freq(freq_2g):
+  if not setup_utils.is_valid_wifi_2g_freq(freq_2g):  # pyrefly: ignore[bad-argument-type]
     _report_error(
         f'2G AP - {wifi_2g_ssid}, frequency - {freq_2g} is not valid. Set'
         ' the AP channel, reboot the AP and try again.'
     )
   if supports_5g:
-    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):
+    if not setup_utils.is_valid_wifi_5g_freq(freq_5g):  # pyrefly: ignore[bad-argument-type]
       _report_error(
           f'5G AP - {wifi_5g_ssid}, frequency - {freq_5g} is not valid. Set'
           ' the AP channel, reboot the AP and try again.'
       )
-    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):
+    if not setup_utils.is_valid_wifi_5g_dfs_freq(freq_5g_dfs):  # pyrefly: ignore[bad-argument-type]
       _report_error(
           f'5G DFS AP - {wifi_dfs_5g_ssid}, frequency - {freq_5g_dfs} is not'
           ' valid. Set the AP channel, reboot the AP and try again.'
@@ -221,7 +221,7 @@ def get_nearby2_snippet_config(
 def setup_android_device_for_nc_tests(
     ad: android_device.AndroidDevice,
     snippet_confs: Sequence[constants.SnippetConfig],
-    country_code: str,
+    country_code: str = '',
     skip_flag_override: bool = False,
 ) -> None:
   """Performs general Android device setup steps for NC tests."""
@@ -254,10 +254,11 @@ def setup_android_device_for_nc_tests(
       ad.nearby.wifiEnable()
     setup_utils.reset_nearby_connection(ad)
     device_specific_dict['wifi_fw'] = setup_utils.get_wifi_firmware_version(ad)
-    device_specific_dict['bt_fw'] = setup_utils.get_bt_firmware_version(ad)
     device_specific_dict['one_time_setup_done'] = True
 
-  if country_code != device_specific_dict.get('wifi_country_code', ''):
+  if country_code and country_code != device_specific_dict.get(
+      'wifi_country_code', ''
+  ):
     setup_utils.set_country_code(ad, country_code)
     device_specific_dict['wifi_country_code'] = country_code
 
@@ -268,81 +269,12 @@ def setup_android_device_for_nc_tests(
   ad.nearby.acquireUiAutomation()
 
 
-class LegacyTestResultAdapter:
-  """Adapter to coerce legacy SingleTestResult into MetricsCollector interface."""
-
-  def __init__(self, test_result: Any) -> None:
-    self.test_result = test_result
-
-  def record(
-      self,
-      key: str,
-      value: Any,
-  ) -> None:
-    """Records a metric using the legacy test result object.
-
-    Args:
-      key: The name of the metric to record.
-      value: The value of the metric.
-    """
-    if key == 'discoverer_sta_latency':
-      self.test_result.discoverer_sta_latency = value
-    elif key == 'advertiser_sta_latency':
-      self.test_result.advertiser_sta_latency = value
-    elif key == 'prior_nc_fail_reason':
-      self.test_result.set_prior_nc_fail_reason(value)
-    elif key == 'active_nc_fail_reason':
-      self.test_result.set_active_nc_fail_reason(value)
-    elif key == 'result_message':
-      self.test_result.result_message = value
-    # Quality info fields
-    elif key in (
-        'discovery_latency',
-        'connection_latency',
-        'upgrade_latency',
-        'connection_medium',
-        'upgrade_medium',
-        'medium_frequency',
-    ):
-      if key == 'discovery_latency':
-        self.test_result.quality_info.discovery_latency = value
-      elif key == 'connection_latency':
-        self.test_result.quality_info.connection_latency = value
-      elif key == 'upgrade_latency':
-        self.test_result.quality_info.medium_upgrade_latency = value
-      elif key == 'connection_medium':
-        self.test_result.quality_info.connection_medium = value
-      elif key == 'upgrade_medium':
-        self.test_result.quality_info.upgrade_medium = value
-      elif key == 'medium_frequency':
-        self.test_result.quality_info.medium_frequency = value
-    # Prior Quality info fields
-    elif key in ('prior_discovery_latency', 'prior_connection_latency'):
-      if key == 'prior_discovery_latency':
-        self.test_result.prior_nc_quality_info.discovery_latency = value
-      elif key == 'prior_connection_latency':
-        self.test_result.prior_nc_quality_info.connection_latency = value
-    else:
-      logging.warning(
-          'LegacyTestResultAdapter received an unknown key: %s with value %s.'
-          ' This metric will not be recorded.',
-          key,
-          value,
-      )
-
-
-def _coerce_metrics(metrics: Any) -> Any:
-  if hasattr(metrics, 'record'):
-    return metrics
-  return LegacyTestResultAdapter(metrics)
-
-
 def connect_ad_to_wifi_sta(
     ad: android_device.AndroidDevice,
     *,
     wifi_ssid: str,
     wifi_password: str,
-    metrics: MetricsCollector | Any,
+    metrics: MetricsCollector,
     is_discoverer: bool,
 ) -> bool:
   """Connects NC discoverer or advertiser to the given Wi-Fi STA.
@@ -351,8 +283,7 @@ def connect_ad_to_wifi_sta(
     ad: The device to connect to Wi-Fi STA.
     wifi_ssid: The Wi-Fi SSID.
     wifi_password: The Wi-Fi password.
-    metrics: The object to record test result and metrics. Can be a
-      MetricsCollector or a legacy test result object.
+    metrics: The MetricsCollector to record test result and metrics.
     is_discoverer: Whether the device is the NC discoverer. This is used for
       generating test failure reason and result summary info.
 
@@ -363,7 +294,7 @@ def connect_ad_to_wifi_sta(
   Raises:
     Exception: If an error occurs during the Wi-Fi connection process.
   """
-  metrics_collector = _coerce_metrics(metrics)
+  metrics_collector = metrics
   try:
     wifi_info = ad.nearby.wifiGetConnectionInfo()
     current_wifi_ssid = wifi_info.get('SSID', '')
@@ -402,12 +333,11 @@ def connect_ad_to_wifi_sta(
       ad.log.info('No valid RSSI')
     if rssi > constants.RSSI_HIGH_THRESHOLD:
       high_rssi_tip = (
-          f'RSSI={rssi} of which is too high. Consider to move the device'
-          ' away from the AP.'
+          f'RSSI={rssi} is too high. Consider moving the device away'
+          ' from the AP.'
       )
       ad.log.info(
-          'RSSI=%d of which is too high. Consider to move the device away from'
-          ' the AP.',
+          'RSSI=%d is too high. Consider moving the device away from the AP.',
           rssi,
       )
       result_messages.append(high_rssi_tip)
@@ -436,7 +366,7 @@ def start_prior_bt_nearby_connection(
     advertiser: android_device.AndroidDevice,
     discoverer: android_device.AndroidDevice,
     *,
-    metrics: MetricsCollector | Any,
+    metrics: MetricsCollector,
     test_parameters: constants.TestParameters | None = None,
 ) -> nearby_connection_wrapper.NearbyConnectionWrapper:
   """Starts a prior BT Nearby Connection.
@@ -444,14 +374,13 @@ def start_prior_bt_nearby_connection(
   Args:
     advertiser: The Android device acting as the Nearby Connection advertiser.
     discoverer: The Android device acting as the Nearby Connection discoverer.
-    metrics: The object to record test result and metrics. Can be a
-      MetricsCollector or a legacy test result object.
+    metrics: The MetricsCollector to record test result and metrics.
     test_parameters: Optional test parameters.
 
   Returns:
     A NearbyConnectionWrapper instance for the prior connection.
   """
-  metrics_collector = _coerce_metrics(metrics)
+  metrics_collector = metrics
   logging.info('Set up a prior BT connection.')
   prior_bt_snippet = _get_snippet(
       advertiser,
@@ -489,7 +418,7 @@ def start_main_nearby_connection(
     discoverer: android_device.AndroidDevice,
     *,
     upgrade_medium_under_test: constants.NearbyMedium,
-    metrics: MetricsCollector | Any,
+    metrics: MetricsCollector,
     test_parameters: constants.TestParameters | None = None,
     connection_medium: constants.NearbyMedium = constants.NearbyMedium.BT_ONLY,
     connect_timeout: constants.ConnectionSetupTimeouts = constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
@@ -503,8 +432,7 @@ def start_main_nearby_connection(
     advertiser: The Android device acting as the Nearby Connection advertiser.
     discoverer: The Android device acting as the Nearby Connection discoverer.
     upgrade_medium_under_test: The medium to test for connection upgrade.
-    metrics: The object to record test result and metrics. Can be a
-      MetricsCollector or a legacy test result object.
+    metrics: The MetricsCollector to record test result and metrics.
     test_parameters: Optional test parameters.
     connection_medium: The medium used for the initial connection.
     connect_timeout: Timeouts for the connection setup stages.
@@ -515,7 +443,7 @@ def start_main_nearby_connection(
   Returns:
     A NearbyConnectionWrapper instance for the main connection.
   """
-  metrics_collector = _coerce_metrics(metrics)
+  metrics_collector = metrics
   logging.info('Set up a nearby connection for file transfer.')
 
   active_snippet = _get_snippet(
@@ -550,15 +478,11 @@ def start_main_nearby_connection(
     )
     metrics_collector.record(
         'connection_medium',
-        q_info.connection_medium.name
-        if hasattr(q_info.connection_medium, 'name')
-        else q_info.connection_medium,
+        getattr(q_info.connection_medium, 'name', q_info.connection_medium),
     )
     metrics_collector.record(
         'upgrade_medium',
-        q_info.upgrade_medium.name
-        if hasattr(q_info.upgrade_medium, 'name')
-        else q_info.upgrade_medium,
+        getattr(q_info.upgrade_medium, 'name', q_info.upgrade_medium),
         aggregator='counter',
     )
     metrics_collector.record('medium_frequency', q_info.medium_frequency)
@@ -583,11 +507,11 @@ def start_main_nearby_connection(
 
 def handle_file_transfer_failure(
     fail_reason: constants.SingleTestFailureReason,
-    metrics: MetricsCollector | Any,
+    metrics: MetricsCollector,
     file_transfer_failure_tip: str,
 ) -> None:
   """Collects metrics and generates result message for file transfer failure."""
-  metrics_collector = _coerce_metrics(metrics)
+  metrics_collector = metrics
   if fail_reason == constants.SingleTestFailureReason.SUCCESS:
     return
   result_message = None

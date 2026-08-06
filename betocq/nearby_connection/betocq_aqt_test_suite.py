@@ -35,12 +35,11 @@ from betocq.nearby_connection.directed_tests import xcc_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import xcc_wfd_dfs_5g_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
 
-
 _SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '9'
+_SUITE_VERSION = '10'
 # LINT.ThenChange()
 
 
@@ -91,8 +90,8 @@ class BetoCqAqtTestSuite(base_suite.BaseSuite):
     # Directed test cases:
     self.add_test_class(bt_performance_test.BtPerformanceTest)
     # 5G STA
-    self.add_test_class(scc_5g_wfd_sta_test.Scc5gWfdStaTest)
     self.add_test_class(scc_5g_wlan_sta_test.Scc5gWifiLanStaTest)
+    self.add_test_class(scc_5g_wfd_sta_test.Scc5gWfdStaTest)
     # 5G DFS STA
     self.add_test_class(xcc_wfd_dfs_5g_sta_test.XccWfdDfs5gStaTest)
     # 2G STA

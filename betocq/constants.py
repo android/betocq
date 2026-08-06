@@ -19,7 +19,7 @@ import dataclasses
 import datetime
 import enum
 import logging
-from typing import Any
+from typing import Any, Self
 
 from mobly import signals
 from mobly.controllers import android_device
@@ -144,7 +144,6 @@ class TestParameters:
 
   # Optional test cases disabled by default.
   run_aware_test: bool = False
-  run_ble_performance_test: bool = False
   requires_bt_multiplex: bool = False
   allow_unrooted_device: bool = False
   do_nc_wlan_file_transfer_test: bool = True
@@ -170,7 +169,7 @@ class TestParameters:
   metrics_yaml_filename: str = ''
 
   @classmethod
-  def from_user_params(cls, user_params: dict[str, Any]) -> 'TestParameters':
+  def from_user_params(cls, user_params: dict[str, Any]) -> Self:
     """convert the parameters from the testbed to the test parameter."""
 
     # Convert G3 user int parameter in str format to int.
@@ -855,7 +854,7 @@ class NcTestRuntime:
   discoverer: android_device.AndroidDevice
   upgrade_medium_under_test: NearbyMedium
   connection_medium: NearbyMedium = NearbyMedium.BT_ONLY
-  country_code: str = 'US'
+  country_code: str = ''
   is_dbs_mode: bool = False
   advertising_discovery_medium: NearbyMedium = NearbyMedium.BLE_ONLY
   wifi_info: WifiInfo | None = None

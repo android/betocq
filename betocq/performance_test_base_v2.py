@@ -63,6 +63,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
   """Base test class for nearby connection E2E performance tests."""
 
   metrics_helper_class = metrics.MetricsHelper
+  script_version: str = version.TEST_SCRIPT_VERSION
 
   # Configuration parameters
 
@@ -129,7 +130,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   def setup_class(self) -> None:
     self.metrics_manager = metrics.MetricsManager(
-        self.TAG, metric_registry=self._metric_registry
+        self.TAG, metric_registry=self._metric_registry  # pyrefly: ignore[bad-argument-type]
     )
     try:
       super().setup_class()
@@ -167,7 +168,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
       # Record basic class level info
       self.metrics_manager.class_metrics.record(
           'test_script_version',
-          version.TEST_SCRIPT_VERSION,
+          self.script_version,
       )
       self.metrics_manager.class_metrics.record('test_result', 'UNINITIALIZED')
 
@@ -196,7 +197,9 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   @override
   def setup_test(self) -> None:
-    scenario_name = self.current_test_info.name  # pytype: disable=attribute-error
+    if self.current_test_info is None:
+      raise ValueError('current_test_info is None')
+    scenario_name = self.current_test_info.name
     # Strip Mobly repeat suffix if present
     parts = scenario_name.rsplit('_', 1)
     base_scenario_name = scenario_name
@@ -521,7 +524,11 @@ class PerformanceTestBase(base_test.BaseTestClass):
   @override
   def teardown_class(self) -> None:
     try:
-      self.metrics_manager.stop()
+      if getattr(self, 'metrics_manager', None) is None:
+        logging.info(
+            'metrics_manager is missing, returning early from teardown_class.'
+        )
+        return
 
       # Subclass hook to record dynamic teardown metadata
       if getattr(self, '_framework_setup_class_completed', False):
@@ -697,8 +704,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
     """Safely attempts to record class setup metadata, warning on failure."""
     try:
       self.metrics_helper.record_class_setup_metadata(class_metrics)
-    except Exception:  # pylint: disable=broad-except
-      logging.warning('Failed to record class setup metadata.', exc_info=True)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.warning('Failed to record class setup metadata: %s', e)
 
   def _try_record_class_teardown_metadata(
       self, class_metrics: metrics.MetricsCollector
@@ -706,8 +713,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
     """Safely attempts to record class teardown metadata, warning on failure."""
     try:
       self.metrics_helper.record_class_teardown_metadata(class_metrics)
-    except Exception:  # pylint: disable=broad-except
-      logging.warning('Failed to record teardown metadata.', exc_info=True)
+    except Exception as e:  # pylint: disable=broad-except
+      logging.warning('Failed to record teardown metadata: %s', e)
 
 
 class FunctionTestBase(PerformanceTestBase):

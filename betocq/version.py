@@ -40,3 +40,5 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 # '2.6.5': 'Reduce the test cases for AQT and fix some bugs.'
 # '3.0.0': ('Migrate the tests to the new performance test framework; Unify'
 #          'the metrics collection and fix some bugs.')
+# '3.1.0': ('Adjust the test cases, remove most compound tests and the world
+#          'mode test cases.')

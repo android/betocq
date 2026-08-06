@@ -70,8 +70,6 @@ NEARBY_LOG_TAGS = [
     'NearbySetup',
 ]
 
-_UNKNOWN_BT_FIRMWARE_VERSION = 'unknown'
-
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
         ([0-9a-f:]{17})  # Captures BSSID
@@ -95,6 +93,10 @@ def get_betocq_device_specific_info(
     ad: android_device.AndroidDevice,
 ) -> dict[str, Any]:
   """Gets the device specific info from the class attribute."""
+  if ad is None:
+    raise ValueError(
+        'AndroidDevice instance is None; device lost or not initialized.'
+    )
   # Check if the class attribute exists. If not, create it as an empty dict.
   if not hasattr(android_device.AndroidDevice, 'betocq_customized_device_info'):
     setattr(android_device.AndroidDevice, 'betocq_customized_device_info', {})
@@ -419,7 +421,7 @@ def connect_to_wifi_sta_till_success(
   ad.log.info('Start connecting to wifi STA/AP')
   wifi_connect_start = datetime.datetime.now()
   if not wifi_password:
-    wifi_password = None
+    wifi_password = None  # pyrefly: ignore[bad-assignment]
   connect_to_wifi(
       ad, wifi_ssid, wifi_password, num_retries=_WIFI_CONNECT_RETRY_TIMES
   )
@@ -638,6 +640,7 @@ def restart_gms(ad: android_device.AndroidDevice) -> None:
       ' in the test.'
   )
   ad.adb.shell('am force-stop com.google.android.gms')
+  time.sleep(5)
 
 
 def disable_gms_auto_updates(ad: android_device.AndroidDevice) -> None:
@@ -1257,7 +1260,7 @@ def load_nearby_snippet(
 
   ad.load_snippet(config.snippet_name, config.package_name)
   if not hasattr(ad, 'loaded_snippet_packages'):
-    ad.loaded_snippet_packages = set()
+    ad.loaded_snippet_packages = set()  # pyrefly: ignore[missing-attribute]
   ad.loaded_snippet_packages.add(config.package_name)
 
 
@@ -1743,108 +1746,6 @@ def get_wifi_firmware_version(
   return version
 
 
-def get_bt_firmware_version(
-    ad: android_device.AndroidDevice,
-) -> str:
-  """Gets the BT firmware version on the given device."""
-  try:
-    bt_dumpsys_output = (
-        ad.adb.shell('dumpsys android.hardware.bluetooth.IBluetoothHci/default')
-        .strip()
-        .decode('utf-8')
-    )
-  except (adb.AdbError, ValueError):
-    ad.log.warning(
-        'Failed to get BT firmware version on device %r.',
-        ad.serial,
-        exc_info=True,
-    )
-    return _UNKNOWN_BT_FIRMWARE_VERSION
-
-  if not bt_dumpsys_output:
-    ad.log.warning(
-        'BT IBluetoothHci dumpsys output is empty on device %r.',
-        ad.serial,
-    )
-    return _UNKNOWN_BT_FIRMWARE_VERSION
-
-  try:
-    version = _extract_bt_firmware_version(ad, bt_dumpsys_output)
-  except (TypeError, ValueError):
-    ad.log.warning(
-        'Failed to extract BT firmware version on device %r.',
-        ad.serial,
-        exc_info=True,
-    )
-    return _UNKNOWN_BT_FIRMWARE_VERSION
-  return version
-
-
-def _extract_bt_firmware_version(
-    ad: android_device.AndroidDevice, bt_dumpsys_output: str
-) -> str:
-  """Extracts Bluetooth controller firmware version from dumpsys output.
-
-  Args:
-    ad: AndroidDevice, Mobly Android Device.
-    bt_dumpsys_output: A string containing the output from the dumpsys BT
-      command.
-
-  Returns:
-      A string containing the firmware version, or None if not found.
-  """
-  lines = bt_dumpsys_output.splitlines()
-  header_keywords = [
-      'Firmware Version',
-      'Firmware Information',
-      'Firmware Info',
-      'Firmware Ver',
-      'FW Version',
-      'FW Information',
-      'FW Info',
-      'FW Ver',
-  ]
-
-  for i, line in enumerate(lines):
-    line_lower = line.lower()
-    for lower_keyword in [keyword.lower() for keyword in header_keywords]:
-      if lower_keyword in line_lower:
-        # The firmware version is expected on the next non-empty line
-        # after the header and its separator line.
-        for j in range(i + 1, len(lines)):
-          next_line = lines[j].strip()
-          if not next_line:  # Skip empty lines
-            continue
-
-          # Skip separator lines
-          if (
-              '====' in next_line
-              or '----' in next_line
-              or '****' in next_line
-              or '════' in next_line
-              or next_line.startswith('╠══')
-          ):
-            ad.log.info('Skip separator line: %s', next_line)
-            continue
-
-          # Attempt to extract the version string
-          # Remove potential leading characters like '║' and extra spaces
-          match = re.search(r'^(?:║\s*)?(?P<version>.+)$', next_line)
-          if match:
-            version = match.group('version').strip()
-            ad.log.info('version: %s', version)
-            # Basic check to ensure it looks like a version string
-            if (
-                'FW' in version
-                or 'Firmware' in version
-                or re.search(r'[0-9a-fA-F]{6,}', version)
-            ):
-              return version
-          break  # Stop searching after checking the line(s) below the header
-        break  # Move to the next line in the dumpsys output
-  return _UNKNOWN_BT_FIRMWARE_VERSION
-
-
 def disable_package_verifiers(ad: android_device.AndroidDevice):
   """Disables package verifier and Play Protect for ADB installs."""
   try:
@@ -1892,12 +1793,54 @@ def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
   return device.build_info['hardware'] == 'cutf_cvm'
 
 
-def unlock_screen(device: android_device.AndroidDevice):
+def is_screen_locked(device: android_device.AndroidDevice) -> bool:
+  """Returns True if the screen is locked."""
+  try:
+    window_dumpsys = device.adb.shell(['dumpsys', 'window'])
+    window_dumpsys = window_dumpsys.decode('utf-8', errors='ignore')
+    if (
+        'mShowingLockscreen=true' in window_dumpsys
+        or 'mDreamingLockscreen=true' in window_dumpsys
+    ):
+      return True
+
+    window_policy = device.adb.shell(['dumpsys', 'window', 'policy'])
+    window_policy = window_policy.decode('utf-8', errors='ignore')
+    if 'showing=true' in window_policy:
+      return True
+
+    activity_dumpsys = device.adb.shell(['dumpsys', 'activity', 'top'])
+    activity_dumpsys = activity_dumpsys.decode('utf-8', errors='ignore')
+    if 'mKgShowing=true' in activity_dumpsys or 'Keyguard' in activity_dumpsys:
+      return True
+
+    return False
+  except Exception as e:  # pylint: disable=broad-except
+    device.log.warning('Failed to check if screen is locked: %s', e)
+    return False
+
+
+def unlock_screen(
+    device: android_device.AndroidDevice,
+    timeout: datetime.timedelta = datetime.timedelta(seconds=10),
+):
   """Unlocks the screen on a device if locked."""
+  if not is_screen_locked(device):
+    device.log.info('Screen is already unlocked.')
+    return
+
+  device.log.info('Screen is locked. Attempting to unlock.')
   if is_cuttlefish(device):
     device.adb.shell('wm dismiss-keyguard')
   else:
     device.adb.shell('input keyevent KEYCODE_MENU')
+
+  if not wait_for_predicate(
+      lambda: not is_screen_locked(device),
+      timeout=timeout,
+      interval=datetime.timedelta(seconds=1),
+  ):
+    raise signals.TestFailure('Failed to unlock the device screen')
 
 
 def is_device_on(device: android_device.AndroidDevice) -> bool:
@@ -1946,8 +1889,17 @@ def verify_wfd_ip_setup(
     out = device.adb.shell('ip addr show')
     if isinstance(out, bytes):
       out = out.decode('utf-8')
-    p2p_lines = [line for line in out.splitlines() if 'p2p' in line]
-    has_wfd_ip = any('inet ' in line for line in p2p_lines)
+    in_p2p_interface = False
+    has_wfd_ip = False
+    p2p_lines = []
+    for line in out.splitlines():
+      is_header = '<' in line and '>' in line
+      if is_header:
+        in_p2p_interface = 'p2p' in line
+      if in_p2p_interface:
+        p2p_lines.append(line)
+        if 'inet ' in line or 'inet6 ' in line:
+          has_wfd_ip = True
 
     if has_wfd_ip == expected_state:
       device.log.info('p2p interface lines: %s', p2p_lines)
@@ -2053,21 +2005,19 @@ def get_device_attributes(ad: android_device.AndroidDevice) -> str:
   wifi_fw = device_specific_info.get('wifi_fw', '')
   if not wifi_fw:
     wifi_fw = get_wifi_firmware_version(ad)
-  bt_fw = device_specific_info.get('bt_fw', '')
-  if not bt_fw:
-    bt_fw = get_bt_firmware_version(ad)
 
+  if not hasattr(ad, 'android_version'):
+    setattr(
+        ad, 'android_version', int(ad.adb.getprop('ro.build.version.release'))
+    )
   return '\n'.join((
       f'serial: {getattr(ad, "serial", "NA")}',
       f'model: {getattr(ad, "model", "NA")}',
-      (
-          f'android_version: {getattr(ad, "android_version", "NA")}\n'
-          f'build_info: {getattr(ad, "build_info", "NA")}'
-      ),
+      f'android_version: {ad.android_version}',
+      f'build_info: {getattr(ad, "build_info", "NA")}',
       f'gms_version: {dump_gms_version(ad)}',
       f'wifi_chipset: {getattr(ad, "wifi_chipset", "NA")}',
       f'wifi_fw: {wifi_fw}',
-      f'bt_fw: {bt_fw}',
       f'support_aware: {is_wifi_aware_available(ad)}',
       f'support_dbs_sta_wfd: {getattr(ad, "supports_dbs_sta_wfd", "NA")}',
       (
@@ -2091,7 +2041,7 @@ def betocq_repeat(
   """Decorator to wrap Mobly repeat and attach metadata for dynamic discovery."""
 
   def decorator(func: Callable[..., Any]) -> Callable[..., Any]:
-    func.expected_iterations = count
+    func.expected_iterations = count  # pyrefly: ignore[missing-attribute]
     return base_test.repeat(count, max_consecutive_error)(func)
 
   return decorator
