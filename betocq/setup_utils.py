@@ -1830,10 +1830,8 @@ def unlock_screen(
     return
 
   device.log.info('Screen is locked. Attempting to unlock.')
-  if is_cuttlefish(device):
-    device.adb.shell('wm dismiss-keyguard')
-  else:
-    device.adb.shell('input keyevent KEYCODE_MENU')
+  device.adb.shell('input keyevent KEYCODE_WAKEUP')
+  device.adb.shell('wm dismiss-keyguard')
 
   if not wait_for_predicate(
       lambda: not is_screen_locked(device),
