@@ -1,0 +1,254 @@
+/**
+#  Copyright 2024 Google LLC
+#
+#  Licensed under the Apache License, Version 2.0 (the "License");
+#  you may not use this file except in compliance with the License.
+#  You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#  Unless required by applicable law or agreed to in writing, software
+#  distributed under the License is distributed on an "AS IS" BASIS,
+#  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#  See the License for the specific language governing permissions and
+#  limitations under the License.
+**/
+
+package com.google.android.nearby.mobly.snippet.connection;
+
+import static com.google.android.gms.nearby.connection.Medium.BLE;
+import static com.google.android.gms.nearby.connection.Medium.BLE_L2CAP;
+import static com.google.android.gms.nearby.connection.Medium.BLUETOOTH;
+import static com.google.android.gms.nearby.connection.Medium.USB;
+import static com.google.android.gms.nearby.connection.Medium.WIFI_AWARE;
+import static com.google.android.gms.nearby.connection.Medium.WIFI_DIRECT;
+import static com.google.android.gms.nearby.connection.Medium.WIFI_HOTSPOT;
+import static com.google.android.gms.nearby.connection.Medium.WIFI_LAN;
+
+import com.google.android.gms.nearby.connection.ConnectionType;
+import com.google.android.gms.nearby.connection.PowerLevel;
+import com.google.android.gms.nearby.connection.Strategy;
+import com.google.android.gms.nearby.connection.v3.AdvertisingOptions;
+import com.google.android.gms.nearby.connection.v3.ConnectionOptions;
+import com.google.android.gms.nearby.connection.v3.DiscoveryOptions;
+import com.google.android.gms.nearby.connection.v3.SafeParcelableDataElements;
+import com.google.android.gms.nearby.connection.v3.dct.SupportedServices;
+import com.google.common.collect.ImmutableList;
+import java.util.stream.IntStream;
+
+/**
+ * A factory to create advertising/discovery/connection medium options for Nearby connections V3.
+ */
+public final class MediumSettingsFactoryV3 {
+  private static final int AUTO = 0;
+
+  // LINT.IfChange
+  private static final int MEDIUM_BT_ONLY = 1;
+  private static final int MEDIUM_BLE_ONLY = 2;
+  private static final int MEDIUM_WIFILAN_ONLY = 3;
+  private static final int MEDIUM_WIFIAWARE_ONLY = 4;
+  private static final int MEDIUM_UPGRADE_TO_WEBRTC = 5;
+  private static final int MEDIUM_UPGRADE_TO_WIFIHOTSPOT = 6;
+  private static final int MEDIUM_UPGRADE_TO_WIFIDIRECT = 7;
+  private static final int MEDIUM_BLE_L2CAP_ONLY = 8;
+  private static final int MEDIUM_UPGRADE_TO_ALL_WIFI = 9;
+  private static final int MEDIUM_UPGRADE_TO_USB = 10;
+  // LINT.ThenChange(//depot/google3/wireless/android/platform/testing/bettertogether/betocq/constants.py)
+
+  private static final int MEDIUM_UPGRADE_TYPE_DISRUPTIVE = 1;
+  private static final int MEDIUM_UPGRADE_TYPE_NON_DISRUPTIVE = 2;
+
+  private static final Strategy STRATEGY = Strategy.P2P_POINT_TO_POINT;
+
+  public static AdvertisingOptions getAdvertisingOptions(
+      String password, int advertisingMedium, int upgradeMedium, int supportedService) {
+    boolean autoUpgradeBandwidth = false;
+    boolean enforceTopologyConstraints = true;
+    int powerLevel = PowerLevel.HIGH_POWER;
+    IntStream upgradeMediums = IntStream.empty();
+    AdvertisingOptions.Builder builder =
+        new AdvertisingOptions.Builder().setStrategy(STRATEGY).setAuthenticationPassword(password);
+
+    IntStream advertisingMediums =
+        switch (advertisingMedium) {
+          case AUTO -> null;
+          case MEDIUM_BT_ONLY -> IntStream.of(BLUETOOTH);
+          case MEDIUM_WIFILAN_ONLY -> IntStream.of(WIFI_LAN);
+          case MEDIUM_WIFIAWARE_ONLY -> IntStream.of(BLE, WIFI_AWARE);
+          case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY, MEDIUM_UPGRADE_TO_WEBRTC ->
+              IntStream.of(BLE);
+          case MEDIUM_UPGRADE_TO_WIFIHOTSPOT -> IntStream.of(BLE, WIFI_HOTSPOT);
+          case MEDIUM_UPGRADE_TO_WIFIDIRECT -> IntStream.of(BLE, WIFI_DIRECT);
+          case MEDIUM_UPGRADE_TO_ALL_WIFI ->
+              IntStream.of(BLE, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_LAN, WIFI_AWARE);
+          case MEDIUM_UPGRADE_TO_USB -> IntStream.of(BLE, USB);
+          default ->
+              throw new IllegalArgumentException(
+                  String.format("Unsupported advertising medium: %d", advertisingMedium));
+        };
+
+    switch (upgradeMedium) {
+      case AUTO -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = null;
+      }
+      case MEDIUM_BT_ONLY -> upgradeMediums = IntStream.of(BLUETOOTH);
+      case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> {
+        upgradeMediums = IntStream.of(BLE);
+      }
+      case MEDIUM_WIFILAN_ONLY -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(WIFI_LAN);
+      }
+      case MEDIUM_WIFIAWARE_ONLY -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(WIFI_AWARE, BLE_L2CAP, BLUETOOTH, BLE);
+      }
+      case MEDIUM_UPGRADE_TO_WEBRTC -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(BLE_L2CAP, BLUETOOTH, BLE);
+      }
+      case MEDIUM_UPGRADE_TO_WIFIHOTSPOT -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(WIFI_HOTSPOT, BLE_L2CAP, BLUETOOTH, BLE);
+      }
+      case MEDIUM_UPGRADE_TO_WIFIDIRECT -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(WIFI_DIRECT, BLE_L2CAP, BLUETOOTH, BLE);
+      }
+      case MEDIUM_UPGRADE_TO_ALL_WIFI -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(WIFI_DIRECT, WIFI_AWARE, WIFI_HOTSPOT, WIFI_LAN);
+      }
+      case MEDIUM_UPGRADE_TO_USB -> {
+        autoUpgradeBandwidth = true;
+        upgradeMediums = IntStream.of(USB, BLE_L2CAP, BLUETOOTH, BLE);
+      }
+      default ->
+          throw new IllegalArgumentException(
+              String.format("Unsupported upgrade medium: %d", upgradeMedium));
+    }
+
+    SupportedServices supportedServices = new SupportedServices((byte) supportedService);
+    builder
+        .setAutoUpgradeBandwidth(autoUpgradeBandwidth)
+        .setEnforceTopologyConstraints(enforceTopologyConstraints)
+        .setPowerLevel(powerLevel)
+        .setCustomDataElements(
+            new SafeParcelableDataElements.Builder()
+                .setDctDeviceDataElements(ImmutableList.of(supportedServices))
+                .build());
+
+    if (advertisingMediums != null) {
+      builder.setAdvertisingMediums(advertisingMediums.toArray());
+    }
+
+    if (upgradeMediums != null) {
+      builder.setUpgradeMediums(upgradeMediums.toArray());
+    }
+
+    return builder.build();
+  }
+
+  public static DiscoveryOptions getDiscoveryMediumOptions(
+      int discoveryMedium, int supportedService) {
+    int powerLevel = PowerLevel.HIGH_POWER;
+    IntStream discoveryMediums = IntStream.empty();
+
+    DiscoveryOptions.Builder builder = new DiscoveryOptions.Builder().setStrategy(STRATEGY);
+
+    switch (discoveryMedium) {
+      case AUTO -> {}
+      case MEDIUM_BT_ONLY -> discoveryMediums = IntStream.of(BLUETOOTH);
+      case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> discoveryMediums = IntStream.of(BLE);
+      case MEDIUM_WIFILAN_ONLY -> discoveryMediums = IntStream.of(WIFI_LAN);
+      case MEDIUM_WIFIAWARE_ONLY -> discoveryMediums = IntStream.of(BLE, WIFI_AWARE);
+      case MEDIUM_UPGRADE_TO_WEBRTC,
+          MEDIUM_UPGRADE_TO_WIFIHOTSPOT,
+          MEDIUM_UPGRADE_TO_WIFIDIRECT,
+          MEDIUM_UPGRADE_TO_USB ->
+          discoveryMediums = IntStream.of(BLE);
+      case MEDIUM_UPGRADE_TO_ALL_WIFI -> discoveryMediums = IntStream.of(BLE, WIFI_LAN, WIFI_AWARE);
+      default -> {
+        return builder.build();
+      }
+    }
+    SupportedServices supportedServices = new SupportedServices((byte) supportedService);
+    builder
+        .setPowerLevel(powerLevel)
+        .setDataElementsFilters(
+            new SafeParcelableDataElements.Builder()
+                .setDctDeviceDataElements(ImmutableList.of(supportedServices))
+                .build());
+
+    if (discoveryMedium != AUTO) {
+      builder.setDiscoveryMediums(discoveryMediums.toArray());
+    }
+
+    return builder.build();
+  }
+
+  public static ConnectionOptions getConnectionMediumOptions(
+      String password, int connectionMedium, int upgradeMedium, int mediumUpgradeType) {
+
+    ConnectionOptions.Builder builder =
+        new ConnectionOptions.Builder().setStrategy(STRATEGY).setAuthenticationPassword(password);
+
+    if (mediumUpgradeType == MEDIUM_UPGRADE_TYPE_DISRUPTIVE) {
+      builder.setConnectionType(ConnectionType.DISRUPTIVE);
+    } else if (mediumUpgradeType == MEDIUM_UPGRADE_TYPE_NON_DISRUPTIVE) {
+      builder.setConnectionType(ConnectionType.NON_DISRUPTIVE);
+    }
+
+    IntStream connectionMediums =
+        switch (connectionMedium) {
+          case AUTO -> null;
+          case MEDIUM_BT_ONLY -> IntStream.of(BLUETOOTH);
+          case MEDIUM_BLE_ONLY -> IntStream.of(BLE);
+          case MEDIUM_BLE_L2CAP_ONLY -> IntStream.of(BLE_L2CAP);
+          case MEDIUM_WIFILAN_ONLY -> IntStream.of(WIFI_LAN);
+          case MEDIUM_WIFIAWARE_ONLY -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_AWARE);
+          case MEDIUM_UPGRADE_TO_WEBRTC -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP);
+          case MEDIUM_UPGRADE_TO_WIFIHOTSPOT ->
+              IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_HOTSPOT);
+          case MEDIUM_UPGRADE_TO_WIFIDIRECT -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_DIRECT);
+          case MEDIUM_UPGRADE_TO_ALL_WIFI ->
+              IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_AWARE);
+          case MEDIUM_UPGRADE_TO_USB -> IntStream.of(BLUETOOTH, BLE, BLE_L2CAP, USB);
+          default ->
+              throw new IllegalArgumentException(
+                  String.format("Unsupported connection medium: %d", connectionMedium));
+        };
+
+    if (connectionMediums != null) {
+      builder.setConnectionMediums(connectionMediums.toArray());
+    }
+
+    IntStream upgradeMediums =
+        switch (upgradeMedium) {
+          case AUTO -> null;
+          case MEDIUM_BT_ONLY -> IntStream.of(BLUETOOTH, BLE);
+          case MEDIUM_BLE_ONLY, MEDIUM_BLE_L2CAP_ONLY -> IntStream.of(BLE_L2CAP);
+          case MEDIUM_WIFILAN_ONLY -> IntStream.of(WIFI_LAN);
+          case MEDIUM_WIFIAWARE_ONLY -> IntStream.of(WIFI_AWARE, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_WEBRTC -> IntStream.of(BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_WIFIHOTSPOT ->
+              IntStream.of(WIFI_HOTSPOT, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_WIFIDIRECT -> IntStream.of(WIFI_DIRECT, BLE_L2CAP, BLUETOOTH, BLE);
+          case MEDIUM_UPGRADE_TO_ALL_WIFI ->
+              IntStream.of(WIFI_AWARE, WIFI_DIRECT, WIFI_HOTSPOT, WIFI_LAN);
+          case MEDIUM_UPGRADE_TO_USB -> IntStream.of(USB, BLE_L2CAP, BLUETOOTH, BLE);
+          default ->
+              throw new IllegalArgumentException(
+                  String.format("Unsupported upgrade medium: %d", upgradeMedium));
+        };
+
+    if (upgradeMediums != null) {
+      builder.setUpgradeMediums(upgradeMediums.toArray());
+    }
+
+    return builder.build();
+  }
+
+  private MediumSettingsFactoryV3() {}
+}
