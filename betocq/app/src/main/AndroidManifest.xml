@@ -27,6 +27,7 @@
     <meta-data
         android:name="mobly-snippets"
         android:value="com.google.android.nearby.mobly.snippet.connection.ConnectionsClientSnippet,
+                       com.google.android.nearby.mobly.snippet.connection.ConnectionsClientV3Snippet,
                        com.google.android.nearby.mobly.snippet.utils.UtilitySnippet,
                        com.google.android.nearby.mobly.snippet.utils.WifiAwareManagerSnippet,
                        com.google.android.nearby.mobly.snippet.utils.WifiManagerSnippet" />
