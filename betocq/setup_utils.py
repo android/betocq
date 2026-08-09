@@ -719,7 +719,7 @@ def get_sta_max_link_speed_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   return max_link_speed
 
 
-def _get_wifi_sta_frequency_from_dumpsys(
+def get_wifi_sta_frequency_from_dumpsys(
     ad: android_device.AndroidDevice,
 ) -> int:
   """Get wifi STA frequency on the given device."""
@@ -1214,7 +1214,7 @@ def get_sta_frequency_and_max_link_speed(
 
   # If the info is not available, try getting them by adb wifi status command.
   if sta_frequency == constants.INVALID_INT:
-    sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
+    sta_frequency = get_wifi_sta_frequency_from_dumpsys(ad)
     sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
 
@@ -1231,7 +1231,7 @@ def get_target_sta_frequency_and_max_link_speed(
 
   # If the info is not available, try getting them by adb wifi status command.
   if sta_frequency == constants.INVALID_INT:
-    sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
+    sta_frequency = get_wifi_sta_frequency_from_dumpsys(ad)
     sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
 
