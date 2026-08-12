@@ -109,7 +109,15 @@ class NearbyConnectionV3Wrapper:
       supported_services: int,  # Handled as int here
       timeout: datetime.timedelta,
   ) -> None:
-    """Starts V3 Connection advertising."""
+    """Starts V3 Connection advertising.
+
+    Args:
+      supported_services: Bitmap of supported services.
+      timeout: The maximum time to wait for advertising setup events.
+
+    Raises:
+      ValueError: If advertiser lifecycle callback is already active.
+    """
     if self._advertiser_connection_lifecycle_callback is not None:
       raise ValueError('Advertiser lifecycle callback is already active.')
     advertiser_callback = self._advertiser_nearby.startAdvertisingV3(
@@ -135,7 +143,15 @@ class NearbyConnectionV3Wrapper:
       supported_services: int,
       timeout: datetime.timedelta,
   ) -> None:
-    """Starts V3 Connection discovery."""
+    """Starts V3 Connection discovery.
+
+    Args:
+      supported_services: Bitmap of supported services.
+      timeout: The maximum time to wait for discovery events.
+
+    Raises:
+      ValueError: If discoverer discovery callback is already active.
+    """
     self._discoverer.log.info(
         'Start discovery V3 %s', self._advertising_discovery_medium.name
     )
@@ -175,7 +191,15 @@ class NearbyConnectionV3Wrapper:
       medium_upgrade_type: constants.MediumUpgradeType,
       timeout: datetime.timedelta,
   ) -> None:
-    """Requests V3 Connection."""
+    """Requests V3 Connection.
+
+    Args:
+      medium_upgrade_type: The type of medium upgrade to request.
+      timeout: The maximum time to wait for connection initiation.
+
+    Raises:
+      ValueError: If discoverer lifecycle callback is already active.
+    """
 
     if self._discoverer_connection_lifecycle_callback is not None:
       raise ValueError('Discoverer lifecycle callback is already active.')
@@ -223,7 +247,15 @@ class NearbyConnectionV3Wrapper:
     self._discoverer_endpoint_id = a_connection_init_event.data['endpointId']
 
   def accept_connection(self, timeout: datetime.timedelta) -> None:
-    """Accepts V3 Connection."""
+    """Accepts V3 Connection.
+
+    Args:
+      timeout: The maximum time to wait for connection acceptance.
+
+    Raises:
+      ValueError: If callbacks are already active.
+      TimeoutError: If medium upgrade times out.
+    """
     if self._advertiser_payload_callback is not None:
       raise ValueError('Advertiser payload callback is already active.')
     self._advertiser_payload_callback = (
@@ -328,7 +360,7 @@ class NearbyConnectionV3Wrapper:
       if discoverer_medium_upgrade_event.data['isHighBwQuality']:
         self.connection_quality_info.medium_upgrade_latency = (
             datetime.timedelta(  # pyrefly: ignore[bad-assignment]
-                               seconds=time.monotonic() - upgrade_start_time
+                seconds=time.monotonic() - upgrade_start_time
             )
         )
         self.connection_quality_info.upgrade_medium = (
@@ -406,7 +438,18 @@ class NearbyConnectionV3Wrapper:
       simulate_address_rotation: bool = False,
       keep_enabling_discovery: bool = False,
   ) -> None:
-    """Starts V3 Connection between two Android devices."""
+    """Starts V3 Connection between two Android devices.
+
+    Args:
+      timeouts: ConnectionSetupTimeouts object containing various timeouts.
+      medium_upgrade_type: The type of medium upgrade to request.
+      supported_services: Bitmap of supported services.
+      simulate_address_rotation: Whether to simulate address rotation.
+      keep_enabling_discovery: Whether to keep enabling discovery.
+
+    Raises:
+      ValueError: If any required timeout is missing.
+    """
     if timeouts.connection_init_timeout is None:
       raise ValueError('connection_init_timeout is required')
     if timeouts.discovery_timeout is None:
@@ -487,7 +530,22 @@ class NearbyConnectionV3Wrapper:
       part_number: int = 1,
       concurrent_requests_num: int = 1,
   ) -> float:
-    """Sends payloads and returns the transfer speed in kilo byte per second."""
+    """Sends payloads and returns the transfer speed in kilo byte per second.
+
+    Args:
+      payload_size_kb: The size of each payload to transfer in kilobytes.
+      timeout: The maximum time to wait for the transfer to complete.
+      payload_type: The type of payload to send (e.g., FILE, BYTES, REQUEST).
+      response_payload_type: The type of payload expected in response.
+      num_files: The number of files/payloads to transfer.
+      response_size_kb: The size of the response payload expected.
+      part_type: The part type (e.g., SINGLE_PART, MULTI_PART).
+      part_number: The part number being transferred.
+      concurrent_requests_num: The number of concurrent requests to send.
+
+    Returns:
+      The calculated transfer speed in kilobytes per second.
+    """
     try:
       self.test_failure_reason = (
           constants.SingleTestFailureReason.FILE_TRANSFER_FAIL
@@ -543,8 +601,19 @@ class NearbyConnectionV3Wrapper:
       part_number: int,
       timeout: datetime.timedelta,
   ) -> float:
-    """Sends request, receives response and returns the response payload
-    transfer speed in kBS."""
+    """Sends request, receives response and returns transfer speed in kBS.
+
+    Args:
+      request_size_kb: The size of the request payload in kilobytes.
+      response_size_kb: The size of the expected response payload in kilobytes.
+      response_payload_type: The type of payload expected in response.
+      part_type: The part type (e.g., SINGLE_PART, MULTI_PART).
+      part_number: The part number being transferred.
+      timeout: The maximum time to wait for the transfer to complete.
+
+    Returns:
+      The calculated transfer speed in kilobytes per second.
+    """
     self._advertiser.log.info(
         'sending REQUEST payload with request size: %s kB and '
         'response size: %s kB',
@@ -630,8 +699,20 @@ class NearbyConnectionV3Wrapper:
       timeout: datetime.timedelta,
       concurrent_requests_num: int,
   ) -> float:
-    """Send multiple requests concurrently and calculate the average
-    throughput."""
+    """Sends concurrent requests and calculates average throughput.
+
+    Args:
+      request_size_kb: The size of each request payload in kilobytes.
+      response_size_kb: The size of each expected response payload in kilobytes.
+      response_payload_type: The type of payload expected in response.
+      part_type: The part type (e.g., SINGLE_PART, MULTI_PART).
+      part_number: The part number being transferred.
+      timeout: The maximum time to wait for the transfers to complete.
+      concurrent_requests_num: The number of concurrent requests to send.
+
+    Returns:
+      The calculated average transfer speed in kilobytes per second.
+    """
     if response_size_kb == 0:
       return 0.0
 
@@ -695,7 +776,6 @@ class NearbyConnectionV3Wrapper:
       )
       self._advertiser.log.info('tx_received_event: %s', tx_received_event)
 
-
     throughputs = []
     for _ in range(concurrent_requests_num):
       tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
@@ -728,7 +808,17 @@ class NearbyConnectionV3Wrapper:
       payload_type: constants.PayloadType,
       num_files: int = constants.TRANSFER_FILE_NUM_DEFAULT,
   ) -> float:
-    """Sends payloads and returns the transfer speed in kBS."""
+    """Sends payloads and returns the transfer speed in kBS.
+
+    Args:
+      file_size_kb: The size of each file to transfer in kilobytes.
+      timeout: The maximum time to wait for the transfer to complete.
+      payload_type: The type of payload to send (e.g., FILE, BYTES).
+      num_files: The number of files/payloads to transfer.
+
+    Returns:
+      The calculated transfer speed in kilobytes per second.
+    """
     # Creates a file and send it to the advertiser.
     file_name = utils.rand_ascii_str(8)
 

@@ -21,7 +21,6 @@ Test requirements:
     None
 
 Test preparations:
-  Set country code to US on Android devices.
 
 Test steps:
   1. Set up a connection with BLE as advertising and connection medium.
@@ -57,12 +56,9 @@ _V3_ON_OVERRIDES = (
     '//wireless/android/platform/testing/bettertogether/betocq:nc_v3_on_overrides'
 )
 
-
-
 _THROUGHPUT_LOW_TIP = (
     'Check with the chip vendor if there is any BT firmware issue.'
 )
-
 
 _PAYLOAD_TRANSFER_FAILURE_TIP = (
     'The BLE connection might be broken, check related logs.'
