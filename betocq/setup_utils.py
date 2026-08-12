@@ -1581,26 +1581,6 @@ def abort_if_device_cap_not_match(
     )
 
 
-def reset_nearby_connection(
-    ad: android_device.AndroidDevice,
-) -> None:
-  """Resets Nearby Connection on the given device.
-
-  Safe guard for the failure test, in case the previous test failed in the
-  middle of the NC, this function makes the NC be reset in best effort properly.
-
-  Args:
-    ad: A AndroidDevice instances.
-  """
-  ad.log.info('reset_nearby_connection')
-  for prop in ['nearby', 'nearby2', 'nearby3']:
-    if nearby := getattr(ad, prop, None):
-      nearby.stopAdvertising()
-      nearby.stopDiscovery()
-      nearby.stopAllEndpoints()
-  time.sleep(constants.NEARBY_RESET_WAIT_TIME.total_seconds())
-
-
 _Priority = Literal['d', 'e', 'f', 'i', 'v', 'w', 's']
 
 

@@ -57,7 +57,28 @@ NC_SCC_5G_TRANSFER_FILE_SIZE_KB = 500 * 1024  # kB
 
 
 @enum.unique
+class V3PayloadType(enum.IntEnum):
+  REQUEST = 1
+  BYTES_RESPONSE = 2
+  FILES_RESPONSE = 3
+
+
+@enum.unique
+class PartType(enum.IntEnum):
+  SINGLE_PART = 1
+  MULTI_PART = 2
+
+
+@enum.unique
+class SupportedServicesEnum(enum.IntEnum):
+  SETTINGS_ESIM = 1
+  DATA_MIGRATION = 2
+  DATA_TRANSFER = 4
+
+
+@enum.unique
 class NcBandwidthUpgradeStatus(enum.IntEnum):
+
   UNKNOWN = 0
   # The upgrade is successful.
   SUCCESS = 1

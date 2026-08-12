@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 import logging
+import time
 from typing import Any
 
 from mobly import base_test
@@ -30,9 +31,11 @@ from betocq import setup_utils
 from betocq.metrics import metrics_base
 from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import nc_test_result_utils
+from betocq.nearby_connection import nearby_connection_v3_wrapper
 from betocq.nearby_connection import nearby_connection_wrapper
 
 MetricsCollector = metrics_base.MetricsCollector
+_NEARBY_SNIPPET_NAMES = ('nearby', 'nearby2', 'nearby3')
 
 
 def check_wifi_ap_status_in_setup_class(
@@ -252,7 +255,7 @@ def setup_android_device_for_nc_tests(
     setup_utils.disable_airplane_mode(ad)
     if not setup_utils.wifi_is_enabled(ad):
       ad.nearby.wifiEnable()
-    setup_utils.reset_nearby_connection(ad)
+    reset_nearby_connection(ad)
     device_specific_dict['wifi_fw'] = setup_utils.get_wifi_firmware_version(ad)
     device_specific_dict['one_time_setup_done'] = True
 
@@ -337,8 +340,7 @@ def connect_ad_to_wifi_sta(
           ' from the AP.'
       )
       ad.log.info(
-          'RSSI=%d is too high. Consider moving the device away from the AP.',
-          rssi,
+          high_rssi_tip,
       )
       result_messages.append(high_rssi_tip)
     nc_test_result_utils.set_active_nc_fail_reason(
@@ -478,7 +480,9 @@ def start_main_nearby_connection(
     )
     metrics_collector.record(
         'connection_medium',
-        getattr(q_info.connection_medium, 'name', q_info.connection_medium),
+        q_info.connection_medium.name
+        if hasattr(q_info.connection_medium, 'name')
+        else q_info.connection_medium,
     )
     metrics_collector.record(
         'upgrade_medium',
@@ -505,6 +509,101 @@ def start_main_nearby_connection(
   return active_snippet
 
 
+def start_main_nearby_connection_v3(
+    advertiser: android_device.AndroidDevice,
+    discoverer: android_device.AndroidDevice,
+    metrics: MetricsCollector,
+    *,
+    upgrade_medium_under_test: constants.NearbyMedium,
+    connection_medium: constants.NearbyMedium = constants.NearbyMedium.BT_ONLY,
+    connect_timeout: constants.ConnectionSetupTimeouts = (
+        constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS
+    ),
+    medium_upgrade_type: constants.MediumUpgradeType = (
+        constants.MediumUpgradeType.DISRUPTIVE
+    ),
+    supported_services: int = 1,
+    simulate_address_rotation: bool = False,
+    keep_enabling_discovery: bool = False,
+) -> nearby_connection_v3_wrapper.NearbyConnectionV3Wrapper:
+  """Starts a main Nearby Connection V3 which is used for file transfer.
+
+  Args:
+    advertiser: The Android device acting as the advertiser.
+    discoverer: The Android device acting as the discoverer.
+    metrics: The metrics collector.
+    upgrade_medium_under_test: The medium expected for the connection upgrade.
+    connection_medium: The medium used for the initial connection.
+    connect_timeout: Timeouts for the connection setup phases.
+    medium_upgrade_type: The type of medium upgrade.
+    supported_services: The service ID generic representation.
+    simulate_address_rotation: Whether to simulate address rotation.
+    keep_enabling_discovery: Whether to keep enabling discovery.
+
+  Returns:
+    A NearbyConnectionV3Wrapper instance for the established connection.
+  """
+  logging.info('set up a Nearby Connection V3 for file transfer.')
+
+  active_snippet = nearby_connection_v3_wrapper.NearbyConnectionV3Wrapper(
+      advertiser,
+      discoverer,
+      advertiser.nearby,
+      discoverer.nearby,
+      advertising_discovery_medium=constants.NearbyMedium.BLE_ONLY,
+      connection_medium=connection_medium,
+      upgrade_medium=upgrade_medium_under_test,
+  )
+  try:
+    active_snippet.start_nearby_connection(
+        timeouts=connect_timeout,
+        medium_upgrade_type=medium_upgrade_type,
+        supported_services=supported_services,
+        simulate_address_rotation=simulate_address_rotation,
+        keep_enabling_discovery=keep_enabling_discovery,
+    )
+
+  finally:
+    # Record connection quality metrics
+    q_info = active_snippet.connection_quality_info
+    metrics.record(
+        'discovery_latency',
+        q_info.discovery_latency,
+        aggregator='stats',
+    )
+    metrics.record(
+        'connection_latency',
+        q_info.connection_latency,
+        aggregator='stats',
+    )
+    metrics.record(
+        'upgrade_latency',
+        q_info.medium_upgrade_latency,
+        aggregator='stats',
+    )
+    metrics.record('connection_medium', q_info.connection_medium)
+    metrics.record(
+        'upgrade_medium',
+        q_info.upgrade_medium,
+        aggregator='counter',
+    )
+    metrics.record('medium_frequency', q_info.medium_frequency)
+
+    fail_reason = active_snippet.test_failure_reason
+    result_message = None
+    if fail_reason == constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
+      result_message = (
+          f'unexpected upgrade medium - {upgrade_medium_under_test.name}'
+      )
+
+    if fail_reason != constants.SingleTestFailureReason.SUCCESS:
+      nc_test_result_utils.set_active_nc_fail_reason(
+          metrics, fail_reason, result_message
+      )
+
+  return active_snippet
+
+
 def handle_file_transfer_failure(
     fail_reason: constants.SingleTestFailureReason,
     metrics: MetricsCollector,
@@ -523,6 +622,51 @@ def handle_file_transfer_failure(
   # do not assert fail here, run in the finally block to ensure metrics are
   # recorded; the failure exception will be raised by the caller.
   # asserts.fail(f'File transfer failed: {fail_reason.name} - {result_message}')
+
+
+def reset_nearby_connection(
+    ad: android_device.AndroidDevice,
+) -> None:
+  """Resets Nearby Connection on the given device.
+
+  Safe guard for the failure test, in case the previous test failed in the
+  middle of the NC, this function makes the NC be reset in best effort properly.
+
+  Args:
+    ad: A AndroidDevice instances.
+  """
+  ad.log.info('reset_nearby_connection')
+  for prop in _NEARBY_SNIPPET_NAMES:
+    if nearby := getattr(ad, prop, None):
+      # V3 APIs
+      if hasattr(nearby, 'stopAdvertisingV3'):
+        try:
+          nearby.stopAdvertisingV3()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to stopAdvertisingV3: %s', e)
+      if hasattr(nearby, 'stopDiscoveryV3'):
+        try:
+          nearby.stopDiscoveryV3()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to stopDiscoveryV3: %s', e)
+
+      # V1/V2 APIs
+      if hasattr(nearby, 'stopAdvertising'):
+        try:
+          nearby.stopAdvertising()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to stopAdvertising: %s', e)
+      if hasattr(nearby, 'stopDiscovery'):
+        try:
+          nearby.stopDiscovery()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to stopDiscovery: %s', e)
+      if hasattr(nearby, 'stopAllEndpoints'):
+        try:
+          nearby.stopAllEndpoints()
+        except Exception as e:  # pylint: disable=broad-except
+          ad.log.warning('Failed to stopAllEndpoints: %s', e)
+  time.sleep(constants.NEARBY_RESET_WAIT_TIME.total_seconds())
 
 
 def _get_snippet(

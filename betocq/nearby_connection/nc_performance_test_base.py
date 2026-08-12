@@ -27,6 +27,7 @@ from betocq.metrics import formatters as metrics_formatters
 from betocq.metrics import metrics_base
 from betocq.nearby_connection import nc_group_formatters
 from betocq.nearby_connection import nc_metrics_registry
+from betocq.nearby_connection import utils as nc_utils
 
 
 class NcMetricsHelper(metrics_base.MetricsHelper):
@@ -184,9 +185,7 @@ class NcMetricsHelper(metrics_base.MetricsHelper):
         completed_metrics.record('result_message', 'PASS')
     else:
       # Check for GMS PID changes and prepend error to result_message
-      pids_changed_error = setup_utils.check_gms_pids_changed(
-          self.test.ads
-      )
+      pids_changed_error = setup_utils.check_gms_pids_changed(self.test.ads)
       if pids_changed_error:
         m = completed_metrics.get('result_message')
         message = m.value if m is not None else ''
@@ -305,6 +304,11 @@ class NcPerformanceTestBase(
   @override
   def get_metric_registry(self) -> Mapping[str, metrics_base.MetricDefinition]:
     return nc_metrics_registry.NC_METRICS_REGISTRY
+
+  @override
+  def reset_device(self, ad: base_test.android_device.AndroidDevice) -> None:
+    """Resets Nearby Connection state."""
+    nc_utils.reset_nearby_connection(ad)
 
   def _get_advertiser_sta_frequency(self) -> int:
     """Gets the advertiser STA frequency from the current iteration metrics."""
