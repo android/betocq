@@ -114,7 +114,7 @@ class BlePerformanceV3Test(nc_performance_test_base.NcPerformanceTestBase):
         connection_medium=self.test_runtime.connection_medium,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
-        supported_services=_SUPPORTED_SERVICES.value,
+        supported_services=_SUPPORTED_SERVICES,
     )
 
     # Test Step: Transfer payload on the established NC.

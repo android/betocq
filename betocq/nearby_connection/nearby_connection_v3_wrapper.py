@@ -106,13 +106,13 @@ class NearbyConnectionV3Wrapper:
 
   def start_advertising(
       self,
-      supported_services: int,  # Handled as int here
+      supported_services: nc_constants.SupportedServicesEnum,
       timeout: datetime.timedelta,
   ) -> None:
     """Starts V3 Connection advertising.
 
     Args:
-      supported_services: Bitmap of supported services.
+      supported_services: Supported services enum.
       timeout: The maximum time to wait for advertising setup events.
 
     Raises:
@@ -124,7 +124,7 @@ class NearbyConnectionV3Wrapper:
         self._password,
         self._advertising_discovery_medium.value,
         self._upgrade_medium.value,
-        supported_services,
+        supported_services.value,
     )
     self._advertiser.log.info(
         'Start advertising V3 %s', self._advertising_discovery_medium.name
@@ -140,26 +140,23 @@ class NearbyConnectionV3Wrapper:
 
   def start_discovery(
       self,
-      supported_services: int,
+      supported_services: nc_constants.SupportedServicesEnum,
       timeout: datetime.timedelta,
   ) -> None:
     """Starts V3 Connection discovery.
 
     Args:
-      supported_services: Bitmap of supported services.
+      supported_services: Supported services enum.
       timeout: The maximum time to wait for discovery events.
 
     Raises:
       ValueError: If discoverer discovery callback is already active.
     """
-    self._discoverer.log.info(
-        'Start discovery V3 %s', self._advertising_discovery_medium.name
-    )
     if self._discoverer_endpoint_discovery_callback is not None:
       raise ValueError('Discoverer discovery callback is already active.')
     self._discoverer_endpoint_discovery_callback = (
         self._discoverer_nearby.startDiscoveryV3(
-            self._advertising_discovery_medium.value, supported_services
+            self._advertising_discovery_medium.value, supported_services.value
         )
     )
 
@@ -434,7 +431,9 @@ class NearbyConnectionV3Wrapper:
       medium_upgrade_type: constants.MediumUpgradeType = (
           constants.MediumUpgradeType.DEFAULT
       ),
-      supported_services: int = 1,  # Default or something appropriate
+      supported_services: nc_constants.SupportedServicesEnum = (
+          nc_constants.SupportedServicesEnum.SETTINGS_ESIM
+      ),
       simulate_address_rotation: bool = False,
       keep_enabling_discovery: bool = False,
   ) -> None:
@@ -671,9 +670,8 @@ class NearbyConnectionV3Wrapper:
     tx_payload_id = tx_received_event.data['payload']['id']
     tx_transfer_event = self._discoverer_payload_callback.waitForEvent(
         'onPayloadTransferUpdate',
-        predicate=lambda event: event.data['update']['payloadId']
-        == tx_payload_id
-        and event.data['endpointId'] == self._advertiser_endpoint_id,
+        predicate=lambda event: event.data['endpointId']
+        == self._advertiser_endpoint_id,
         timeout=timeout.total_seconds(),
     )
     self._discoverer.log.info('tx_transfer_event: %s', tx_transfer_event)
@@ -910,7 +908,7 @@ class NearbyConnectionV3Wrapper:
 
   def _simulate_address_rotation(
       self,
-      supported_services: int,
+      supported_services: nc_constants.SupportedServicesEnum,
       timeout: datetime.timedelta,
   ) -> None:
     """Simulates advertising rotation on advertiser."""

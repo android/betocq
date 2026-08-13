@@ -167,7 +167,7 @@ class Aware5gStaV3Test(nc_performance_test_base.NcPerformanceTestBase):
         connection_medium=constants.NearbyMedium.BLE_ONLY,
         upgrade_medium_under_test=self.test_runtime.upgrade_medium_under_test,
         connect_timeout=constants.DEFAULT_FIRST_CONNECTION_TIMEOUTS,
-        supported_services=_SUPPORTED_SERVICES.value,
+        supported_services=_SUPPORTED_SERVICES,
     )
 
     # Let wifi aware slot update complete before the transfer.

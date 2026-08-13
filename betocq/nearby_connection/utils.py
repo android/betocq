@@ -522,7 +522,9 @@ def start_main_nearby_connection_v3(
     medium_upgrade_type: constants.MediumUpgradeType = (
         constants.MediumUpgradeType.DISRUPTIVE
     ),
-    supported_services: int = 1,
+    supported_services: nc_constants.SupportedServicesEnum = (
+        nc_constants.SupportedServicesEnum.SETTINGS_ESIM
+    ),
     simulate_address_rotation: bool = False,
     keep_enabling_discovery: bool = False,
 ) -> nearby_connection_v3_wrapper.NearbyConnectionV3Wrapper:
