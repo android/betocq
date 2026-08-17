@@ -344,3 +344,8 @@ class NcFunctionTestBase(
   @override
   def get_metric_registry(self) -> Mapping[str, metrics_base.MetricDefinition]:
     return nc_metrics_registry.NC_METRICS_REGISTRY
+
+  @override
+  def reset_device(self, ad: base_test.android_device.AndroidDevice) -> None:
+    """Resets Nearby Connection state."""
+    nc_utils.reset_nearby_connection(ad)
