@@ -74,6 +74,7 @@ class BlePerformanceV3Test(nc_performance_test_base.NcPerformanceTestBase):
   @override
   def setup_class(self) -> None:
     super().setup_class()
+    setup_utils.abort_if_extension_less_than(self.ads, 's', 17)
     self.test_runtime = constants.NcTestRuntime(
         advertiser=self.advertiser,
         discoverer=self.discoverer,

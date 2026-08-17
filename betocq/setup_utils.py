@@ -1563,6 +1563,41 @@ def abort_if_wifi_aware_pairing_not_supported(
     )
 
 
+def abort_if_extension_less_than(
+    ads: list[android_device.AndroidDevice],
+    extension_name: str,
+    min_version: int,
+) -> None:
+  """Aborts test class if any device has specified Mainline extension less than min_version.
+
+  See https://developer.android.com/guide/sdk-extensions for more details about
+  Mainline extension versions.
+
+  Args:
+    ads: A list of AndroidDevice instances.
+    extension_name: The name of the Mainline extension (e.g., 's', 't').
+    min_version: The minimum required version of the extension.
+  """
+  for ad in ads:
+    try:
+      ext_version = ad.adb.getprop(f'build.version.extensions.{extension_name}')
+      ext_version_val = int(ext_version) if ext_version else 0
+    except (adb.AdbError, ValueError):
+      ad.log.exception(
+          'Failed to get or parse Android %s Extension Version. Skipping'
+          ' version check.',
+          extension_name.upper(),
+      )
+      continue
+
+    asserts.abort_class_if(
+        ext_version_val < min_version,
+        f'Android {extension_name.upper()} Extension Version is'
+        f' {ext_version_val}, which is less than {min_version}. Device {ad}'
+        ' does not support required features.',
+    )
+
+
 def abort_if_device_cap_not_match(
     ads: list[android_device.AndroidDevice],
     attribute_name: str,

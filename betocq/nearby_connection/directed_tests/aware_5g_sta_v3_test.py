@@ -112,6 +112,7 @@ class Aware5gStaV3Test(nc_performance_test_base.NcPerformanceTestBase):
     )
 
     # Check device capabilities.
+    setup_utils.abort_if_extension_less_than(self.ads, 's', 17)
     setup_utils.abort_if_5g_band_not_supported(
         [self.discoverer, self.advertiser]
     )
