@@ -20,6 +20,7 @@ import json
 import os
 import shutil
 import tempfile
+from unittest import mock
 import zipfile
 
 from absl.testing import absltest
@@ -397,6 +398,19 @@ class ServerTest(absltest.TestCase):
     self.assertIn("Invalid component ID", response.message)
     self.assertIsNone(response.issue_id)
     self.assertIsNone(response.issue_url)
+
+  def test_pick_unused_port_default(self) -> None:
+    port = server.pick_unused_port()
+    self.assertIsInstance(port, int)
+    self.assertGreater(port, 0)
+    self.assertLessEqual(port, 65535)
+
+  def test_pick_unused_port_socket_fallback(self) -> None:
+    with mock.patch.object(server, "portpicker", None):
+      port = server.pick_unused_port()
+      self.assertIsInstance(port, int)
+      self.assertGreater(port, 0)
+      self.assertLessEqual(port, 65535)
 
 
 if __name__ == "__main__":

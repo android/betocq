@@ -24,6 +24,7 @@ import json
 import os
 import pkgutil
 import shutil
+import socket
 import socketserver
 import sys
 import tempfile
@@ -42,12 +43,36 @@ for _p in list(sys.path):
   if _tp_path not in sys.path:
     sys.path.append(_tp_path)
 
-import portpicker  # pylint: disable=g-import-not-at-top
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+if _current_dir not in sys.path:
+  sys.path.append(_current_dir)
+_repo_root = os.path.abspath(os.path.join(_current_dir, "../../.."))
+if _repo_root not in sys.path:
+  sys.path.append(_repo_root)
 
-from google3.google.devtools.issuetracker.v1 import issuetracker_builders
-from google3.google.devtools.issuetracker.v1 import issuetracker_client
-from google3.net.rpc.python import pywraprpc
-from betocq.tools.test_explorer import mobly_parser
+try:
+  import portpicker  # pylint: disable=g-import-not-at-top
+except ImportError:
+  portpicker = None
+
+
+class _DummyRpcError(Exception):
+  """Fallback exception type when pywraprpc is not available."""
+
+
+try:
+  from google3.google.devtools.issuetracker.v1 import issuetracker_builders  # pylint: disable=g-import-not-at-top
+  from google3.google.devtools.issuetracker.v1 import issuetracker_client  # pylint: disable=g-import-not-at-top
+  from google3.net.rpc.python import pywraprpc  # pylint: disable=g-import-not-at-top
+
+  _RpcException: type[Exception] = pywraprpc.RPCException
+except ImportError:
+  issuetracker_builders = None
+  issuetracker_client = None
+  pywraprpc = None
+  _RpcException: type[Exception] = _DummyRpcError
+
+from betocq.tools.test_explorer import mobly_parser  # pylint: disable=g-import-not-at-top
 
 
 class ApiEndpoint(enum.StrEnum):
@@ -155,10 +180,14 @@ def get_template_html() -> bytes:
     The raw HTML template bytes, or an error HTML snippet if not found.
   """
   base_dir = os.path.dirname(os.path.abspath(__file__))
-  template_path = os.path.join(base_dir, "templates", "index.html")
-  if os.path.isfile(template_path):
-    with open(template_path, "rb") as f:
-      return f.read()
+  candidate_template_paths = [
+      os.path.join(base_dir, "templates", "index.html"),
+      os.path.join(base_dir, "index.html"),
+  ]
+  for template_path in candidate_template_paths:
+    if os.path.isfile(template_path):
+      with open(template_path, "rb") as f:
+        return f.read()
 
   candidate_zips = [
       os.environ.get("_PARFILE", ""),
@@ -253,6 +282,25 @@ def _create_buganizer_issue(
         message=f"Invalid component ID: {component_id!r}. Must be an integer.",
     )
 
+  if issuetracker_builders is None or issuetracker_client is None:
+    # External Partner Mode: No internal API credentials available
+    params = {
+        "component": component_id,
+        "title": summary,
+        "description": description[:_MAX_DESCRIPTION_URL_CHARS],
+    }
+    if assignee:
+      params["assignee"] = assignee
+    web_url = _ISSUETRACKER_NEW_ISSUE_URL + urllib.parse.urlencode(params)
+    return FileBugResponse(
+        success=True,
+        message=(
+            "External Partner Mode (No internal API access): Click below to"
+            " open Google Issue Tracker with pre-populated failure details:"
+        ),
+        issue_url=web_url,
+    )
+
   create = issuetracker_builders.CreateIssueRequestBuilder(numeric_component_id)
   create.SetTitle(summary)
   create.SetComment(description)
@@ -285,7 +333,7 @@ def _create_buganizer_issue(
     write_requests = create.BuildAttachmentsWriteRequests(issue)
     if write_requests:
       issuetracker_client.WriteAttachments(client, write_requests)
-  except pywraprpc.RPCException as e:
+  except _RpcException as e:
     err_str = str(e).lower()
     if "retention" in err_str:
       return FileBugResponse(
@@ -583,6 +631,15 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     """Overrides BaseHTTPRequestHandler.log_message to suppress console log noise."""
 
 
+def pick_unused_port() -> int:
+  """Picks an unused TCP port using portpicker if available, otherwise stdlib socket."""
+  if portpicker is not None:
+    return portpicker.pick_unused_port()
+  with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+    s.bind(("", 0))
+    return int(s.getsockname()[1])
+
+
 def main() -> None:
   """Parses CLI flags and launches the Test Explorer HTTP web server."""
   parser = argparse.ArgumentParser(description="BeToCQ Test Explorer")
@@ -617,7 +674,7 @@ def main() -> None:
     elif isinstance(parsed, dict) and "error" in parsed:
       print(f"[!] Error parsing: {parsed['error']}")
 
-  port = args.port or portpicker.pick_unused_port()
+  port = args.port or pick_unused_port()
   print(f"[*] Starting BeToCQ Test Explorer at http://localhost:{port}/ ...")
   threading.Timer(
       _BROWSER_OPEN_DELAY_SECONDS,
