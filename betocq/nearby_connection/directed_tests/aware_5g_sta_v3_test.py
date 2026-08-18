@@ -62,6 +62,7 @@ _PAYLOAD_TRANSFER_TIMEOUT = constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT
 _V3_PAYLOAD_TYPE = nc_constants.V3PayloadType.REQUEST
 _COUNTRY_CODE = 'US'
 _SUPPORTED_SERVICES = nc_constants.SupportedServicesEnum.DATA_MIGRATION
+_MIN_GMS_VERSION = 262600000
 _V3_AWARE_ON_OVERRIDES = (
     '//wireless/android/platform/testing/bettertogether/betocq:nc_v3_aware_on_overrides'
 )
@@ -112,6 +113,7 @@ class Aware5gStaV3Test(nc_performance_test_base.NcPerformanceTestBase):
     )
 
     # Check device capabilities.
+    setup_utils.abort_if_gms_version_less_than(self.ads, _MIN_GMS_VERSION)
     setup_utils.abort_if_extension_less_than(self.ads, 's', 17)
     setup_utils.abort_if_5g_band_not_supported(
         [self.discoverer, self.advertiser]

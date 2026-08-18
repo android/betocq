@@ -52,6 +52,7 @@ _PAYLOAD_TRANSFER_SIZE_KB = constants.TRANSFER_FILE_SIZE_1KB
 _PAYLOAD_TRANSFER_TIMEOUT = constants.BLE_20K_PAYLOAD_TRANSFER_TIMEOUT
 _SUPPORTED_SERVICES = nc_constants.SupportedServicesEnum.SETTINGS_ESIM
 _PAYLOAD_TYPE = constants.PayloadType.BYTES
+_MIN_GMS_VERSION = 262600000
 _V3_ON_OVERRIDES = (
     '//wireless/android/platform/testing/bettertogether/betocq:nc_v3_on_overrides'
 )
@@ -74,6 +75,7 @@ class BlePerformanceV3Test(nc_performance_test_base.NcPerformanceTestBase):
   @override
   def setup_class(self) -> None:
     super().setup_class()
+    setup_utils.abort_if_gms_version_less_than(self.ads, _MIN_GMS_VERSION)
     setup_utils.abort_if_extension_less_than(self.ads, 's', 17)
     self.test_runtime = constants.NcTestRuntime(
         advertiser=self.advertiser,

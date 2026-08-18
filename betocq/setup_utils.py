@@ -1658,6 +1658,24 @@ def is_gms_version_above_required_version(
   return int(gms_version) >= required_version
 
 
+def abort_if_gms_version_less_than(
+    ads: list[android_device.AndroidDevice],
+    min_version: int,
+) -> None:
+  """Aborts test class if any device has GMS version less than min_version.
+
+  Args:
+    ads: The Android devices to check.
+    min_version: The minimum required GMS version code.
+  """
+  for ad in ads:
+    asserts.abort_class_if(
+        not is_gms_version_above_required_version(ad, min_version),
+        f'GMS version on device {ad} is less than {min_version} (or could not'
+        ' be obtained). Device does not support required features.',
+    )
+
+
 def is_nc_wlan_file_transfer_flaky_issue_fixed(
     advertiser: android_device.AndroidDevice,
 ) -> bool:
