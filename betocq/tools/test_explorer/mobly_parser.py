@@ -588,16 +588,16 @@ def collect_artifacts(results_dir: str) -> list[ArtifactInfo]:
       try:
         rel_path = os.path.relpath(full_path, results_dir)
         size_b = os.path.getsize(full_path)
-        art = ArtifactInfo(
-            filename=f,
-            rel_path=rel_path,
-            size_bytes=size_b,
-            size_formatted=format_file_size(size_b),
-            is_text=f.endswith(TEXT_ARTIFACT_EXTENSIONS),
-        )
-        artifacts.append(art)
       except OSError:
-        pass
+        continue
+      art = ArtifactInfo(
+          filename=f,
+          rel_path=rel_path,
+          size_bytes=size_b,
+          size_formatted=format_file_size(size_b),
+          is_text=f.endswith(TEXT_ARTIFACT_EXTENSIONS),
+      )
+      artifacts.append(art)
   return artifacts
 
 
@@ -646,16 +646,18 @@ def find_and_parse_results(results_dir: str) -> ParseResult | dict[str, Any]:
     temp_dir = tempfile.mkdtemp(prefix="betocq_explorer_")
     try:
       with zipfile.ZipFile(results_dir, "r") as zip_ref:
-        if not safe_extract_zip(zip_ref, temp_dir):
-          shutil.rmtree(temp_dir, ignore_errors=True)
-          return {
-              "error": (
-                  f"Zip archive contains unsafe path entries: {results_dir}"
-              )
-          }
+        is_safe = safe_extract_zip(zip_ref, temp_dir)
     except (zipfile.BadZipFile, OSError) as e:
       shutil.rmtree(temp_dir, ignore_errors=True)
       return {"error": f"Invalid ZIP file ({results_dir}): {e}"}
+
+    if not is_safe:
+      shutil.rmtree(temp_dir, ignore_errors=True)
+      return {
+          "error": (
+              f"Zip archive contains unsafe path entries: {results_dir}"
+          )
+      }
 
     parsed = find_and_parse_results(temp_dir)
     if isinstance(parsed, dict) and "error" in parsed:

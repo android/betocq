@@ -44,6 +44,9 @@ for _p in list(sys.path):
 
 import portpicker  # pylint: disable=g-import-not-at-top
 
+from google3.google.devtools.issuetracker.v1 import issuetracker_builders
+from google3.google.devtools.issuetracker.v1 import issuetracker_client
+from google3.net.rpc.python import pywraprpc
 from betocq.tools.test_explorer import mobly_parser
 
 
@@ -55,6 +58,7 @@ class ApiEndpoint(enum.StrEnum):
   ARTIFACT = "/api/artifact"
   DOWNLOAD = "/api/download"
   UPLOAD = "/api/upload"
+  FILE_BUG = "/api/file_bug"
 
 
 class ContentType(enum.StrEnum):
@@ -90,8 +94,25 @@ class ErrorResponse:
   error: str
 
 
+@dataclasses.dataclass
+class FileBugResponse:
+  """Payload structure for file bug status response."""
+
+  success: bool
+  message: str
+  issue_id: str | None = None
+  issue_url: str | None = None
+
+
 PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.test_explorer"
 TEMPLATE_RESOURCE_PATH = "templates/index.html"
+DEFAULT_COMPONENT_ID = "2105900"
+_MAX_DESCRIPTION_URL_CHARS = 1800
+_MAX_ARTIFACT_READ_BYTES = 2 * 1024 * 1024  # 2MB
+_ISSUETRACKER_NEW_ISSUE_URL = "https://issuetracker.google.com/issues/new?"
+_ISSUETRACKER_ISSUE_URL_PREFIX = "https://issuetracker.google.com/issues/"
+_TEMP_DIR_PREFIX = "betocq_explorer_"
+_BROWSER_OPEN_DELAY_SECONDS = 1.25
 
 # In-memory store for MVP
 TEST_RESULTS: dict[str, Any] | mobly_parser.ParseResult = {
@@ -99,6 +120,7 @@ TEST_RESULTS: dict[str, Any] | mobly_parser.ParseResult = {
     "test_classes": {},
 }
 UPLOAD_TEMP_DIRS: list[str] = []
+BUG_FILING_LOCK = threading.Lock()
 
 
 def cleanup_uploaded_temp_dirs() -> None:
@@ -153,10 +175,10 @@ def get_template_html() -> bytes:
         PACKAGE_NAME,
         TEMPLATE_RESOURCE_PATH,
     )
-    if data:
-      return data
   except (OSError, ImportError, ValueError):
-    pass
+    data = None
+  if data:
+    return data
 
   return (
       b"<!DOCTYPE html><html><body><h1>Error: Template not"
@@ -202,6 +224,107 @@ def _extract_zip_payload(post_data: bytes, content_type: str) -> bytes | None:
   return None
 
 
+def _create_buganizer_issue(
+    summary: str,
+    description: str,
+    component_id: str,
+    attachment_paths: list[str],
+    assignee: str = "",
+) -> FileBugResponse:
+  """Creates an Issue Tracker ticket sequentially and attaches specified files.
+
+  Adheres to sequential execution and retention policy conflict rules.
+
+  Args:
+    summary: The issue summary/title.
+    description: The issue body description.
+    component_id: The Issue Tracker component ID.
+    attachment_paths: List of file paths to attach to the issue.
+    assignee: Optional user email to assign the issue to.
+
+  Returns:
+    A FileBugResponse instance containing status and issue metadata.
+  """
+  try:
+    numeric_component_id = int(component_id)
+  except ValueError:
+    return FileBugResponse(
+        success=False,
+        message=f"Invalid component ID: {component_id!r}. Must be an integer.",
+    )
+
+  create = issuetracker_builders.CreateIssueRequestBuilder(numeric_component_id)
+  create.SetTitle(summary)
+  create.SetComment(description)
+  if assignee:
+    create.SetAssignee(assignee)
+
+  for full_path in attachment_paths:
+    if os.path.isfile(full_path):
+      filename = os.path.basename(full_path)
+      try:
+        with open(full_path, "rb") as f:
+          content_bytes = f.read()
+      except OSError:
+        continue
+      if (
+          filename.endswith(".txt")
+          or filename.endswith(".log")
+          or "logcat" in filename
+      ):
+        create.AddPlaintextAttachment(filename, content_bytes)
+      else:
+        create.AddAttachment(
+            filename, ContentType.OCTET_STREAM.value, content_bytes
+        )
+
+  try:
+    auth_helper = issuetracker_client.LocalOrBorgWithLoquat()
+    client = issuetracker_client.Build(use_prod=True, auth_helper=auth_helper)
+    issue = client.stub.CreateIssue(create.Build())
+    write_requests = create.BuildAttachmentsWriteRequests(issue)
+    if write_requests:
+      issuetracker_client.WriteAttachments(client, write_requests)
+  except pywraprpc.RPCException as e:
+    err_str = str(e).lower()
+    if "retention" in err_str:
+      return FileBugResponse(
+          success=False,
+          message=(
+              "Issue Tracker rejected due to conflicting data retention"
+              " settings. Please re-file or check target component retention."
+          ),
+      )
+    # External Partner Mode: No internal API credentials available
+    params = {
+        "component": component_id,
+        "title": summary,
+        "description": description[:_MAX_DESCRIPTION_URL_CHARS],
+    }
+    if assignee:
+      params["assignee"] = assignee
+    web_url = (
+        _ISSUETRACKER_NEW_ISSUE_URL
+        + urllib.parse.urlencode(params)
+    )
+    return FileBugResponse(
+        success=True,
+        message=(
+            "External Partner Mode (No internal API access): Click below to"
+            " open Google Issue Tracker with pre-populated failure details:"
+        ),
+        issue_url=web_url,
+    )
+
+  issue_id = str(issue.issue_id)
+  return FileBugResponse(
+      success=True,
+      message=f"Successfully created Issue Tracker ticket {issue_id}",
+      issue_id=issue_id,
+      issue_url=f"{_ISSUETRACKER_ISSUE_URL_PREFIX}{issue_id}",
+  )
+
+
 class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
   """Request handler for serving the Test Explorer UI and API endpoints."""
 
@@ -231,9 +354,11 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     full_path = os.path.abspath(os.path.join(results_dir, rel_path))
     results_dir_abs = os.path.abspath(results_dir)
     try:
-      if os.path.commonpath([full_path, results_dir_abs]) != results_dir_abs:
-        return None
+      common_path = os.path.commonpath([full_path, results_dir_abs])
     except ValueError:
+      return None
+
+    if common_path != results_dir_abs:
       return None
 
     if os.path.isfile(full_path):
@@ -259,16 +384,18 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     full_path, rel_path = target
     try:
       with open(full_path, "r", encoding="utf-8", errors="replace") as f:
-        content = f.read(2 * 1024 * 1024)
-      self._send_json(
-          ArtifactResponse(
-              filename=os.path.basename(rel_path),
-              path=rel_path,
-              content=content,
-          )
-      )
+        content = f.read(_MAX_ARTIFACT_READ_BYTES)
     except OSError as e:
       self._send_json(ErrorResponse(error=str(e)), 500)
+      return
+
+    self._send_json(
+        ArtifactResponse(
+            filename=os.path.basename(rel_path),
+            path=rel_path,
+            content=content,
+        )
+    )
 
   def _handle_download(self) -> None:
     """Serves artifact files as binary downloads."""
@@ -278,16 +405,21 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
       return
 
     full_path, rel_path = target
+    filename = os.path.basename(rel_path)
     try:
-      filename = os.path.basename(rel_path)
       file_size = os.path.getsize(full_path)
-      self.send_response(200)
-      self.send_header("Content-Type", ContentType.OCTET_STREAM.value)
-      self.send_header(
-          "Content-Disposition", f'attachment; filename="{filename}"'
-      )
-      self.send_header("Content-Length", str(file_size))
-      self.end_headers()
+    except OSError as e:
+      self.send_error(500, f"Download error: {e}")
+      return
+
+    self.send_response(200)
+    self.send_header("Content-Type", ContentType.OCTET_STREAM.value)
+    self.send_header(
+        "Content-Disposition", f'attachment; filename="{filename}"'
+    )
+    self.send_header("Content-Length", str(file_size))
+    self.end_headers()
+    try:
       with open(full_path, "rb") as f:
         shutil.copyfileobj(f, self.wfile)
     except OSError as e:
@@ -306,8 +438,91 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     else:
       self.send_error(404, "Not Found")
 
+  def _handle_file_bug(self) -> None:
+    """Handles POST requests to file an Issue Tracker ticket with attachments."""
+    content_length = int(self.headers.get("Content-Length", 0))
+    post_data = self.rfile.read(content_length)
+    try:
+      payload = json.loads(post_data.decode("utf-8"))
+    except (json.JSONDecodeError, UnicodeDecodeError) as e:
+      self._send_json(ErrorResponse(error=f"Invalid JSON payload: {e}"), 400)
+      return
+
+    summary = str(payload.get("summary", "")).strip()
+    description = str(payload.get("description", "")).strip()
+    component_id = str(payload.get("component_id") or "").strip()
+    if not component_id:
+      component_id = DEFAULT_COMPONENT_ID
+    assignee = str(payload.get("assignee", "")).strip()
+    is_shielded = payload.get("is_shielded", True)
+    is_throughput = payload.get("is_throughput", False)
+    rel_paths = payload.get("attachment_paths", [])
+
+    if not summary:
+      self._send_json(ErrorResponse(error="Summary is required."), 400)
+      return
+
+    try:
+      int(component_id)
+    except ValueError:
+      self._send_json(
+          ErrorResponse(
+              error=(
+                  f"Invalid component ID: {component_id!r}. Must be an integer."
+              )
+          ),
+          400,
+      )
+      return
+
+    # Check rule: Bug Filing for Throughput Issues
+    if is_throughput and not is_shielded:
+      self._send_json(
+          FileBugResponse(
+              success=False,
+              message=(
+                  "Ticket filing skipped: Throughput/transfer speed failures"
+                  " in unshielded environments must not be filed as tickets."
+              ),
+          ),
+          200,
+      )
+      return
+
+    if isinstance(TEST_RESULTS, mobly_parser.ParseResult):
+      results_dir = TEST_RESULTS.results_dir
+    else:
+      results_dir = str(TEST_RESULTS.get("results_dir") or "")
+
+    attachment_paths: list[str] = []
+    if results_dir and isinstance(rel_paths, list):
+      results_dir_abs = os.path.abspath(results_dir)
+      for rel_p in rel_paths:
+        full_path = os.path.abspath(os.path.join(results_dir_abs, str(rel_p)))
+        try:
+          common_path = os.path.commonpath([full_path, results_dir_abs])
+        except ValueError:
+          continue
+        if common_path == results_dir_abs and os.path.isfile(full_path):
+          attachment_paths.append(full_path)
+
+    with BUG_FILING_LOCK:
+      response = _create_buganizer_issue(
+          summary=summary,
+          description=description,
+          component_id=component_id,
+          attachment_paths=attachment_paths,
+          assignee=assignee,
+      )
+
+    status_code = 200 if response.success else 500
+    self._send_json(response, status_code)
+
   def do_POST(self) -> None:  # pylint: disable=invalid-name
     """Handles HTTP POST requests for result uploads."""
+    if self.path == ApiEndpoint.FILE_BUG.value:
+      self._handle_file_bug()
+      return
     if self.path != ApiEndpoint.UPLOAD.value:
       self.send_error(404, "Not Found")
       return
@@ -326,23 +541,25 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
       )
       return
 
-    temp_dir = tempfile.mkdtemp(prefix="betocq_explorer_")
+    temp_dir = tempfile.mkdtemp(prefix=_TEMP_DIR_PREFIX)
     zip_path = os.path.join(temp_dir, mobly_parser.UPLOADED_ZIP_NAME)
     with open(zip_path, "wb") as f:
       f.write(zip_payload)
 
     try:
       with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        if not _safe_extract_zip(zip_ref, temp_dir):
-          shutil.rmtree(temp_dir, ignore_errors=True)
-          self._send_json(
-              ErrorResponse(error="Zip archive contains unsafe path entries."),
-              400,
-          )
-          return
+        is_safe = _safe_extract_zip(zip_ref, temp_dir)
     except (zipfile.BadZipFile, OSError):
       shutil.rmtree(temp_dir, ignore_errors=True)
       self._send_json(ErrorResponse(error="Invalid ZIP file."), 400)
+      return
+
+    if not is_safe:
+      shutil.rmtree(temp_dir, ignore_errors=True)
+      self._send_json(
+          ErrorResponse(error="Zip archive contains unsafe path entries."),
+          400,
+      )
       return
 
     parsed_data = mobly_parser.find_and_parse_results(temp_dir)
@@ -403,7 +620,8 @@ def main() -> None:
   port = args.port or portpicker.pick_unused_port()
   print(f"[*] Starting BeToCQ Test Explorer at http://localhost:{port}/ ...")
   threading.Timer(
-      1.25, lambda: webbrowser.open(f"http://localhost:{port}/")
+      _BROWSER_OPEN_DELAY_SECONDS,
+      lambda: webbrowser.open(f"http://localhost:{port}/"),
   ).start()
 
   class ReusableTCPServer(socketserver.TCPServer):

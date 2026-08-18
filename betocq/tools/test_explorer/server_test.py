@@ -289,6 +289,115 @@ class ServerTest(absltest.TestCase):
     finally:
       shutil.rmtree(temp_dir, ignore_errors=True)
 
+  def test_file_bug_missing_summary(self) -> None:
+    payload_bytes = json.dumps({"summary": ""}).encode("utf-8")
+    handler = DummyRequestHandler(
+        path="/api/file_bug",
+        headers={
+            "Content-Type": "application/json",
+            "Content-Length": str(len(payload_bytes)),
+        },
+    )
+    handler.rfile = io.BytesIO(payload_bytes)
+    handler.do_POST()
+
+    self.assertEqual(handler.response_status, 400)
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertIn("Summary is required", output.get("error", ""))
+
+  def test_file_bug_unshielded_throughput_skipped(self) -> None:
+    payload_bytes = json.dumps({
+        "summary": "Transfer speed regression",
+        "is_shielded": False,
+        "is_throughput": True,
+    }).encode("utf-8")
+    handler = DummyRequestHandler(
+        path="/api/file_bug",
+        headers={
+            "Content-Type": "application/json",
+            "Content-Length": str(len(payload_bytes)),
+        },
+    )
+    handler.rfile = io.BytesIO(payload_bytes)
+    handler.do_POST()
+
+    self.assertEqual(handler.response_status, 200)
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertFalse(output.get("success"))
+    self.assertIn("unshielded environments", output.get("message", ""))
+
+  def test_file_bug_fallback_uses_default_component_id(self) -> None:
+    payload_bytes = json.dumps({
+        "summary": "Connection failure",
+        "description": "Details about connection drop",
+    }).encode("utf-8")
+    handler = DummyRequestHandler(
+        path="/api/file_bug",
+        headers={
+            "Content-Type": "application/json",
+            "Content-Length": str(len(payload_bytes)),
+        },
+    )
+    handler.rfile = io.BytesIO(payload_bytes)
+    handler.do_POST()
+
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertTrue(output.get("success"))
+    issue_url = output.get("issue_url") or ""
+    self.assertIn(f"component={server.DEFAULT_COMPONENT_ID}", issue_url)
+
+  def test_file_bug_empty_component_id_falls_back_to_default(self) -> None:
+    payload_bytes = json.dumps({
+        "summary": "Connection failure with empty component",
+        "description": "Details about connection drop",
+        "component_id": "   ",
+    }).encode("utf-8")
+    handler = DummyRequestHandler(
+        path="/api/file_bug",
+        headers={
+            "Content-Type": "application/json",
+            "Content-Length": str(len(payload_bytes)),
+        },
+    )
+    handler.rfile = io.BytesIO(payload_bytes)
+    handler.do_POST()
+
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertTrue(output.get("success"))
+    issue_url = output.get("issue_url") or ""
+    self.assertIn(f"component={server.DEFAULT_COMPONENT_ID}", issue_url)
+
+  def test_file_bug_invalid_component_id_returns_400(self) -> None:
+    payload_bytes = json.dumps({
+        "summary": "Connection failure",
+        "component_id": "invalid_component",
+    }).encode("utf-8")
+    handler = DummyRequestHandler(
+        path="/api/file_bug",
+        headers={
+            "Content-Type": "application/json",
+            "Content-Length": str(len(payload_bytes)),
+        },
+    )
+    handler.rfile = io.BytesIO(payload_bytes)
+    handler.do_POST()
+
+    self.assertEqual(handler.response_status, 400)
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertIn("Invalid component ID", output.get("error", ""))
+
+  def test_create_buganizer_issue_invalid_component_id(self) -> None:
+    response = server._create_buganizer_issue(
+        summary="Test summary",
+        description="Test desc",
+        component_id="not_an_int",
+        attachment_paths=[],
+    )
+    self.assertFalse(response.success)
+    self.assertIn("Invalid component ID", response.message)
+    self.assertIsNone(response.issue_id)
+    self.assertIsNone(response.issue_url)
+
 
 if __name__ == "__main__":
   absltest.main()

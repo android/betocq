@@ -193,10 +193,198 @@
     </div>
   </div>
 
+  <!-- File Bug Modal -->
+  <div id="file-bug-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
+      <div class="p-5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div class="flex items-center gap-2 font-bold text-gray-900 text-base">
+          <span>🎫</span>
+          <span>File Issue Tracker Ticket</span>
+        </div>
+        <button onclick="closeFileBugModal()" class="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-lg">
+          &times;
+        </button>
+      </div>
+      <div class="p-6 flex-1 overflow-y-auto space-y-4 text-xs text-gray-700">
+        <div>
+          <label class="block font-bold text-gray-800 mb-1">Issue Summary <span class="text-red-500">*</span></label>
+          <input type="text" id="bug-summary" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block font-bold text-gray-800 mb-1">Component ID</label>
+            <input type="text" id="bug-component-id" value="2105900" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block font-bold text-gray-800 mb-1">Assignee LDAP (Optional)</label>
+            <input type="text" id="bug-assignee" placeholder="e.g. username@google.com" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          </div>
+        </div>
+        <!-- Throughput & Shielding Rules Checklist -->
+        <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="bug-is-throughput" onchange="toggleShieldedOption()" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <label for="bug-is-throughput" class="font-bold text-amber-900 cursor-pointer">Is this a throughput or transfer speed failure?</label>
+          </div>
+          <div id="shielded-option-container" class="hidden pl-6 pt-1 border-t border-amber-200/60">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="bug-is-shielded" checked class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+              <label for="bug-is-shielded" class="font-semibold text-amber-950 cursor-pointer">Tested in an RF-shielded box/room? (Required for throughput bugs)</label>
+            </div>
+            <p class="text-[11px] text-amber-800 mt-1">Note: Per project rules, skip filing tickets for throughput issues if the environment is unshielded.</p>
+          </div>
+        </div>
+        <div>
+          <label class="block font-bold text-gray-800 mb-1">Description & Failure Log</label>
+          <textarea id="bug-description" rows="6" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none whitespace-pre"></textarea>
+        </div>
+        <div>
+          <label class="block font-bold text-gray-800 mb-1">Attachments to Upload (Bugreport & Logcat)</label>
+          <div id="bug-attachments-list" class="space-y-1.5 max-h-36 overflow-y-auto p-3 border border-gray-200 rounded-xl bg-gray-50">
+            <!-- Checkboxes populated via JS -->
+          </div>
+        </div>
+        <div id="bug-submit-status" class="hidden p-3 rounded-xl font-medium text-center"></div>
+      </div>
+      <div class="p-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
+        <button onclick="closeFileBugModal()" class="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer">
+          Cancel
+        </button>
+        <button id="bug-submit-btn" onclick="submitFileBug()" class="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+          <span>🎫 Submit Ticket</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
   <script>
     // Global store for parsed data
     let globalData = null;
     let currentArtifacts = [];
+
+    function toggleShieldedOption() {
+      const isTp = document.getElementById('bug-is-throughput').checked;
+      const cont = document.getElementById('shielded-option-container');
+      if (isTp) {
+        cont.classList.remove('hidden');
+      } else {
+        cont.classList.add('hidden');
+      }
+    }
+
+    function openFileBugModal(className, groupIndex, iterationIndex) {
+      if (!globalData) return;
+      const clsData = globalData.test_classes[className];
+      if (!clsData) return;
+      const group = clsData.test_groups[groupIndex];
+      if (!group) return;
+      const iter = group.iterations[iterationIndex];
+      if (!iter) return;
+
+      document.getElementById('bug-summary').value = `[BeToCQ Failure] ${className}.${iter.name} failed`;
+      
+      const logSnippet = iter.stacktrace || iter.details || '(No failure log available)';
+      const desc = `Test Suite: ${className}\nTest Case: ${iter.name}\nStatus: ${iter.status}\nDuration: ${iter.duration || 0}s\nStart Time: ${iter.begin_time ? new Date(iter.begin_time).toLocaleString() : 'N/A'}\n\n--- Failure Log ---\n${logSnippet}`;
+      document.getElementById('bug-description').value = desc;
+
+      document.getElementById('bug-is-throughput').checked = false;
+      document.getElementById('bug-is-shielded').checked = true;
+      document.getElementById('shielded-option-container').classList.add('hidden');
+      document.getElementById('bug-submit-status').classList.add('hidden');
+      document.getElementById('bug-submit-btn').disabled = false;
+      document.getElementById('bug-submit-btn').innerHTML = '<span>🎫 Submit Ticket</span>';
+
+      // Populate attachments
+      const { logcats, bugreports } = getIterationArtifacts(iter.name);
+      const attList = document.getElementById('bug-attachments-list');
+      attList.innerHTML = '';
+      const combined = [...bugreports, ...logcats];
+      if (combined.length === 0) {
+        attList.innerHTML = '<div class="text-gray-400 italic">No logcat or bugreport files detected for this iteration.</div>';
+      } else {
+        combined.forEach(attachment => {
+          attList.innerHTML += `
+            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-colors">
+              <input type="checkbox" name="bug-attachment-item" value="${encodeURIComponent(attachment.rel_path)}" checked class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+              <span class="font-mono text-xs text-gray-700">${attachment.filename}</span>
+              <span class="text-[10px] text-gray-400 font-normal">(${attachment.rel_path})</span>
+            </label>
+          `;
+        });
+      }
+
+      document.getElementById('file-bug-modal').classList.remove('hidden');
+    }
+
+    function closeFileBugModal() {
+      document.getElementById('file-bug-modal').classList.add('hidden');
+    }
+
+    function submitFileBug() {
+      const summary = document.getElementById('bug-summary').value.trim();
+      if (!summary) {
+        alert('Please provide an issue summary.');
+        return;
+      }
+      const componentId = document.getElementById('bug-component-id').value.trim();
+      const assignee = document.getElementById('bug-assignee').value.trim();
+      const description = document.getElementById('bug-description').value;
+      const isThroughput = document.getElementById('bug-is-throughput').checked;
+      const isShielded = document.getElementById('bug-is-shielded').checked;
+
+      const attCheckboxes = document.querySelectorAll('input[name="bug-attachment-item"]:checked');
+      const attachmentPaths = Array.from(attCheckboxes).map(cb => decodeURIComponent(cb.value));
+
+      const statusDiv = document.getElementById('bug-submit-status');
+      const submitBtn = document.getElementById('bug-submit-btn');
+
+      statusDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800', 'bg-amber-100', 'text-amber-800');
+      statusDiv.classList.add('bg-blue-50', 'text-blue-800');
+      statusDiv.textContent = '⏳ Submitting ticket to Issue Tracker sequentially...';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Submitting...';
+
+      fetch('/api/file_bug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary,
+          description,
+          component_id: componentId,
+          assignee,
+          is_throughput: isThroughput,
+          is_shielded: isShielded,
+          attachment_paths: attachmentPaths
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>🎫 Submit Ticket</span>';
+        if (data.success) {
+          statusDiv.classList.add('bg-green-100', 'text-green-800');
+          if (data.issue_id) {
+            statusDiv.innerHTML = `✓ ${data.message} <a href="https://issuetracker.google.com/issues/${data.issue_id}" target="_blank" class="underline font-bold ml-1">View Ticket ↗</a>`;
+          } else if (data.issue_url) {
+            statusDiv.innerHTML = `✓ ${data.message} <div class="mt-3"><a href="${data.issue_url}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl inline-block shadow transition-colors text-xs cursor-pointer">🚀 Open Pre-populated Issue Tracker ↗</a></div><div class="mt-2 text-[11px] text-gray-600 font-normal">Please attach your selected bugreport and logcat files directly in the browser.</div>`;
+            window.open(data.issue_url, '_blank');
+          } else {
+            statusDiv.textContent = `✓ ${data.message}`;
+          }
+        } else {
+          const isWarning = data.message.includes('skipped');
+          statusDiv.classList.add(isWarning ? 'bg-amber-100' : 'bg-red-100', isWarning ? 'text-amber-900' : 'text-red-800');
+          statusDiv.textContent = data.message || 'Failed to create ticket.';
+        }
+      })
+      .catch(err => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>🎫 Submit Ticket</span>';
+        statusDiv.classList.remove('bg-blue-50', 'text-blue-800');
+        statusDiv.classList.add('bg-red-100', 'text-red-800');
+        statusDiv.textContent = 'Error sending request: ' + err;
+      });
+    }
     let dirCounter = 0;
 
     // Helper function to format test suite names in clean CamelCase / TitleCase
@@ -290,19 +478,19 @@
       return { logcats, bugreports, others };
     }
 
-    function toggleIterationLog(className, groupIdx, iterIdx) {
+    function toggleIterationLog(className, groupIndex, iterationIndex) {
       const safeClass = className.replace(/[^a-zA-Z0-9]/g, '');
-      const drawer = document.getElementById(`log-drawer-${safeClass}-${groupIdx}`);
-      const headerEl = document.getElementById(`log-header-${safeClass}-${groupIdx}`);
-      const contentEl = document.getElementById(`log-content-${safeClass}-${groupIdx}`);
+      const drawer = document.getElementById(`log-drawer-${safeClass}-${groupIndex}`);
+      const headerEl = document.getElementById(`log-header-${safeClass}-${groupIndex}`);
+      const contentEl = document.getElementById(`log-content-${safeClass}-${groupIndex}`);
 
       if (!drawer || !globalData) return;
 
       const clsData = globalData.test_classes[className];
       if (!clsData) return;
-      const group = clsData.test_groups[groupIdx];
+      const group = clsData.test_groups[groupIndex];
       if (!group) return;
-      const iter = group.iterations[iterIdx];
+      const iter = group.iterations[iterationIndex];
       if (!iter) return;
 
       const itStatus = (iter.status || 'UNKNOWN').toUpperCase();
@@ -376,11 +564,18 @@
         `;
       }
 
+      const fileBugBtnHtml = !isPass ? `
+        <button onclick="openFileBugModal('${className}', ${groupIndex}, ${iterationIndex})" class="ml-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-sm transition-colors cursor-pointer" title="File Issue Tracker ticket for this failure">
+          🎫 <span>File Ticket</span>
+        </button>
+      ` : '';
+
       headerEl.innerHTML = `
         <div class="flex items-center justify-between p-2.5 bg-gray-100 rounded-lg text-gray-800">
           <div class="flex items-center gap-2">
             <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isPass ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}">${itStatus}</span>
             <span class="font-mono text-xs font-bold">${iter.name}</span>
+            ${fileBugBtnHtml}
           </div>
           <div class="flex items-center gap-3 text-xs text-gray-500">
             <span>⏱️ Start: ${iter.begin_time ? new Date(iter.begin_time).toLocaleTimeString() : 'N/A'}</span>
@@ -768,7 +963,7 @@
                 `;
 
                 // Render Each Base Test Case Group Card (Mockup Style)
-                groups.forEach((group, gidx) => {
+                groups.forEach((group, groupIndex) => {
                     const status = (group.status || 'UNKNOWN').toUpperCase();
                     const isFail = (status === 'FAIL' || status === 'FAILED' || status === 'ERROR');
                     const isPass = (status === 'PASS' || status === 'PASSED');
@@ -780,7 +975,7 @@
 
                     let badgeClass = isPass
                       ? 'bg-green-600 text-white'
-                      : (isThroughput ? 'bg-amber-500 text-white' : 'bg-red-500 text-white');
+                      : (isThroughput ? 'bg-amber-50/60 border-amber-200' : 'bg-red-500 text-white');
                     if (status === 'SKIP') badgeClass = 'bg-yellow-400 text-gray-900';
 
                     let cardBg = isPass
@@ -794,7 +989,7 @@
 
                     // Generate Repeat Chips
                     let chipsHtml = '';
-                    (group.iterations || []).forEach((it, iterIdx) => {
+                    (group.iterations || []).forEach((it, iterationIndex) => {
                         const itStatus = (it.status || 'UNKNOWN').toUpperCase();
                         const itPass = (itStatus === 'PASS' || itStatus === 'PASSED');
                         const itSkip = (itStatus === 'SKIP' || itStatus === 'SKIPPED');
@@ -805,8 +1000,8 @@
                         const chipIcon = itPass ? '✓' : (itSkip ? '-' : '!');
 
                         chipsHtml += `
-                          <button onclick="toggleIterationLog('${className}', ${gidx}, ${iterIdx})"
-                                  title="Iteration #${iterIdx + 1}: ${it.name} (${itStatus})"
+                          <button onclick="toggleIterationLog('${className}', ${groupIndex}, ${iterationIndex})"
+                                  title="Iteration #${iterationIndex + 1}: ${it.name} (${itStatus})"
                                   class="w-6 h-6 rounded flex items-center justify-center font-bold text-xs shadow-sm transition-transform hover:scale-110 cursor-pointer ${chipBg}">
                             ${chipIcon}
                           </button>
@@ -838,9 +1033,9 @@
                         </div>
 
                         <!-- Expandable Log Drawer (Hidden by default) -->
-                        <div id="log-drawer-${safeClass}-${gidx}" class="hidden mt-4 pt-3 border-t border-gray-200">
-                          <div id="log-header-${safeClass}-${gidx}" class="mb-2 text-xs font-bold"></div>
-                          <div id="log-content-${safeClass}-${gidx}"></div>
+                        <div id="log-drawer-${safeClass}-${groupIndex}" class="hidden mt-4 pt-3 border-t border-gray-200">
+                          <div id="log-header-${safeClass}-${groupIndex}" class="mb-2 text-xs font-bold"></div>
+                          <div id="log-content-${safeClass}-${groupIndex}"></div>
                         </div>
                       </div>
                     `;
@@ -848,22 +1043,22 @@
 
                 // Render Cleanup Failures at bottom of test suite if any
                 if (cleanups.length > 0) {
-                  cleanups.forEach((c, cidx) => {
-                    const cStatus = (c.status || 'UNKNOWN').toUpperCase();
+                  cleanups.forEach((cleanup, cleanupIndex) => {
+                    const cStatus = (cleanup.status || 'UNKNOWN').toUpperCase();
                     const isFail = cStatus !== 'PASS' && cStatus !== 'SKIP';
                     if (isFail) {
-                      const cleanupId = `cleanup-details-${className.replace(/[^a-zA-Z0-9]/g, '')}-${cidx}`;
+                      const cleanupId = `cleanup-details-${className.replace(/[^a-zA-Z0-9]/g, '')}-${cleanupIndex}`;
                       treeHtml += `
                         <div class="p-4 bg-red-50/80 border border-red-200 rounded-2xl text-xs shadow-sm">
                           <div class="flex justify-between items-center cursor-pointer font-bold text-red-800" onclick="document.getElementById('${cleanupId}').classList.toggle('hidden')">
-                            <span class="flex items-center gap-1.5">⚠️ Cleanup / Fixture Failure: <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-red-200">${c.name}</code></span>
+                            <span class="flex items-center gap-1.5">⚠️ Cleanup / Fixture Failure: <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-red-200">${cleanup.name}</code></span>
                             <div class="flex items-center gap-2">
                               <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full uppercase font-bold text-[10px]">${cStatus}</span>
                               <span class="text-red-400 text-xs">▼</span>
                             </div>
                           </div>
                           <div id="${cleanupId}" class="hidden mt-2.5 p-3.5 bg-white text-red-700 border border-red-200 rounded-xl font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-sm">
-                            ${c.stacktrace || c.details || 'Fixture / Cleanup failed with no stacktrace.'}
+                            ${cleanup.stacktrace || cleanup.details || 'Fixture / Cleanup failed with no stacktrace.'}
                           </div>
                         </div>
                       `;
