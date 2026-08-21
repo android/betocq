@@ -55,7 +55,7 @@ _THROUGHPUT_LOW_TIP = (
 
 class Aware5gDfsStaV3Test(aware_sta_v3_test_base.AwareStaV3TestBase):
 
-  d2d_type: constants.WifiD2DType = constants.WifiD2DType.XCC_5G_STA
+  d2d_type: constants.WifiD2DType = constants.WifiD2DType.XCC_5G_DFS_STA
   throughput_low_tip: str = _THROUGHPUT_LOW_TIP
 
   @override
