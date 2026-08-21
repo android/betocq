@@ -401,14 +401,18 @@ def start_prior_bt_nearby_connection(
     )
   finally:
     q_info = prior_bt_snippet.connection_quality_info
-    metrics_collector.record(
-        'prior_discovery_latency', q_info.discovery_latency, aggregator='stats'
-    )
-    metrics_collector.record(
-        'prior_connection_latency',
-        q_info.connection_latency,
-        aggregator='stats',
-    )
+    if q_info.discovery_latency != constants.UNSET_LATENCY:
+      metrics_collector.record(
+          'prior_discovery_latency',
+          q_info.discovery_latency,
+          aggregator='stats',
+      )
+    if q_info.connection_latency != constants.UNSET_LATENCY:
+      metrics_collector.record(
+          'prior_connection_latency',
+          q_info.connection_latency,
+          aggregator='stats',
+      )
     nc_test_result_utils.set_prior_nc_fail_reason(
         metrics_collector, prior_bt_snippet.test_failure_reason
     )
@@ -467,17 +471,19 @@ def start_main_nearby_connection(
         test_parameters=test_parameters,
     )
   finally:
-    # Record connection quality metrics
     q_info = active_snippet.connection_quality_info
-    metrics_collector.record(
-        'discovery_latency', q_info.discovery_latency, aggregator='stats'
-    )
-    metrics_collector.record(
-        'connection_latency', q_info.connection_latency, aggregator='stats'
-    )
-    metrics_collector.record(
-        'upgrade_latency', q_info.medium_upgrade_latency, aggregator='stats'
-    )
+    if q_info.discovery_latency != constants.UNSET_LATENCY:
+      metrics_collector.record(
+          'discovery_latency', q_info.discovery_latency, aggregator='stats'
+      )
+    if q_info.connection_latency != constants.UNSET_LATENCY:
+      metrics_collector.record(
+          'connection_latency', q_info.connection_latency, aggregator='stats'
+      )
+    if q_info.medium_upgrade_latency != constants.UNSET_LATENCY:
+      metrics_collector.record(
+          'upgrade_latency', q_info.medium_upgrade_latency, aggregator='stats'
+      )
     metrics_collector.record(
         'connection_medium',
         q_info.connection_medium.name
@@ -492,6 +498,7 @@ def start_main_nearby_connection(
     metrics_collector.record('medium_frequency', q_info.medium_frequency)
 
     fail_reason = active_snippet.test_failure_reason
+
     result_message = None
     if fail_reason == constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
       default_message = (
@@ -566,23 +573,25 @@ def start_main_nearby_connection_v3(
     )
 
   finally:
-    # Record connection quality metrics
     q_info = active_snippet.connection_quality_info
-    metrics.record(
-        'discovery_latency',
-        q_info.discovery_latency,
-        aggregator='stats',
-    )
-    metrics.record(
-        'connection_latency',
-        q_info.connection_latency,
-        aggregator='stats',
-    )
-    metrics.record(
-        'upgrade_latency',
-        q_info.medium_upgrade_latency,
-        aggregator='stats',
-    )
+    if q_info.discovery_latency != constants.UNSET_LATENCY:
+      metrics.record(
+          'discovery_latency',
+          q_info.discovery_latency,
+          aggregator='stats',
+      )
+    if q_info.connection_latency != constants.UNSET_LATENCY:
+      metrics.record(
+          'connection_latency',
+          q_info.connection_latency,
+          aggregator='stats',
+      )
+    if q_info.medium_upgrade_latency != constants.UNSET_LATENCY:
+      metrics.record(
+          'upgrade_latency',
+          q_info.medium_upgrade_latency,
+          aggregator='stats',
+      )
     metrics.record('connection_medium', q_info.connection_medium)
     metrics.record(
         'upgrade_medium',
@@ -592,6 +601,7 @@ def start_main_nearby_connection_v3(
     metrics.record('medium_frequency', q_info.medium_frequency)
 
     fail_reason = active_snippet.test_failure_reason
+
     result_message = None
     if fail_reason == constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE:
       result_message = (
