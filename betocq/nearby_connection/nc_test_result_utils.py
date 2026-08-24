@@ -153,27 +153,6 @@ def set_and_assert_concurrency_mode(
     )
 
 
-def collect_nc_test_metrics(
-    metrics: MetricsCollector,
-    nc_test_runtime: constants.NcTestRuntime,
-) -> None:
-  """Collects general test metrics for nearby connection tests."""
-  advertiser = nc_test_runtime.advertiser
-  sta_frequency, max_link_speed_mbps = (
-      setup_utils.get_target_sta_frequency_and_max_link_speed(advertiser)
-  )
-  metrics.record('advertiser_sta_frequency', sta_frequency)
-  metrics.record('advertiser_max_sta_link_speed_mbps', max_link_speed_mbps)
-
-  if nc_test_runtime.upgrade_medium_under_test.to_connection_medium() in [
-      constants.NearbyConnectionMedium.WIFI_DIRECT,
-      constants.NearbyConnectionMedium.WIFI_HOTSPOT,
-  ]:
-    metrics.record(
-        'medium_frequency', setup_utils.get_wifi_p2p_frequency(advertiser)
-    )
-
-
 def assert_sta_frequency(
     metrics: MetricsCollector,
     expected_wifi_type: constants.WifiType,

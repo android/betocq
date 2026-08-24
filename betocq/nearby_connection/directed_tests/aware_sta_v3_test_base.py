@@ -132,6 +132,13 @@ class AwareStaV3TestBase(nc_performance_test_base.NcPerformanceTestBase):
         supported_services=_SUPPORTED_SERVICES,
     )
 
+    nc_test_result_utils.set_and_assert_sta_frequency(
+        self.advertiser,
+        metrics=self.get_current_iteration_metrics(),
+        expected_wifi_type=self.wifi_info.sta_type,
+        prefix='advertiser_',
+    )
+
     # Let wifi aware slot update complete before the transfer.
     # This is important especially for the transfer speed test.
     # time.sleep(
@@ -156,13 +163,6 @@ class AwareStaV3TestBase(nc_performance_test_base.NcPerformanceTestBase):
           active_snippet.test_failure_reason,
           self.get_current_iteration_metrics(),
           file_transfer_failure_tip=_PAYLOAD_TRANSFER_FAILURE_TIP,
-      )
-
-      # Collect test metrics and check the transfer medium info regardless of
-      # whether the transfer succeeded or not.
-      # TODO: do we need this ?
-      nc_test_result_utils.collect_nc_test_metrics(
-          self.get_current_iteration_metrics(), self.test_runtime
       )
 
     active_snippet.disconnect_endpoint()
