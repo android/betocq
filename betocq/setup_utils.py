@@ -212,10 +212,26 @@ def _do_set_country_code(
     force_telephony_cc: bool = False,
 ) -> None:
   """Sets Wi-Fi and Telephony country code."""
-  ad.log.info('Set Wi-Fi country code to %s.', country_code)
+  wifi_was_enabled = wifi_is_enabled(ad)
+  driver_cc = _get_driver_country_code(ad)
+  skip_wifi = (
+      driver_cc is not None and driver_cc.upper() == country_code.upper()
+  )
+
+  if skip_wifi:
+    ad.log.info(
+        'Driver country code is already %s. Skipping Wi-Fi country code set.',
+        country_code,
+    )
+  else:
+    ad.log.info('Set Wi-Fi country code to %s.', country_code)
+
   try:
-    ad.adb.shell('cmd wifi set-wifi-enabled disabled')
-    time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+    if not skip_wifi and not wifi_was_enabled:
+      ad.log.info('WiFi was disabled, enabling it before setting country code')
+      ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+      time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+
     if force_telephony_cc:
       ad.log.info('Set Telephony country code to %s.', country_code)
       ad.adb.shell(
@@ -223,61 +239,69 @@ def _do_set_country_code(
           ' com.android.internal.telephony.action.COUNTRY_OVERRIDE --es'
           f' country {country_code}'
       )
-      toggle_airplane_mode(ad)
-    ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
-    ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+      toggle_airplane_mode(ad, toggle_wifi=False)
 
-    if country_code == '00':
-      max_retries = 5
-      delay = 0.1
-      verified = False
-      driver_cc = None
-      for attempt in range(max_retries):
-        driver_cc = _get_driver_country_code(ad)
+    if not skip_wifi:
+      ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
+      ad.log.info('Disabling and re-enabling WiFi after setting country code')
+      ad.adb.shell('cmd wifi set-wifi-enabled disabled')
+      time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+      if wifi_was_enabled:
+        ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+
+      if country_code == '00':
+        max_retries = 5
+        delay = 0.1
+        verified = False
+        driver_cc = None
+        for attempt in range(max_retries):
+          driver_cc = _get_driver_country_code(ad)
+          if driver_cc is None:
+            ad.log.warning(
+                'mDriverCountryCode is not available in dumpsys wifi'
+            )
+            break
+          if driver_cc == '00':
+            ad.log.info(
+                'Successfully verified mDriverCountryCode is 00 after %d'
+                ' attempts',
+                attempt + 1,
+            )
+            verified = True
+            break
+          if attempt < max_retries - 1:
+            ad.log.warning(
+                (
+                    'mDriverCountryCode is %s (expected 00), attempt %d,'
+                    ' waiting %ss to retry'
+                ),
+                driver_cc,
+                attempt + 1,
+                delay,
+            )
+            time.sleep(delay)
+            delay *= 2
+          else:
+            ad.log.warning(
+                'mDriverCountryCode is %s (expected 00), attempt %d (last'
+                ' attempt)',
+                driver_cc,
+                attempt + 1,
+            )
+
         if driver_cc is None:
-          ad.log.warning('mDriverCountryCode is not available in dumpsys wifi')
-          break
-        if driver_cc == '00':
-          ad.log.info(
-              'Successfully verified mDriverCountryCode is 00 after %d'
-              ' attempts',
-              attempt + 1,
-          )
-          verified = True
-          break
-        if attempt < max_retries - 1:
           ad.log.warning(
+              'mDriverCountryCode is not available, skipping XY fallback.'
+          )
+        elif not verified:
+          ad.log.info(
               (
-                  'mDriverCountryCode is %s (expected 00), attempt %d, waiting'
-                  ' %ss to retry'
+                  'Failed to verify mDriverCountryCode as 00 (last seen: %s),'
+                  ' trying XY'
               ),
               driver_cc,
-              attempt + 1,
-              delay,
           )
-          time.sleep(delay)
-          delay *= 2
-        else:
-          ad.log.warning(
-              'mDriverCountryCode is %s (expected 00), attempt %d (last'
-              ' attempt)',
-              driver_cc,
-              attempt + 1,
-          )
-
-      if driver_cc is None:
-        ad.log.warning(
-            'mDriverCountryCode is not available, skipping XY fallback.'
-        )
-      elif not verified:
-        ad.log.info(
-            (
-                'Failed to verify mDriverCountryCode as 00 (last seen: %s),'
-                ' trying XY'
-            ),
-            driver_cc,
-        )
-        _do_set_country_code(ad, 'XY')
+          _do_set_country_code(ad, 'XY')
 
     if force_telephony_cc:
       telephony_country_code = (
@@ -406,12 +430,14 @@ def _do_dump_gms_version(ad: android_device.AndroidDevice) -> int | None:
   return get_int_between_prefix_postfix(out, prefix, postfix, search_last)
 
 
-def toggle_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def toggle_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Toggles airplane mode on the given device."""
   ad.log.info('turn on airplane mode')
-  enable_airplane_mode(ad)
+  enable_airplane_mode(ad, toggle_wifi)
   ad.log.info('turn off airplane mode')
-  disable_airplane_mode(ad)
+  disable_airplane_mode(ad, toggle_wifi)
 
 
 def connect_to_wifi_sta_till_success(
@@ -572,19 +598,23 @@ def _grant_manage_external_storage_permission(
     ad.log.info('Failed to grant MANAGE_EXTERNAL_STORAGE permission.')
 
 
-def enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def enable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Enables airplane mode on the given device."""
   try:
-    _do_enable_airplane_mode(ad)
+    _do_enable_airplane_mode(ad, toggle_wifi)
   except adb.AdbError:
     ad.log.exception(
         'Failed to enable airplane mode on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
-    _do_enable_airplane_mode(ad)
+    _do_enable_airplane_mode(ad, toggle_wifi)
 
 
-def _do_enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def _do_enable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Enables airplane mode on the given device."""
   if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '1'])
@@ -597,24 +627,29 @@ def _do_enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
         'state',
         'true',
     ])
-  ad.adb.shell(['svc', 'wifi', 'disable'])
+  if toggle_wifi:
+    ad.adb.shell(['svc', 'wifi', 'disable'])
   ad.adb.shell(['svc', 'bluetooth', 'disable'])
   time.sleep(TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC)
 
 
-def disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def disable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Disables airplane mode on the given device."""
   try:
-    _do_disable_airplane_mode(ad)
+    _do_disable_airplane_mode(ad, toggle_wifi)
   except adb.AdbError:
     ad.log.exception(
         'Failed to disable airplane mode on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
-    _do_disable_airplane_mode(ad)
+    _do_disable_airplane_mode(ad, toggle_wifi)
 
 
-def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def _do_disable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Disables airplane mode on the given device."""
   if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '0'])
@@ -627,7 +662,8 @@ def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
         'state',
         'false',
     ])
-  ad.adb.shell(['svc', 'wifi', 'enable'])
+  if toggle_wifi:
+    ad.adb.shell(['svc', 'wifi', 'enable'])
   ad.adb.shell(['svc', 'bluetooth', 'enable'])
   time.sleep(TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC)
 
