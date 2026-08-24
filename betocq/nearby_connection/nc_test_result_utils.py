@@ -153,44 +153,6 @@ def set_and_assert_concurrency_mode(
     )
 
 
-def assert_sta_frequency(
-    metrics: MetricsCollector,
-    expected_wifi_type: constants.WifiType,
-) -> None:
-  """Asserts the STA frequency is expected."""
-  sta_frequency_metric = metrics.get('advertiser_sta_frequency')
-  sta_frequency = (
-      sta_frequency_metric.value
-      if sta_frequency_metric
-      else constants.INVALID_INT
-  )
-  # Check whether the device is still connected to the AP.
-  if sta_frequency == constants.INVALID_INT:
-    set_active_nc_fail_reason(
-        metrics, constants.SingleTestFailureReason.DISCONNECTED_FROM_AP
-    )
-    asserts.fail('Target device is disconnected from AP. Check AP DHCP config.')
-
-  # Check whether the STA frequency is expected.
-  match expected_wifi_type:
-    case constants.WifiType.FREQ_2G:
-      is_valid_freq = setup_utils.is_valid_wifi_2g_freq(sta_frequency)
-    case constants.WifiType.FREQ_5G:
-      is_valid_freq = setup_utils.is_valid_wifi_5g_freq(sta_frequency)
-    case constants.WifiType.FREQ_5G_DFS:
-      is_valid_freq = setup_utils.is_valid_wifi_5g_dfs_freq(sta_frequency)
-    case _:
-      is_valid_freq = False
-
-  if is_valid_freq:
-    return
-
-  set_active_nc_fail_reason(
-      metrics, constants.SingleTestFailureReason.WRONG_AP_FREQUENCY
-  )
-  asserts.fail(f'AP is set to a wrong frequency {sta_frequency}')
-
-
 def set_and_assert_sta_frequency(
     ad: android_device.AndroidDevice,
     metrics: MetricsCollector,
