@@ -25,9 +25,11 @@ import com.google.android.mobly.snippet.rpc.Rpc;
 import com.google.android.mobly.snippet.rpc.RpcOptional;
 import com.google.android.mobly.snippet.util.Log;
 import java.lang.reflect.Method;
+import java.time.Duration;
 
 /** Snippet class for exposing utility RPCs. */
 public class UtilitySnippet implements Snippet {
+  private static final int UI_AUTOMATION_ACQUIRE_RETRIES = 5;
 
   private UiAutomation uia = null;
 
@@ -39,8 +41,26 @@ public class UtilitySnippet implements Snippet {
     // Reuse an UiAutomation instance if there is an existing one; otherwise, create one.
     // The UiAutomation instance is maintained by the Instrumentation.
     if (uia == null) {
-      uia = InstrumentationRegistry.getInstrumentation().getUiAutomation();
-      Log.i("UiAutomation instance acquired: " + uia);
+      for (int i = 1; i <= UI_AUTOMATION_ACQUIRE_RETRIES; i++) {
+        try {
+          uia = InstrumentationRegistry.getInstrumentation().getUiAutomation();
+          Log.i("UiAutomation instance acquired: " + uia);
+          return;
+        } catch (IllegalStateException e) {
+          if (i == UI_AUTOMATION_ACQUIRE_RETRIES) {
+            throw e;
+          }
+          Log.w("Failed to acquire UiAutomation, attempt " + i + " failed", e);
+          try {
+            Duration waitTime = Duration.ofSeconds(i);
+            Log.i("Waiting for " + waitTime.toMillis() + " ms before retry");
+            Thread.sleep(waitTime.toMillis());
+          } catch (InterruptedException ie) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("Interrupted during acquireUiAutomation retry", ie);
+          }
+        }
+      }
     }
   }
 
