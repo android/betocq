@@ -456,7 +456,21 @@ def connect_to_wifi_sta_till_success(
 
 def wifi_is_enabled(ad: android_device.AndroidDevice) -> bool:
   """Checks if wifi is enabled on the given device."""
-  return ad.nearby.wifiCheckState(constants.WifiState.ENABLED)
+  if hasattr(ad, 'nearby') and getattr(ad, 'nearby', None):
+    try:
+      return ad.nearby.wifiCheckState(constants.WifiState.ENABLED)
+    except Exception:  # pylint: disable=broad-exception-caught
+      pass
+  try:
+    out = ad.adb.shell('dumpsys wifi').decode('utf-8')
+    return (
+        'Current wifi mode: ConnectedState' in out
+        or 'Current wifi mode: DisconnectedState' in out
+        or 'Wi-Fi is enabled' in out
+        or 'WifiState 1' in out
+    )
+  except Exception:  # pylint: disable=broad-exception-caught
+    return False
 
 
 def connect_to_wifi(

@@ -229,9 +229,13 @@ class PerformanceTestBase(base_test.BaseTestClass):
       self, record: records.TestResultRecord
   ) -> metrics.MetricsCollector | None:
     """Returns the collector matching the current test record, or None if bypassed."""
-    if not self.metrics_manager.iteration_collectors:
+    metrics_mgr = getattr(self, 'metrics_manager', None)
+    if (
+        not metrics_mgr
+        or not getattr(metrics_mgr, 'iteration_collectors', None)
+    ):
       return None
-    col = self.metrics_manager.iteration_collectors[-1]
+    col = metrics_mgr.iteration_collectors[-1]
     if getattr(col, 'test_name', '') == getattr(record, 'test_name', ''):
       return col
     return None
@@ -346,7 +350,14 @@ class PerformanceTestBase(base_test.BaseTestClass):
     """
     # Group iteration collectors by scenario name
     scenario_collectors = collections.defaultdict(list)
-    for col in self.metrics_manager.iteration_collectors:
+    metrics_mgr = getattr(self, 'metrics_manager', None)
+    if (
+        not metrics_mgr
+        or not getattr(metrics_mgr, 'iteration_collectors', None)
+    ):
+      logging.info('is_test_class_passed: False (No iterations executed)')
+      return False
+    for col in metrics_mgr.iteration_collectors:
       scenario_name = col.scenario_name
       if scenario_name:
         scenario_collectors[scenario_name].append(col)
@@ -419,7 +430,14 @@ class PerformanceTestBase(base_test.BaseTestClass):
       A string providing a summary of the test class execution status.
     """
     scenario_collectors = collections.defaultdict(list)
-    for col in self.metrics_manager.iteration_collectors:
+    metrics_mgr = getattr(self, 'metrics_manager', None)
+    if (
+        not metrics_mgr
+        or not getattr(metrics_mgr, 'iteration_collectors', None)
+    ):
+      logging.info('get_test_class_result_message: FAIL (Zero finished tests)')
+      return 'FAIL: Test did not execute any iterations. Zero finished tests.'
+    for col in metrics_mgr.iteration_collectors:
       if col.scenario_name:
         scenario_collectors[col.scenario_name].append(col)
 
