@@ -109,6 +109,39 @@ def get_betocq_device_specific_info(
   return device_specific_dict
 
 
+def get_snippet_client(
+    ad: android_device.AndroidDevice, method_name: str | None = None
+) -> Any:
+  """Gets the snippet client from the device."""
+  if hasattr(ad, 'services') and hasattr(ad.services, 'snippets'):
+    # Iterate over all loaded snippets to find one supporting the method
+    for client in ad.services.snippets._snippet_clients.values():  # pylint: disable=protected-access
+      if method_name is None:
+        return client
+
+      # Mobly Snippet Clients implement dynamic RPC routing via __getattr__,
+      # so hasattr() always returns True. We must check available methods
+      # explicitly.
+      if not isinstance(
+          getattr(client, '_betocq_cached_methods', None), str  # pylint: disable=protected-access
+      ):
+        try:
+          help_text = client.help(print_output=False)
+        except Exception:  # pylint: disable=broad-except
+          help_text = ''
+        client._betocq_cached_methods = help_text if help_text else ''  # pylint: disable=protected-access
+
+      if re.search(
+          r'\b' + method_name + r'\b',
+          client._betocq_cached_methods,  # pylint: disable=protected-access
+      ):
+        return client
+
+  raise AttributeError(
+      f'No loaded snippet found supporting method {method_name or "any"}'
+  )
+
+
 def get_snippet_apk_path(
     user_params: dict[str, Any], snippet_name: str
 ) -> str | None:
@@ -456,11 +489,14 @@ def connect_to_wifi_sta_till_success(
 
 def wifi_is_enabled(ad: android_device.AndroidDevice) -> bool:
   """Checks if wifi is enabled on the given device."""
-  if hasattr(ad, 'nearby') and getattr(ad, 'nearby', None):
-    try:
-      return ad.nearby.wifiCheckState(constants.WifiState.ENABLED)
-    except Exception:  # pylint: disable=broad-exception-caught
-      pass
+  try:
+    snippet = get_snippet_client(ad, 'wifiCheckState')
+    return snippet.wifiCheckState(constants.WifiState.ENABLED)
+  except AttributeError:
+    ad.log.warning("WifiManagerSnippet wasn't loaded in the mobly snippet.")
+    pass
+  except Exception:  # pylint: disable=broad-exception-caught
+    pass
   try:
     out = ad.adb.shell('dumpsys wifi').decode('utf-8')
     return (
@@ -480,14 +516,15 @@ def connect_to_wifi(
     num_retries: int = 1,
 ) -> None:
   """Connects to the specified wifi AP and raise exception if failed."""
+  snippet = get_snippet_client(ad, 'wifiConnectSimple')
   if not wifi_is_enabled(ad):
-    ad.nearby.wifiEnable()
+    snippet.wifiEnable()
   # return until the wifi is connected.
   wifi_password = password or None
   ad.log.info('Connect to wifi: ssid: %r, password: %r', ssid, wifi_password)
   for i in range(num_retries):
     try:
-      ad.nearby.wifiConnectSimple(ssid, wifi_password)
+      snippet.wifiConnectSimple(ssid, wifi_password)
       return
     except errors.ApiError:
       ad.log.warning(
@@ -495,8 +532,8 @@ def connect_to_wifi(
       )
       if i < num_retries - 1:
         # Reset wifi to make sure the wifi state is clean.
-        ad.nearby.wifiDisable()
-        ad.nearby.wifiEnable()
+        snippet.wifiDisable()
+        snippet.wifiEnable()
         time.sleep(_WIFI_CONNECT_INTERVAL_SEC)
       else:
         ad.log.error(
@@ -519,7 +556,8 @@ def remove_current_connected_wifi_network(
   Returns:
     True if a network was found and removed, False otherwise.
   """
-  wifi_info = ad.nearby.wifiGetConnectionInfo()
+  snippet = get_snippet_client(ad, 'wifiGetConnectionInfo')
+  wifi_info = snippet.wifiGetConnectionInfo()
   if (
       not wifi_info
       or wifi_info.get('SupplicantState', '')
@@ -531,7 +569,7 @@ def remove_current_connected_wifi_network(
   network_id = get_sta_network_id_from_wifi_info(wifi_info)
   if network_id != constants.INVALID_NETWORK_ID:
     ad.log.info('disconnecting from %r', wifi_info.get('SSID', ''))
-    ad.nearby.wifiRemoveNetwork(network_id)
+    snippet.wifiRemoveNetwork(network_id)
   else:
     ad.log.warning(
         'No valid network id for %r, try to remove all networks.',
@@ -544,18 +582,19 @@ def remove_current_connected_wifi_network(
 
 def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   """Removes and disconnects all wifi network on the given device."""
-  was_wifi_enabled = ad.nearby.wifiIsEnabled()
+  snippet = get_snippet_client(ad, 'wifiClearConfiguredNetworks')
+  was_wifi_enabled = snippet.wifiIsEnabled()
   if was_wifi_enabled:
     # wifiClearConfiguredNetworks() calls getConfiguredNetworks() and
     # removeNetworks() which could take a long time to complete because these
     # calls have the complicated ownership check and wifi thread could be busy
     # with other tasks. Wifi thread is optimized in V but not in old releases.
     # Therefore let's disable wifi so that these calls can be completed on time.
-    ad.nearby.wifiDisable()
+    snippet.wifiDisable()
   ad.log.info('Clear wifi configured networks')
-  ad.nearby.wifiClearConfiguredNetworks()
+  snippet.wifiClearConfiguredNetworks()
   if was_wifi_enabled:
-    ad.nearby.wifiEnable()
+    snippet.wifiEnable()
   time.sleep(constants.WIFI_DISCONNECTION_DELAY.total_seconds())
 
 
@@ -565,14 +604,15 @@ def wait_for_wifi_auto_join(
     wifi_password: str,
 ) -> None:
   """Waits for the wifi connection after disruptive test."""
+  snippet = get_snippet_client(ad, 'wifiIsConnected')
   initial_max_wait_time_sec = 6
   max_wait_time_sec = initial_max_wait_time_sec
-  wifi_is_connected = ad.nearby.wifiIsConnected(wifi_ssid)
+  wifi_is_connected = snippet.wifiIsConnected(wifi_ssid)
   while not wifi_is_connected and max_wait_time_sec > 0:
     time.sleep(1)
-    wifi_is_connected = ad.nearby.wifiIsConnected(wifi_ssid)
+    wifi_is_connected = snippet.wifiIsConnected(wifi_ssid)
     if not wifi_is_connected:
-      ad.nearby.wifiConnectSimple(wifi_ssid, wifi_password)
+      snippet.wifiConnectSimple(wifi_ssid, wifi_password)
     max_wait_time_sec -= 1
   ad.log.info(
       'Waiting %d seconds for'
@@ -841,23 +881,21 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
 
 def is_5g_band_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if 5G band is supported on the given device."""
-  if hasattr(ad, 'services') and hasattr(ad.services, 'snippets'):
-    for client in ad.services.snippets._snippet_clients.values():  # pylint: disable=protected-access
-      if hasattr(client, 'wifiIs5GHzBandSupported'):
-        try:
-          return client.wifiIs5GHzBandSupported()
-        except Exception as e:  # pylint: disable=broad-except
-          ad.log.warning('Failed to check 5G support via snippet: %s', e)
-  raise RuntimeError(
-      'No snippet found supporting wifiIs5GHzBandSupported. '
-      'Ensure snippets are loaded before calling this check.'
-  )
+  try:
+    return get_snippet_client(
+        ad, 'wifiIs5GHzBandSupported'
+    ).wifiIs5GHzBandSupported()
+  except AttributeError as e:
+    raise RuntimeError(
+        'No snippet found supporting wifiIs5GHzBandSupported. '
+        'Ensure snippets are loaded before calling this check.'
+    ) from e
 
 
 def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if WiFi Direct is supported on the given device."""
   try:
-    return ad.nearby.wifiIsP2pSupported()
+    return get_snippet_client(ad, 'wifiIsP2pSupported').wifiIsP2pSupported()
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('WiFi Direct is not supported due to %s', e)
     return False
@@ -1256,7 +1294,9 @@ def get_sta_frequency_and_max_link_speed(
 ) -> tuple[int, int]:
   """Gets the STA frequency and max link speed."""
   if connection_info is None:
-    connection_info = ad.nearby.wifiGetConnectionInfo()
+    connection_info = get_snippet_client(
+        ad, 'wifiGetConnectionInfo'
+    ).wifiGetConnectionInfo()
   sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
   sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
       connection_info
@@ -1273,7 +1313,9 @@ def get_target_sta_frequency_and_max_link_speed(
     ad: android_device.AndroidDevice,
 ) -> tuple[int, int]:
   """Gets the STA frequency and max link speed."""
-  connection_info = ad.nearby.wifiGetConnectionInfo()
+  connection_info = get_snippet_client(
+      ad, 'wifiGetConnectionInfo'
+  ).wifiGetConnectionInfo()
   sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
   sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
       connection_info
@@ -1286,6 +1328,7 @@ def get_target_sta_frequency_and_max_link_speed(
   return (sta_frequency, sta_max_link_speed_mbps)
 
 
+# TODO: rename this as load_android_snippet
 def load_nearby_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
@@ -1303,10 +1346,13 @@ def load_nearby_snippet(
     ad.log.warning(
         ' apk path is not specified, make sure it is installed in the device'
     )
-  if not device_specific_dict.get('external_storage_permission_granted', False):
+  key_permission_granted = (
+      f'external_storage_permission_granted_{config.package_name}'
+  )
+  if not device_specific_dict.get(key_permission_granted, False):
     ad.log.info('grant manage external storage permission')
     grant_manage_external_storage_permission(ad, config.package_name)
-    device_specific_dict['external_storage_permission_granted'] = True
+    device_specific_dict[key_permission_granted] = True
 
   ad.load_snippet(config.snippet_name, config.package_name)
   if not hasattr(ad, 'loaded_snippet_packages'):
@@ -1321,6 +1367,13 @@ def unload_nearby_snippet(
   """Unloads a nearby snippet with the given snippet config."""
   device_specific_dict = get_betocq_device_specific_info(ad)
   key_apk_installed = config.package_name + '_installed'
+  key_permission_granted = (
+      f'external_storage_permission_granted_{config.package_name}'
+  )
+
+  # Clean up permission flag
+  device_specific_dict.pop(key_permission_granted, None)
+
   try:
     ad.unload_snippet(config.snippet_name)
     if hasattr(ad, 'loaded_snippet_packages'):
