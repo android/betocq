@@ -1,7 +1,15 @@
 # BeToCQ test suite release history
+
+## 3.1.1 (08/27/2026)
+### New
+* Introduce a local test result viewer - betocq-result-viewer
+### Bug fixes
+* Fix issue about the test metrics output.
+
 ## 3.1.0 (08/06/2026)
 ### New
 * Reduce the test cases for onboarding test suite and fix some bugs.
+
 ## 3.0.0 (06/22/2026)
 ### New
 * Migrate the tests to the new performance test framework
