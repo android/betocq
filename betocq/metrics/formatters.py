@@ -121,6 +121,35 @@ def _flatten_aggregated_data(agg_data: dict[str, Any]) -> dict[str, Any]:
   return flattened
 
 
+def _dict_to_kv_array(d: Mapping[str, Any]) -> list[dict[str, Any]]:
+  """Converts a dictionary to a list of key-value dictionaries."""
+  return [{'key': k, 'value': v} for k, v in d.items()]
+
+
+def _is_kv_list(l: Any) -> bool:
+  """Checks if a list is a list of KV dictionaries."""
+  if not isinstance(l, list):
+    return False
+  if not l:
+    return True  # Empty list can be KV list
+  return isinstance(l[0], dict) and 'key' in l[0] and 'value' in l[0]
+
+
+def _update_kv_list(
+    existing_list: list[dict[str, Any]], new_list: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
+  """Updates a list of KV dicts with new entries."""
+  merged = {
+      d['key']: d['value']
+      for d in existing_list
+      if isinstance(d, dict) and 'key' in d
+  }
+  for d in new_list:
+    if isinstance(d, dict) and 'key' in d:
+      merged[d['key']] = d['value']
+  return [{'key': k, 'value': v} for k, v in merged.items()]
+
+
 class CrossPlatformFileLock:
   """Atomic file locking supported across Linux, Mac, and Windows."""
 
@@ -201,6 +230,14 @@ def _locked_update_file(
     global_dict = global_dict or {}
     if (
         update_key in global_dict
+        and _is_kv_list(global_dict[update_key])
+        and _is_kv_list(update_data)
+    ):
+      global_dict[update_key] = _update_kv_list(
+          global_dict[update_key], update_data
+      )
+    elif (
+        update_key in global_dict
         and isinstance(global_dict[update_key], dict)
         and isinstance(update_data, dict)
     ):
@@ -242,7 +279,7 @@ def export_manager_to_files(
     _locked_update_file(
         json_file_path,
         'test_classes',
-        {manager.test_class_tag: current_dict},
+        [{'key': manager.test_class_tag, 'value': current_dict}],
         is_yaml=False,
     )
 
@@ -378,7 +415,13 @@ class JsonFormatter(MetricsFormatter):
           bucketed_iter = _bucket_metrics(iter_metrics)
           scenario_iters.append({
               'test_name': col.test_name,
-              **bucketed_iter,
+              'numeric_metrics': _dict_to_kv_array(
+                  bucketed_iter['numeric_metrics']
+              ),
+              'boolean_metrics': _dict_to_kv_array(
+                  bucketed_iter['boolean_metrics']
+              ),
+              'text_metrics': _dict_to_kv_array(bucketed_iter['text_metrics']),
           })
 
       scenario_metrics = {}
@@ -405,9 +448,9 @@ class JsonFormatter(MetricsFormatter):
       }
 
       scenario_dict: dict[str, Any] = {
-          'numeric_metrics': merged_numeric,
-          'boolean_metrics': merged_boolean,
-          'text_metrics': merged_text,
+          'numeric_metrics': _dict_to_kv_array(merged_numeric),
+          'boolean_metrics': _dict_to_kv_array(merged_boolean),
+          'text_metrics': _dict_to_kv_array(merged_text),
           'iterations': scenario_iters,
       }
       if hero_metric_val_mbps is not None:
@@ -428,12 +471,12 @@ class JsonFormatter(MetricsFormatter):
                 manager.end_time.isoformat() if manager.end_time else None
             ),
         },
-        'class_metrics': {
+        'class_metrics': _dict_to_kv_array({
             k: str(m.value)
             for k, m in manager.class_metrics.metrics.items()
             if m.aggregator != aggregators.AggregatorType.EXCLUDE_ALL
-        },
-        'scenarios': self._format_scenarios(manager),
+        }),
+        'scenarios': _dict_to_kv_array(self._format_scenarios(manager)),
     }
 
   def format(self, manager: MetricsManager) -> str:
