@@ -38,18 +38,13 @@ BeToCQ Test Explorer provides an instant local web dashboard to:
     aggregator, and recursive artifact indexer.
 -   **`templates/index.html`**: Material 3 / Tailwind single-page application
     dashboard.
--   **`BUILD`**: Built with `launcher =
-    "//devtools/python/launcher:no_launcher"` and `paropts =
-    ["--interpreter=/usr/bin/env python3"]` to create a fast, launcher-free
-    universal zipapp (`test_explorer.par`) for standalone distribution.
+-   **`BUILD`**: Blaze build rules defining targets and unit tests.
 
 ## Usage
 
-### Method 1: Run Directly via Python 3 (Default)
+Launch the server directly using `python3`:
 
-Launch the server directly using `python3` without building any binary:
-
-#### 1. Launch with Results Directory or Zip File
+### 1. Launch with Results Directory or Zip File
 
 ```bash
 # Pass a zip file directly (positional argument)
@@ -65,7 +60,7 @@ python3 server.py /path/to/mobly_results/
 python3 server.py /path/to/mobly_results.zip --port 8080
 ```
 
-#### 2. Launch in Interactive Upload Mode
+### 2. Launch in Interactive Upload Mode
 
 ```bash
 python3 server.py
@@ -75,31 +70,3 @@ The server will automatically select an available port (or run on a port
 specified via `--port <port>`), open your default browser, and display the
 dashboard. Drag and drop any Mobly `.zip` test result archive to view the
 dashboard.
-
----
-
-### Method 2: Run via Standalone PAR Binary (Backup / Distribution)
-
-For standalone environments or distributions without a full workspace checkout,
-you can build and run the hermetic `.par` zipapp:
-
-#### Build the PAR Binary
-
-```bash
-blaze build //wireless/android/platform/testing/bettertogether/betocq/tools/test_explorer:test_explorer.par
-```
-
-#### Run the PAR Binary
-
-```bash
-# Pass a results zip or directory
-./test_explorer.par /path/to/mobly_results.zip
-
-# Pass a zip file via flag
-./test_explorer.par --results_dir /path/to/mobly_results.zip
-
-# Launch in interactive upload mode
-./test_explorer.par
-```
-
-*(or `./osmosis.sh explore`)*
