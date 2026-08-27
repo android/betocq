@@ -235,7 +235,7 @@ def export_manager_to_files(
     json_formatter = JsonFormatter()
     current_dict = sanitize_for_mobly(json_formatter.to_dict(manager))
 
-    report_log_path = os.path.join(log_path, 'report-log-files')
+    report_log_path = os.path.join(global_log_path, 'report-log-files')
     os.makedirs(report_log_path, exist_ok=True)
     json_file_path = os.path.join(report_log_path, json_filename)
     logging.info('Writing global JSON metrics to %s', json_file_path)
