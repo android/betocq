@@ -32,7 +32,8 @@ BeToCQ Test Explorer provides an instant local web dashboard to:
 -   **`server.py`**: A pure Python 3 standard library HTTP server
     (`http.server`) exposing REST endpoints for metrics (`/api/results`), zip
     uploads (`/api/upload`), in-browser text previews (`/api/artifact`), and
-    direct file downloads (`/api/download`).
+    direct file downloads (`/api/download`). Can be executed directly with
+    `python3`.
 -   **`mobly_parser.py`**: Mobly YAML stream parser, repeat iteration
     aggregator, and recursive artifact indexer.
 -   **`templates/index.html`**: Material 3 / Tailwind single-page application
@@ -40,32 +41,65 @@ BeToCQ Test Explorer provides an instant local web dashboard to:
 -   **`BUILD`**: Built with `launcher =
     "//devtools/python/launcher:no_launcher"` and `paropts =
     ["--interpreter=/usr/bin/env python3"]` to create a fast, launcher-free
-    universal zipapp (`test_explorer.par`).
+    universal zipapp (`test_explorer.par`) for standalone distribution.
 
 ## Usage
 
-### 1. Launch with Results Directory or Zip File
+### Method 1: Run Directly via Python 3 (Default)
+
+Launch the server directly using `python3` without building any binary:
+
+#### 1. Launch with Results Directory or Zip File
 
 ```bash
 # Pass a zip file directly (positional argument)
-./test_explorer.par /path/to/mobly_results.zip
+python3 server.py /path/to/mobly_results.zip
 
 # Pass a zip file via flag
-./test_explorer.par --results_dir /path/to/mobly_results.zip
+python3 server.py --results_dir /path/to/mobly_results.zip
 
 # Pass an extracted results directory
-./test_explorer.par /path/to/mobly_results/
+python3 server.py /path/to/mobly_results/
+
+# Specify a custom port (optional, defaults to an available port)
+python3 server.py /path/to/mobly_results.zip --port 8080
 ```
 
-### 2. Launch in Interactive Upload Mode
+#### 2. Launch in Interactive Upload Mode
 
 ```bash
-./test_explorer.par
+python3 server.py
 ```
-
-*(or `./osmosis.sh explore`)*
 
 The server will automatically select an available port (or run on a port
 specified via `--port <port>`), open your default browser, and display the
 dashboard. Drag and drop any Mobly `.zip` test result archive to view the
 dashboard.
+
+---
+
+### Method 2: Run via Standalone PAR Binary (Backup / Distribution)
+
+For standalone environments or distributions without a full workspace checkout,
+you can build and run the hermetic `.par` zipapp:
+
+#### Build the PAR Binary
+
+```bash
+blaze build //wireless/android/platform/testing/bettertogether/betocq/tools/test_explorer:test_explorer.par
+```
+
+#### Run the PAR Binary
+
+```bash
+# Pass a results zip or directory
+./test_explorer.par /path/to/mobly_results.zip
+
+# Pass a zip file via flag
+./test_explorer.par --results_dir /path/to/mobly_results.zip
+
+# Launch in interactive upload mode
+./test_explorer.par
+```
+
+*(or `./osmosis.sh explore`)*
