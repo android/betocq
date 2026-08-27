@@ -16,6 +16,7 @@
 
 import logging
 import sys
+
 import os
 import traceback
 
@@ -26,6 +27,7 @@ from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import errors
+
 from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
@@ -295,6 +297,10 @@ class BaseTestClass(base_test.BaseTestClass):
         f'CLASS END: {self.__class__.__name__}',
     )
 
+  def reset_device(self, ad: android_device.AndroidDevice) -> None:
+    """Resets the device protocol state. Can be overridden by subclasses."""
+    pass
+
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
     # run it before clear_hermetic_overrides to make sure the GMS restart will
@@ -394,10 +400,10 @@ class BaseTestClass(base_test.BaseTestClass):
           error_class=constants.SnippetDisconnectionError,
       )
 
-    # Reset the Nearby Connection state to ensure the testbed is in a good
+    # Reset the device state to ensure the testbed is in a good
     # state for the next test.
     utils.concurrent_exec(
-        setup_utils.reset_nearby_connection,
+        self.reset_device,
         param_list=[[ad] for ad in self.ads],
         raise_on_exception=False,
     )

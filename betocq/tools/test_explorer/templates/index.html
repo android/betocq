@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BeToCQ Test Explorer</title>
+  <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
+  <style>
+    /* Custom scrollbars */
+    ::-webkit-scrollbar {
+      width: 8px;
+      height: 8px;
+    }
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(120, 120, 120, 0.2);
+      border-radius: 9999px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(120, 120, 120, 0.4);
+    }
+
+    /* Custom styles for Material 3 Tab Active Indicator */
+    .m3-tab-active::after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 40px;
+      height: 3px;
+      background-color: #2563eb; /* blue-600 */
+      border-radius: 3px 3px 0 0;
+    }
+  </style>
+</head>
+<body class="bg-[#f8f9fa] text-gray-900 antialiased min-h-screen flex flex-col p-6 max-w-7xl mx-auto w-full font-sans">
+
+  <!-- Header -->
+  <header class="bg-white border text-gray-800 border-gray-200 rounded-3xl p-6 mb-6 flex items-center justify-between shadow-sm">
+    <div class="flex items-center gap-4">
+      <div class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-semibold text-2xl shadow-md">B</div>
+      <div>
+        <h1 class="text-xl font-semibold tracking-tight">BeToCQ Test Explorer</h1>
+        <p class="text-sm text-gray-500 mt-0.5">Local results dashboard, hierarchical breakdown & hierarchical artifacts tree</p>
+      </div>
+    </div>
+    <div class="flex items-center gap-3">
+      <button id="upload-new-btn" onclick="document.getElementById('file-input').click()" class="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 font-semibold px-4 py-2.5 rounded-2xl text-sm transition-all shadow-sm cursor-pointer hover:shadow">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+        <span>Upload New Mobly Zip</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Top Notification / Status Banner (Visible when replacing/uploading a new folder) -->
+  <div id="top-upload-status" class="hidden mb-6 p-4 rounded-2xl text-sm font-semibold flex items-center justify-between border shadow-sm transition-all"></div>
+
+  <!-- Upload Section (if no data) -->
+  <div id="upload-section" class="bg-white border border-gray-200 rounded-3xl p-10 mb-6 text-center border-dashed border-2 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
+    <div class="flex flex-col items-center justify-center gap-2">
+      <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+      <h3 class="text-lg font-semibold text-gray-700">Upload Mobly Zip Results</h3>
+      <p class="text-sm text-gray-500">Drag and drop a .zip file, or click anywhere in this box to select</p>
+      <input type="file" id="file-input" class="hidden" accept=".zip" />
+    </div>
+    <div id="upload-status" class="mt-4 text-sm font-semibold hidden"></div>
+  </div>
+
+  <div id="main-content" class="flex-1 flex flex-col hidden">
+      <!-- Tabs -->
+      <nav class="flex space-x-1 border-b border-gray-200 mb-6 overflow-x-auto relative">
+        <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-5 py-3 relative font-semibold text-sm transition-all text-blue-600 m3-tab-active">
+          📊 Results Dashboard
+        </button>
+        <button onclick="switchTab('breakdown')" id="tab-btn-breakdown" class="tab-btn px-5 py-3 relative font-semibold text-sm transition-all text-gray-500 hover:text-gray-900">
+          🌳 Hierarchical Breakdown
+        </button>
+        <button onclick="switchTab('artifacts')" id="tab-btn-artifacts" class="tab-btn px-5 py-3 relative font-semibold text-sm transition-all text-gray-500 hover:text-gray-900">
+          📦 Artifacts (<span id="artifacts-count-badge">0</span>)
+        </button>
+      </nav>
+
+      <!-- Main Content Panels -->
+      <main class="flex-1 flex flex-col">
+        <!-- Results Dashboard Tab -->
+        <div id="tab-dashboard" class="tab-content flex-1 flex flex-col gap-6">
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="dashboard-stats">
+            <!-- Populated via JS -->
+          </div>
+
+          <!-- Pass Rate Banner & Progress Bar -->
+          <div id="dashboard-progress-card" class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm flex flex-col gap-4">
+            <!-- Populated via JS -->
+          </div>
+
+          <!-- Test Class Summary Table -->
+          <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm text-gray-800">
+            <h3 class="text-lg font-semibold mb-4 border-b pb-2">Suite Overview by Test Class</h3>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-sm">
+                <thead>
+                  <tr class="text-gray-400 font-semibold border-b border-gray-100 pb-2">
+                    <th class="py-2">Test Class</th>
+                    <th class="py-2">Test Executions</th>
+                    <th class="py-2">Passed</th>
+                    <th class="py-2">Failed</th>
+                    <th class="py-2">Pass Rate</th>
+                    <th class="py-2">Cleanups / Fixtures</th>
+                  </tr>
+                </thead>
+                <tbody id="dashboard-class-table" class="divide-y divide-gray-100">
+                  <!-- Populated via JS -->
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hierarchical Breakdown Tab -->
+        <div id="tab-breakdown" class="tab-content hidden flex-1 flex flex-col gap-6">
+          <!-- Mockup Header Instruction Banner -->
+          <div class="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm">
+            <h3 class="text-base font-bold text-gray-900">Hierarchical Test Suite Tree (Suite ➔ Test Case ➔ Iteration Chips)</h3>
+            <p class="text-xs text-gray-500 mt-1">Click any green tick <span class="bg-green-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">✓</span> or red badge <span class="bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">!</span> in the repeat row to jump directly to that iteration's logs, sub-step timings, and protocol state.</p>
+          </div>
+
+          <div id="hierarchical-tree" class="flex flex-col gap-6">
+            <!-- Populated via JS -->
+          </div>
+        </div>
+
+        <!-- Artifacts Tab (Hierarchical Folder Tree View like BTX / Sponge) -->
+        <div id="tab-artifacts" class="tab-content hidden flex-1 flex flex-col gap-6">
+          <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm text-gray-800 flex flex-col gap-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+              <div>
+                <div class="text-xs font-bold text-gray-500 tracking-wider">
+                  Target: <span id="artifacts-target-name" class="text-gray-900 font-mono text-sm font-semibold">OsmosisSuwAwareTest</span>
+                </div>
+                <h3 class="text-lg font-semibold text-gray-900 mt-1">Hierarchical Artifacts & Logs Tree</h3>
+                <p class="text-xs text-gray-500 mt-0.5">Click any file link or download button to download individual files, or click folder arrows to expand/collapse directories.</p>
+              </div>
+              <div class="flex items-center gap-3">
+                <input type="text" id="artifact-filter" oninput="filterArtifacts()" placeholder="Filter artifacts (e.g. logcat, yaml)..." class="px-4 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 shadow-inner" />
+              </div>
+            </div>
+
+            <!-- Header Row -->
+            <div class="flex items-center justify-between py-2.5 px-4 bg-gray-50 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 tracking-wider uppercase">
+              <span>Artifact Name</span>
+              <div class="flex items-center gap-8">
+                <span>File Size</span>
+                <span class="w-24 text-right">Actions</span>
+              </div>
+            </div>
+
+            <!-- Hierarchical Tree Container -->
+            <div id="artifacts-tree-container" class="border border-gray-200 rounded-2xl overflow-hidden divide-y divide-gray-100 bg-white shadow-inner">
+              <!-- Populated via JS -->
+            </div>
+          </div>
+        </div>
+      </main>
+  </div>
+
+  <!-- Artifact Content Preview Modal -->
+  <div id="artifact-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-5xl w-full max-h-[85vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
+      <div class="p-5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div class="flex items-center gap-2 font-mono text-sm font-bold text-gray-900 truncate">
+          <span>📄</span>
+          <span id="modal-filename">filename.txt</span>
+          <span id="modal-filesize" class="text-xs font-normal text-gray-500 bg-gray-200 px-2 py-0.5 rounded-full"></span>
+        </div>
+        <div class="flex items-center gap-2">
+          <a id="modal-download-link" href="#" download="" class="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-100 rounded-xl transition-colors flex items-center gap-1 shadow-sm text-gray-700">
+            📥 Download
+          </a>
+          <button onclick="copyModalContent()" id="modal-copy-btn" class="px-3 py-1.5 text-xs font-semibold bg-white border border-gray-200 hover:bg-gray-100 rounded-xl transition-colors flex items-center gap-1 shadow-sm text-gray-700">
+            📋 Copy
+          </button>
+          <button onclick="closeArtifactModal()" class="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-lg">
+            &times;
+          </button>
+        </div>
+      </div>
+      <div class="p-5 flex-1 overflow-auto bg-[#1e1e1e] text-[#d4d4d4] font-mono text-xs leading-relaxed selection:bg-blue-600 selection:text-white">
+        <pre id="modal-content" class="whitespace-pre-wrap break-all"></pre>
+      </div>
+    </div>
+  </div>
+
+  <!-- File Bug Modal -->
+  <div id="file-bug-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
+    <div class="bg-white rounded-3xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden border border-gray-200">
+      <div class="p-5 border-b border-gray-200 flex items-center justify-between bg-gray-50">
+        <div class="flex items-center gap-2 font-bold text-gray-900 text-base">
+          <span>🎫</span>
+          <span>File Issue Tracker Ticket</span>
+        </div>
+        <button onclick="closeFileBugModal()" class="w-8 h-8 rounded-full hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-lg">
+          &times;
+        </button>
+      </div>
+      <div class="p-6 flex-1 overflow-y-auto space-y-4 text-xs text-gray-700">
+        <div>
+          <label class="block font-bold text-gray-800 mb-1">Issue Summary <span class="text-red-500">*</span></label>
+          <input type="text" id="bug-summary" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block font-bold text-gray-800 mb-1">Component ID</label>
+            <input type="text" id="bug-component-id" value="2105900" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label class="block font-bold text-gray-800 mb-1">Assignee LDAP (Optional)</label>
+            <input type="text" id="bug-assignee" placeholder="e.g. username@google.com" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+          </div>
+        </div>
+        <!-- Throughput & Shielding Rules Checklist -->
+        <div class="p-3.5 bg-amber-50 border border-amber-200 rounded-2xl space-y-2">
+          <div class="flex items-center gap-2">
+            <input type="checkbox" id="bug-is-throughput" onchange="toggleShieldedOption()" class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+            <label for="bug-is-throughput" class="font-bold text-amber-900 cursor-pointer">Is this a throughput or transfer speed failure?</label>
+          </div>
+          <div id="shielded-option-container" class="hidden pl-6 pt-1 border-t border-amber-200/60">
+            <div class="flex items-center gap-2">
+              <input type="checkbox" id="bug-is-shielded" checked class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+              <label for="bug-is-shielded" class="font-semibold text-amber-950 cursor-pointer">Tested in an RF-shielded box/room? (Required for throughput bugs)</label>
+            </div>
+            <p class="text-[11px] text-amber-800 mt-1">Note: Per project rules, skip filing tickets for throughput issues if the environment is unshielded.</p>
+          </div>
+        </div>
+        <div>
+          <label class="block font-bold text-gray-800 mb-1">Description & Failure Log</label>
+          <textarea id="bug-description" rows="6" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none whitespace-pre"></textarea>
+        </div>
+        <div>
+          <label class="block font-bold text-gray-800 mb-1">Attachments to Upload (Bugreport & Logcat)</label>
+          <div id="bug-attachments-list" class="space-y-1.5 max-h-36 overflow-y-auto p-3 border border-gray-200 rounded-xl bg-gray-50">
+            <!-- Checkboxes populated via JS -->
+          </div>
+        </div>
+        <div id="bug-submit-status" class="hidden p-3 rounded-xl font-medium text-center"></div>
+      </div>
+      <div class="p-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
+        <button onclick="closeFileBugModal()" class="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-200 rounded-xl transition-colors cursor-pointer">
+          Cancel
+        </button>
+        <button id="bug-submit-btn" onclick="submitFileBug()" class="px-5 py-2 text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+          <span>🎫 Submit Ticket</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Global store for parsed data
+    let globalData = null;
+    let currentArtifacts = [];
+
+    function toggleShieldedOption() {
+      const isTp = document.getElementById('bug-is-throughput').checked;
+      const cont = document.getElementById('shielded-option-container');
+      if (isTp) {
+        cont.classList.remove('hidden');
+      } else {
+        cont.classList.add('hidden');
+      }
+    }
+
+    function openFileBugModal(className, groupIndex, iterationIndex) {
+      if (!globalData) return;
+      const clsData = globalData.test_classes[className];
+      if (!clsData) return;
+      const group = clsData.test_groups[groupIndex];
+      if (!group) return;
+      const iter = group.iterations[iterationIndex];
+      if (!iter) return;
+
+      document.getElementById('bug-summary').value = `[BeToCQ Failure] ${className}.${iter.name} failed`;
+      
+      const logSnippet = iter.stacktrace || iter.details || '(No failure log available)';
+      const desc = `Test Suite: ${className}\nTest Case: ${iter.name}\nStatus: ${iter.status}\nDuration: ${iter.duration || 0}s\nStart Time: ${iter.begin_time ? new Date(iter.begin_time).toLocaleString() : 'N/A'}\n\n--- Failure Log ---\n${logSnippet}`;
+      document.getElementById('bug-description').value = desc;
+
+      document.getElementById('bug-is-throughput').checked = false;
+      document.getElementById('bug-is-shielded').checked = true;
+      document.getElementById('shielded-option-container').classList.add('hidden');
+      document.getElementById('bug-submit-status').classList.add('hidden');
+      document.getElementById('bug-submit-btn').disabled = false;
+      document.getElementById('bug-submit-btn').innerHTML = '<span>🎫 Submit Ticket</span>';
+
+      // Populate attachments
+      const { logcats, bugreports } = getIterationArtifacts(iter.name);
+      const attList = document.getElementById('bug-attachments-list');
+      attList.innerHTML = '';
+      const combined = [...bugreports, ...logcats];
+      if (combined.length === 0) {
+        attList.innerHTML = '<div class="text-gray-400 italic">No logcat or bugreport files detected for this iteration.</div>';
+      } else {
+        combined.forEach(attachment => {
+          attList.innerHTML += `
+            <label class="flex items-center gap-2 cursor-pointer p-1.5 rounded-lg hover:bg-white border border-transparent hover:border-gray-200 transition-colors">
+              <input type="checkbox" name="bug-attachment-item" value="${encodeURIComponent(attachment.rel_path)}" checked class="rounded text-blue-600 focus:ring-blue-500 cursor-pointer" />
+              <span class="font-mono text-xs text-gray-700">${attachment.filename}</span>
+              <span class="text-[10px] text-gray-400 font-normal">(${attachment.rel_path})</span>
+            </label>
+          `;
+        });
+      }
+
+      document.getElementById('file-bug-modal').classList.remove('hidden');
+    }
+
+    function closeFileBugModal() {
+      document.getElementById('file-bug-modal').classList.add('hidden');
+    }
+
+    function submitFileBug() {
+      const summary = document.getElementById('bug-summary').value.trim();
+      if (!summary) {
+        alert('Please provide an issue summary.');
+        return;
+      }
+      const componentId = document.getElementById('bug-component-id').value.trim();
+      const assignee = document.getElementById('bug-assignee').value.trim();
+      const description = document.getElementById('bug-description').value;
+      const isThroughput = document.getElementById('bug-is-throughput').checked;
+      const isShielded = document.getElementById('bug-is-shielded').checked;
+
+      const attCheckboxes = document.querySelectorAll('input[name="bug-attachment-item"]:checked');
+      const attachmentPaths = Array.from(attCheckboxes).map(cb => decodeURIComponent(cb.value));
+
+      const statusDiv = document.getElementById('bug-submit-status');
+      const submitBtn = document.getElementById('bug-submit-btn');
+
+      statusDiv.classList.remove('hidden', 'bg-red-100', 'text-red-800', 'bg-green-100', 'text-green-800', 'bg-amber-100', 'text-amber-800');
+      statusDiv.classList.add('bg-blue-50', 'text-blue-800');
+      statusDiv.textContent = '⏳ Submitting ticket to Issue Tracker sequentially...';
+      submitBtn.disabled = true;
+      submitBtn.textContent = '⏳ Submitting...';
+
+      fetch('/api/file_bug', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          summary,
+          description,
+          component_id: componentId,
+          assignee,
+          is_throughput: isThroughput,
+          is_shielded: isShielded,
+          attachment_paths: attachmentPaths
+        })
+      })
+      .then(res => res.json())
+      .then(data => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>🎫 Submit Ticket</span>';
+        if (data.success) {
+          statusDiv.classList.add('bg-green-100', 'text-green-800');
+          if (data.issue_id) {
+            statusDiv.innerHTML = `✓ ${data.message} <a href="https://issuetracker.google.com/issues/${data.issue_id}" target="_blank" class="underline font-bold ml-1">View Ticket ↗</a>`;
+          } else if (data.issue_url) {
+            statusDiv.innerHTML = `✓ ${data.message} <div class="mt-3"><a href="${data.issue_url}" target="_blank" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl inline-block shadow transition-colors text-xs cursor-pointer">🚀 Open Pre-populated Issue Tracker ↗</a></div><div class="mt-2 text-[11px] text-gray-600 font-normal">Please attach your selected bugreport and logcat files directly in the browser.</div>`;
+            window.open(data.issue_url, '_blank');
+          } else {
+            statusDiv.textContent = `✓ ${data.message}`;
+          }
+        } else {
+          const isWarning = data.message.includes('skipped');
+          statusDiv.classList.add(isWarning ? 'bg-amber-100' : 'bg-red-100', isWarning ? 'text-amber-900' : 'text-red-800');
+          statusDiv.textContent = data.message || 'Failed to create ticket.';
+        }
+      })
+      .catch(err => {
+        submitBtn.disabled = false;
+        submitBtn.innerHTML = '<span>🎫 Submit Ticket</span>';
+        statusDiv.classList.remove('bg-blue-50', 'text-blue-800');
+        statusDiv.classList.add('bg-red-100', 'text-red-800');
+        statusDiv.textContent = 'Error sending request: ' + err;
+      });
+    }
+    let dirCounter = 0;
+
+    // Helper function to format test suite names in clean CamelCase / TitleCase
+    function formatSuiteName(name) {
+      if (!name) return 'UnknownSuite';
+      if (name.includes('_')) {
+        return name.split('_').filter(Boolean).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join('');
+      }
+      if (name === name.toUpperCase() && name.length > 4) {
+        let lower = name.toLowerCase();
+        lower = lower.replace(/^osmosis/, 'Osmosis');
+        lower = lower.replace(/suw/, 'Suw');
+        lower = lower.replace(/wlan/, 'Wlan');
+        lower = lower.replace(/aware/, 'Aware');
+        lower = lower.replace(/pairing/, 'Pairing');
+        lower = lower.replace(/test/, 'Test');
+        return lower.charAt(0).toUpperCase() + lower.slice(1);
+      }
+      return name;
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.tab-content').forEach(el => {
+        el.classList.add('hidden');
+      });
+
+      const target = document.getElementById('tab-' + tabId);
+      if (target) target.classList.remove('hidden');
+
+      document.querySelectorAll('.tab-btn').forEach(el => {
+        el.classList.remove('m3-tab-active', 'text-blue-600');
+        el.classList.add('text-gray-500');
+      });
+
+      const activeBtn = document.getElementById('tab-btn-' + tabId);
+      if (activeBtn) {
+        activeBtn.classList.remove('text-gray-500');
+        activeBtn.classList.add('m3-tab-active', 'text-blue-600');
+      }
+    }
+
+    function getIterationArtifacts(iterName) {
+      if (!globalData || !globalData.artifacts || !Array.isArray(globalData.artifacts)) {
+        return { logcats: [], bugreports: [], others: [] };
+      }
+
+      const lowerIter = (iterName || '').toLowerCase();
+      const baseName = lowerIter.replace(/_\d+$/, '');
+
+      // 1. Match iteration path or filename
+      let matched = globalData.artifacts.filter(a => {
+        const rel = a.rel_path.toLowerCase();
+        const fname = a.filename.toLowerCase();
+        const parts = rel.split(/[\\/]/);
+        return parts.includes(lowerIter) || rel.includes(lowerIter) || fname.includes(lowerIter);
+      });
+
+      // 2. Fallback to base test name match
+      if (matched.length === 0 && baseName && baseName !== lowerIter) {
+        matched = globalData.artifacts.filter(a => {
+          const rel = a.rel_path.toLowerCase();
+          const fname = a.filename.toLowerCase();
+          return rel.includes(baseName) || fname.includes(baseName);
+        });
+      }
+
+      // 3. Fallback to general logcat/bugreport files in artifacts
+      if (matched.length === 0) {
+        matched = globalData.artifacts.filter(a => {
+          const fname = a.filename.toLowerCase();
+          return fname.includes('logcat') || fname.includes('bugreport') || fname.includes('bug_report');
+        });
+      }
+
+      const logcats = [];
+      const bugreports = [];
+      const others = [];
+
+      matched.forEach(a => {
+        const fname = a.filename.toLowerCase();
+        const rel = a.rel_path.toLowerCase();
+        if (fname.includes('bugreport') || fname.includes('bug_report') || rel.includes('bugreport')) {
+          bugreports.push(a);
+        } else if (fname.includes('logcat') || rel.includes('logcat')) {
+          logcats.push(a);
+        } else {
+          others.push(a);
+        }
+      });
+
+      return { logcats, bugreports, others };
+    }
+
+    function toggleIterationLog(className, groupIndex, iterationIndex) {
+      const safeClass = className.replace(/[^a-zA-Z0-9]/g, '');
+      const drawer = document.getElementById(`log-drawer-${safeClass}-${groupIndex}`);
+      const headerEl = document.getElementById(`log-header-${safeClass}-${groupIndex}`);
+      const contentEl = document.getElementById(`log-content-${safeClass}-${groupIndex}`);
+
+      if (!drawer || !globalData) return;
+
+      const clsData = globalData.test_classes[className];
+      if (!clsData) return;
+      const group = clsData.test_groups[groupIndex];
+      if (!group) return;
+      const iter = group.iterations[iterationIndex];
+      if (!iter) return;
+
+      const itStatus = (iter.status || 'UNKNOWN').toUpperCase();
+      const isPass = (itStatus === 'PASS' || itStatus === 'PASSED');
+
+      const { logcats, bugreports, others } = getIterationArtifacts(iter.name);
+
+      let artifactButtonsHtml = '';
+      if (logcats.length > 0 || bugreports.length > 0 || others.length > 0) {
+        artifactButtonsHtml += `
+          <div class="mt-2.5 p-3 bg-gray-50 border border-gray-200 rounded-xl flex items-center gap-3 flex-wrap text-xs shadow-inner">
+            <span class="font-bold text-gray-700 flex items-center gap-1.5 shrink-0">
+              📎 Iteration Artifacts:
+            </span>
+            <div class="flex items-center gap-2 flex-wrap">
+        `;
+
+        logcats.forEach(lc => {
+          if (lc.is_text) {
+            artifactButtonsHtml += `
+              <div class="inline-flex items-center rounded-xl border border-blue-200 bg-white text-blue-700 overflow-hidden shadow-sm hover:border-blue-300 transition-colors">
+                <button data-path="${encodeURIComponent(lc.rel_path)}" onclick="previewArtifact(decodeURIComponent(this.dataset.path))" class="px-3 py-1.5 hover:bg-blue-50 font-semibold flex items-center gap-1.5 cursor-pointer transition-colors" title="Preview ${lc.filename}">
+                  📋 <span>Logcat (${lc.filename})</span>
+                </button>
+                <a href="/api/download?path=${encodeURIComponent(lc.rel_path)}" download="${lc.filename}" class="px-2.5 py-1.5 hover:bg-blue-50 border-l border-blue-200 text-blue-600 transition-colors" title="Download ${lc.filename}">
+                  📥
+                </a>
+              </div>
+            `;
+          } else {
+            artifactButtonsHtml += `
+              <a href="/api/download?path=${encodeURIComponent(lc.rel_path)}" download="${lc.filename}" class="px-3 py-1.5 bg-white hover:bg-blue-50 text-blue-700 border border-blue-200 hover:border-blue-300 rounded-xl font-semibold flex items-center gap-1.5 shadow-sm transition-colors" title="Download ${lc.filename}">
+                📋 <span>Logcat (${lc.filename})</span> 📥
+              </a>
+            `;
+          }
+        });
+
+        bugreports.forEach(br => {
+          if (br.is_text) {
+            artifactButtonsHtml += `
+              <div class="inline-flex items-center rounded-xl border border-purple-200 bg-white text-purple-700 overflow-hidden shadow-sm hover:border-purple-300 transition-colors">
+                <button data-path="${encodeURIComponent(br.rel_path)}" onclick="previewArtifact(decodeURIComponent(this.dataset.path))" class="px-3 py-1.5 hover:bg-purple-50 font-semibold flex items-center gap-1.5 cursor-pointer transition-colors" title="Preview ${br.filename}">
+                  📦 <span>Bugreport (${br.filename})</span>
+                </button>
+                <a href="/api/download?path=${encodeURIComponent(br.rel_path)}" download="${br.filename}" class="px-2.5 py-1.5 hover:bg-purple-50 border-l border-purple-200 text-purple-600 transition-colors" title="Download ${br.filename}">
+                  📥
+                </a>
+              </div>
+            `;
+          } else {
+            artifactButtonsHtml += `
+              <a href="/api/download?path=${encodeURIComponent(br.rel_path)}" download="${br.filename}" class="px-3 py-1.5 bg-white hover:bg-purple-50 text-purple-700 border border-purple-200 hover:border-purple-300 rounded-xl font-semibold flex items-center gap-1.5 shadow-sm transition-colors" title="Download ${br.filename}">
+                📦 <span>Bugreport (${br.filename})</span> 📥
+              </a>
+            `;
+          }
+        });
+
+        others.forEach(ot => {
+          artifactButtonsHtml += `
+            <a href="/api/download?path=${encodeURIComponent(ot.rel_path)}" download="${ot.filename}" class="px-3 py-1.5 bg-white hover:bg-gray-100 text-gray-700 border border-gray-200 hover:border-gray-300 rounded-xl font-semibold flex items-center gap-1.5 shadow-sm transition-colors" title="Download ${ot.filename}">
+              📄 <span>${ot.filename}</span> 📥
+            </a>
+          `;
+        });
+
+        artifactButtonsHtml += `
+            </div>
+          </div>
+        `;
+      }
+
+      const fileBugBtnHtml = !isPass ? `
+        <button onclick="openFileBugModal('${className}', ${groupIndex}, ${iterationIndex})" class="ml-2 px-3 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-xs flex items-center gap-1 shadow-sm transition-colors cursor-pointer" title="File Issue Tracker ticket for this failure">
+          🎫 <span>File Ticket</span>
+        </button>
+      ` : '';
+
+      headerEl.innerHTML = `
+        <div class="flex items-center justify-between p-2.5 bg-gray-100 rounded-lg text-gray-800">
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${isPass ? 'bg-green-600 text-white' : 'bg-red-500 text-white'}">${itStatus}</span>
+            <span class="font-mono text-xs font-bold">${iter.name}</span>
+            ${fileBugBtnHtml}
+          </div>
+          <div class="flex items-center gap-3 text-xs text-gray-500">
+            <span>⏱️ Start: ${iter.begin_time ? new Date(iter.begin_time).toLocaleTimeString() : 'N/A'}</span>
+            <span>Duration: ${iter.duration || 0}s</span>
+          </div>
+        </div>
+        ${artifactButtonsHtml}
+      `;
+
+      let bodyHtml = '';
+      if (iter.stacktrace || iter.details) {
+        bodyHtml += `
+          <div class="mt-2 p-3.5 bg-white text-red-700 border border-red-200 rounded-xl font-mono text-xs overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-sm">
+            ${iter.stacktrace || iter.details}
+          </div>
+        `;
+      } else {
+        bodyHtml += `
+          <div class="mt-2 p-3.5 bg-green-50 text-green-800 border border-green-200 rounded-xl font-mono text-xs">
+            ✓ Iteration passed cleanly with no failure logs.
+          </div>
+        `;
+      }
+      contentEl.innerHTML = bodyHtml;
+
+      drawer.classList.remove('hidden');
+    }
+
+    // Preview in browser modal
+    function previewArtifact(path) {
+      fetch('/api/artifact?path=' + encodeURIComponent(path))
+        .then(res => res.json())
+        .then(data => {
+          if (data.error) {
+            alert('Could not load artifact: ' + data.error);
+            return;
+          }
+          document.getElementById('modal-filename').textContent = data.filename || path;
+          document.getElementById('modal-filesize').textContent = data.path || '';
+          document.getElementById('modal-content').textContent = data.content || '(Empty file)';
+
+          const dlLink = document.getElementById('modal-download-link');
+          dlLink.href = '/api/download?path=' + encodeURIComponent(path);
+          dlLink.setAttribute('download', data.filename || 'download');
+
+          document.getElementById('artifact-modal').classList.remove('hidden');
+        })
+        .catch(err => {
+          alert('Error loading artifact: ' + err);
+        });
+    }
+
+    function closeArtifactModal() {
+      document.getElementById('artifact-modal').classList.add('hidden');
+    }
+
+    function copyModalContent() {
+      const content = document.getElementById('modal-content').textContent;
+      navigator.clipboard.writeText(content).then(() => {
+        const btn = document.getElementById('modal-copy-btn');
+        btn.textContent = '✓ Copied!';
+        setTimeout(() => { btn.textContent = '📋 Copy'; }, 2000);
+      });
+    }
+
+    // Build hierarchical tree object from flat artifact list
+    function buildFileTree(artifacts) {
+      const root = { name: '', isDir: true, children: {}, files: [] };
+
+      artifacts.forEach(art => {
+        const parts = art.rel_path.split(/[\\/]/);
+        let curr = root;
+        for (let i = 0; i < parts.length - 1; i++) {
+          const part = parts[i];
+          if (!curr.children[part]) {
+            curr.children[part] = { name: part, isDir: true, children: {}, files: [] };
+          }
+          curr = curr.children[part];
+        }
+        curr.files.push(art);
+      });
+      return root;
+    }
+
+    // Render tree node HTML recursively
+    function renderTreeNode(node, depth = 0) {
+      let html = '';
+      const paddingLeft = depth * 24 + 16;
+
+      // Render root or nested subdirectories
+      for (const dirName of Object.keys(node.children).sort()) {
+        const subNode = node.children[dirName];
+        dirCounter++;
+        const dirId = `dir-node-${dirCounter}`;
+        const caretId = `dir-caret-${dirCounter}`;
+
+        html += `
+          <div class="border-b border-gray-100 last:border-0">
+            <div class="flex items-center justify-between py-2.5 px-3 hover:bg-gray-50 cursor-pointer select-none transition-colors" onclick="toggleDir('${dirId}', '${caretId}')" style="padding-left: ${paddingLeft}px">
+              <div class="flex items-center gap-2 font-semibold text-gray-800 text-sm">
+                <span id="${caretId}" class="text-gray-500 font-bold text-xs w-4">⌄</span>
+                <span>📁</span>
+                <span class="font-mono text-gray-900">${dirName}</span>
+              </div>
+              <span class="text-xs text-gray-400 font-mono pr-4">Folder</span>
+            </div>
+            <div id="${dirId}" class="flex flex-col bg-gray-50/30">
+              ${renderTreeNode(subNode, depth + 1)}
+            </div>
+          </div>
+        `;
+      }
+
+      // Render files at this level
+      node.files.sort((a,b) => a.filename.localeCompare(b.filename)).forEach(file => {
+        const filePadding = depth * 24 + 36;
+        let icon = '📄';
+        if (file.filename.endsWith('.yaml') || file.filename.endsWith('.yml')) icon = '⚙️';
+        else if (file.filename.endsWith('.zip')) icon = '📦';
+        else if (file.filename.endsWith('.xml') || file.filename.endsWith('.json')) icon = '📊';
+
+        html += `
+          <div class="flex items-center justify-between py-2 px-3 hover:bg-blue-50/60 border-b border-gray-100 last:border-0 transition-colors" style="padding-left: ${filePadding}px">
+            <div class="flex items-center gap-2 truncate pr-4">
+              <span class="text-sm">${icon}</span>
+              <a href="/api/download?path=${encodeURIComponent(file.rel_path)}" download="${file.filename}" title="Click to download ${file.filename}" class="text-blue-600 hover:underline font-mono text-sm font-medium truncate">
+                ${file.filename}
+              </a>
+            </div>
+            <div class="flex items-center gap-6 shrink-0 pr-4">
+              <span class="font-mono text-xs text-gray-500 w-20 text-right">${file.size_formatted}</span>
+              <div class="flex items-center gap-2 w-28 justify-end">
+                <a href="/api/download?path=${encodeURIComponent(file.rel_path)}" download="${file.filename}" class="px-2.5 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors" title="Download file">
+                  📥 Download
+                </a>
+                ${file.is_text ? `
+                  <button data-path="${encodeURIComponent(file.rel_path)}" onclick="previewArtifact(decodeURIComponent(this.dataset.path))" class="px-2.5 py-1 bg-blue-50 hover:bg-blue-100 text-blue-600 rounded-lg text-xs font-semibold flex items-center gap-1 transition-colors" title="Preview in browser">
+                    👁️ View
+                  </button>
+                ` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      });
+
+      return html;
+    }
+
+    function toggleDir(dirId, caretId) {
+      const el = document.getElementById(dirId);
+      const caret = document.getElementById(caretId);
+      if (el) {
+        el.classList.toggle('hidden');
+        if (caret) {
+          caret.textContent = el.classList.contains('hidden') ? '›' : '⌄';
+        }
+      }
+    }
+
+    function renderArtifacts(artifacts) {
+      currentArtifacts = artifacts || [];
+      document.getElementById('artifacts-count-badge').textContent = currentArtifacts.length;
+      filterArtifacts();
+    }
+
+    function filterArtifacts() {
+      const query = (document.getElementById('artifact-filter').value || '').toLowerCase();
+      const container = document.getElementById('artifacts-tree-container');
+
+      const filtered = currentArtifacts.filter(a =>
+        a.filename.toLowerCase().includes(query) || a.rel_path.toLowerCase().includes(query)
+      );
+
+      if (filtered.length === 0) {
+        container.innerHTML = '<div class="py-8 text-center text-gray-400 text-sm">No artifacts matching query.</div>';
+        return;
+      }
+
+      dirCounter = 0;
+      const tree = buildFileTree(filtered);
+      container.innerHTML = renderTreeNode(tree, 0);
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const uploadSection = document.getElementById('upload-section');
+        const fileInput = document.getElementById('file-input');
+        const uploadStatus = document.getElementById('upload-status');
+        const mainContent = document.getElementById('main-content');
+
+        // Check if server already has data on load
+        fetch('/api/results')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.summary && Object.keys(data.summary).length > 0) {
+                    renderDashboard(data);
+                }
+            })
+            .catch(() => {});
+
+        // Drag & Drop Handling
+        uploadSection.addEventListener('click', () => fileInput.click());
+        uploadSection.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadSection.classList.add('bg-blue-50', 'border-blue-300');
+        });
+        uploadSection.addEventListener('dragleave', () => {
+            uploadSection.classList.remove('bg-blue-50', 'border-blue-300');
+        });
+        uploadSection.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadSection.classList.remove('bg-blue-50', 'border-blue-300');
+            if (e.dataTransfer.files.length > 0) {
+                uploadFile(e.dataTransfer.files[0]);
+            }
+        });
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                uploadFile(fileInput.files[0]);
+            }
+        });
+
+        function uploadFile(file) {
+            const topStatus = document.getElementById('top-upload-status');
+            const uploadStatus = document.getElementById('upload-status');
+
+            function showStatus(msg, type) {
+                const colorMap = {
+                    loading: 'bg-blue-50 text-blue-700 border-blue-200',
+                    error: 'bg-red-50 text-red-700 border-red-200',
+                    success: 'bg-green-50 text-green-700 border-green-200'
+                };
+
+                if (topStatus) {
+                    topStatus.className = `mb-6 p-4 rounded-2xl text-sm font-semibold flex items-center justify-between border shadow-sm transition-all ${colorMap[type] || colorMap.loading}`;
+                    topStatus.innerHTML = `
+                        <div class="flex items-center gap-2">
+                            ${type === 'loading' ? '<svg class="animate-spin h-4 w-4 text-blue-600 inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>' : ''}
+                            <span>${msg}</span>
+                        </div>
+                        <button onclick="document.getElementById('top-upload-status').classList.add('hidden')" class="text-gray-400 hover:text-gray-600 ml-4 font-bold cursor-pointer">✕</button>
+                    `;
+                    topStatus.classList.remove('hidden');
+                }
+
+                if (uploadStatus) {
+                    uploadStatus.classList.remove('hidden', 'text-red-500', 'text-green-500', 'text-blue-600');
+                    uploadStatus.classList.add(type === 'error' ? 'text-red-500' : (type === 'success' ? 'text-green-500' : 'text-blue-600'));
+                    uploadStatus.textContent = msg;
+                }
+            }
+
+            showStatus('Uploading and parsing ' + file.name + '...', 'loading');
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            fetch('/api/upload', {
+                method: 'POST',
+                body: formData
+            })
+            .then(res => res.json())
+            .then(res => {
+                if (res.error) {
+                    showStatus('Error: ' + res.error, 'error');
+                } else {
+                    showStatus('✓ ' + file.name + ' uploaded and analyzed successfully!', 'success');
+                    setTimeout(() => {
+                        if (topStatus) topStatus.classList.add('hidden');
+                    }, 4000);
+                    renderDashboard(res.data);
+                }
+            })
+            .catch(err => {
+                showStatus('Upload failed: ' + err, 'error');
+            })
+            .finally(() => {
+                fileInput.value = '';
+            });
+        }
+
+        function renderDashboard(data) {
+            globalData = data;
+            uploadSection.classList.add('hidden');
+            mainContent.classList.remove('hidden');
+
+            const s = data.summary || {};
+            const req = s.requested || 0;
+            const pass = s.passed || 0;
+            const fail = s.failed || 0;
+            const skip = s.skipped || 0;
+
+            const passPercent = req > 0 ? (pass / req) * 100 : 0;
+            const failPercent = req > 0 ? (fail / req) * 100 : 0;
+            const skipPercent = req > 0 ? (skip / req) * 100 : 0;
+            const passRate = passPercent.toFixed(1);
+
+            // Populate Stats Cards
+            const statsHtml = `
+                <div class="bg-white border border-gray-200 rounded-2xl p-5 text-center shadow-sm">
+                    <div class="text-3xl font-bold text-gray-900">${req}</div>
+                    <div class="text-xs uppercase text-gray-500 mt-1 font-semibold tracking-wide">Total Tests</div>
+                </div>
+                <div class="bg-white border text-green-600 rounded-2xl p-5 text-center shadow-sm">
+                    <div class="text-3xl font-bold">${pass}</div>
+                    <div class="text-xs uppercase mt-1 font-semibold tracking-wide">Passed</div>
+                </div>
+                <div class="bg-white border text-red-600 rounded-2xl p-5 text-center shadow-sm">
+                    <div class="text-3xl font-bold">${fail}</div>
+                    <div class="text-xs uppercase mt-1 font-semibold tracking-wide">Failed</div>
+                </div>
+                <div class="bg-white border text-yellow-600 rounded-2xl p-5 text-center shadow-sm">
+                    <div class="text-3xl font-bold">${skip}</div>
+                    <div class="text-xs uppercase mt-1 font-semibold tracking-wide">Skipped</div>
+                </div>
+            `;
+            document.getElementById('dashboard-stats').innerHTML = statsHtml;
+
+            const progressHtml = `
+                <div class="flex justify-between items-center">
+                    <div>
+                      <h4 class="font-semibold text-gray-800">Overall Suite Pass Rate</h4>
+                      <p class="text-xs text-gray-500 mt-0.5">${pass} of ${req} test iterations passed</p>
+                    </div>
+                    <span class="text-sm font-bold ${fail > 0 ? 'text-red-600' : 'text-green-600'} bg-gray-50 px-3 py-1 rounded-full border">
+                      ${passRate}% Pass Rate
+                    </span>
+                </div>
+                <div class="w-full bg-gray-100 rounded-full h-4 flex overflow-hidden">
+                    <div class="bg-green-500 h-4 transition-all duration-500" style="width: ${passPercent}%" title="Passed: ${pass}"></div>
+                    <div class="bg-red-500 h-4 transition-all duration-500" style="width: ${failPercent}%" title="Failed: ${fail}"></div>
+                    <div class="bg-yellow-400 h-4 transition-all duration-500" style="width: ${skipPercent}%" title="Skipped: ${skip}"></div>
+                </div>
+                <div class="flex items-center gap-6 text-xs font-semibold text-gray-500">
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-green-500"></span> Passed (${passPercent.toFixed(1)}%)</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-red-500"></span> Failed (${failPercent.toFixed(1)}%)</div>
+                    <div class="flex items-center gap-2"><span class="w-3 h-3 rounded-full bg-yellow-400"></span> Skipped (${skipPercent.toFixed(1)}%)</div>
+                </div>
+            `;
+            document.getElementById('dashboard-progress-card').innerHTML = progressHtml;
+
+            // Render Dashboard Table and Mockup Hierarchical Breakdown Tree
+            const classes = data.test_classes || {};
+            let tableHtml = '';
+            let treeHtml = '';
+            let primaryTargetName = 'BeToCQ Test Run';
+
+            for (const [className, clsData] of Object.entries(classes)) {
+                const groups = clsData.test_groups || [];
+                const cleanups = clsData.cleanups || [];
+                const totalExec = clsData.total_executions || clsData.total_test_cases || 0;
+                const passedExec = clsData.passed_test_cases || 0;
+                const failedExec = clsData.failed_test_cases || 0;
+                const clsRate = totalExec > 0 ? ((passedExec / totalExec) * 100).toFixed(1) : '0.0';
+
+                const formattedClassName = formatSuiteName(className);
+                if (primaryTargetName === 'BeToCQ Test Run') {
+                  primaryTargetName = formattedClassName;
+                }
+
+                // Count cleanup failures if any
+                const failedCleanups = cleanups.filter(c => c.status !== 'PASS' && c.status !== 'SKIP');
+                const cleanupBadge = failedCleanups.length > 0
+                  ? `<span class="bg-red-100 text-red-700 px-2 py-0.5 rounded-full text-xs font-bold">${failedCleanups.length} Failed</span>`
+                  : (cleanups.length > 0 ? `<span class="text-gray-400 text-xs">${cleanups.length} OK</span>` : `<span class="text-gray-300 text-xs">-</span>`);
+
+                // Dashboard Table Row
+                tableHtml += `
+                  <tr class="hover:bg-gray-50 font-medium">
+                    <td class="py-3 font-semibold text-gray-800">${formattedClassName}</td>
+                    <td class="py-3">${totalExec}</td>
+                    <td class="py-3 text-green-600 font-bold">${passedExec}</td>
+                    <td class="py-3 text-red-600 font-bold">${failedExec}</td>
+                    <td class="py-3 font-bold ${failedExec > 0 ? 'text-red-600' : 'text-green-600'}">${clsRate}%</td>
+                    <td class="py-3">${cleanupBadge}</td>
+                  </tr>
+                `;
+
+                // Render Suite / Test Class Section in Hierarchical Tree (CamelCase)
+                treeHtml += `
+                  <div class="flex flex-col gap-4">
+                    <div class="text-xs font-bold text-gray-500 tracking-wider pl-1">
+                      📁 Test Suite: <span class="text-gray-900 font-mono text-sm">${formattedClassName}</span>
+                    </div>
+                `;
+
+                // Render Each Base Test Case Group Card (Mockup Style)
+                groups.forEach((group, groupIndex) => {
+                    const status = (group.status || 'UNKNOWN').toUpperCase();
+                    const isFail = (status === 'FAIL' || status === 'FAILED' || status === 'ERROR');
+                    const isPass = (status === 'PASS' || status === 'PASSED');
+
+                    const isThroughput = group.base_name.toLowerCase().includes('throughput');
+
+                    let badgeText = isPass ? 'PASS' : (isThroughput ? 'FAIL (THROUGHPUT)' : 'FAIL');
+                    if (status === 'SKIP') badgeText = 'SKIP';
+
+                    let badgeClass = isPass
+                      ? 'bg-green-600 text-white'
+                      : (isThroughput ? 'bg-amber-50/60 border-amber-200' : 'bg-red-500 text-white');
+                    if (status === 'SKIP') badgeClass = 'bg-yellow-400 text-gray-900';
+
+                    let cardBg = isPass
+                      ? 'bg-white border-gray-200'
+                      : (isThroughput ? 'bg-amber-50/60 border-amber-200' : 'bg-red-50/50 border-red-200');
+
+                    const safeClass = className.replace(/[^a-zA-Z0-9]/g, '');
+                    const subInfo = group.failed_repeats > 0
+                      ? `${group.total_repeats} repeats configured, ${group.failed_repeats} failed`
+                      : `${group.total_repeats} repeats configured, ${group.passed_repeats} passed`;
+
+                    // Generate Repeat Chips
+                    let chipsHtml = '';
+                    (group.iterations || []).forEach((it, iterationIndex) => {
+                        const itStatus = (it.status || 'UNKNOWN').toUpperCase();
+                        const itPass = (itStatus === 'PASS' || itStatus === 'PASSED');
+                        const itSkip = (itStatus === 'SKIP' || itStatus === 'SKIPPED');
+
+                        const chipBg = itPass
+                          ? 'bg-green-600 hover:bg-green-700 text-white'
+                          : (itSkip ? 'bg-yellow-400 text-gray-900' : 'bg-red-500 hover:bg-red-600 text-white');
+                        const chipIcon = itPass ? '✓' : (itSkip ? '-' : '!');
+
+                        chipsHtml += `
+                          <button onclick="toggleIterationLog('${className}', ${groupIndex}, ${iterationIndex})"
+                                  title="Iteration #${iterationIndex + 1}: ${it.name} (${itStatus})"
+                                  class="w-6 h-6 rounded flex items-center justify-center font-bold text-xs shadow-sm transition-transform hover:scale-110 cursor-pointer ${chipBg}">
+                            ${chipIcon}
+                          </button>
+                        `;
+                    });
+
+                    treeHtml += `
+                      <div class="border rounded-2xl p-5 shadow-sm transition-all ${cardBg}">
+                        <!-- Top Header Row -->
+                        <div class="flex items-center gap-3">
+                          <span class="text-gray-400 text-xs font-bold">▶</span>
+                          <span class="px-2 py-0.5 rounded text-[11px] font-bold tracking-wider ${badgeClass}">
+                            ${badgeText}
+                          </span>
+                          <span class="font-mono font-bold text-gray-900 text-sm md:text-base">
+                            ${group.base_name}
+                          </span>
+                          <span class="text-xs text-gray-500 font-medium">
+                            (${subInfo})
+                          </span>
+                        </div>
+
+                        <!-- Repeats Chips Row -->
+                        <div class="mt-4 flex items-center gap-3 flex-wrap">
+                          <span class="text-xs font-bold text-gray-700">Repeats (${group.total_repeats}):</span>
+                          <div class="flex flex-wrap gap-1.5 items-center">
+                            ${chipsHtml}
+                          </div>
+                        </div>
+
+                        <!-- Expandable Log Drawer (Hidden by default) -->
+                        <div id="log-drawer-${safeClass}-${groupIndex}" class="hidden mt-4 pt-3 border-t border-gray-200">
+                          <div id="log-header-${safeClass}-${groupIndex}" class="mb-2 text-xs font-bold"></div>
+                          <div id="log-content-${safeClass}-${groupIndex}"></div>
+                        </div>
+                      </div>
+                    `;
+                });
+
+                // Render Cleanup Failures at bottom of test suite if any
+                if (cleanups.length > 0) {
+                  cleanups.forEach((cleanup, cleanupIndex) => {
+                    const cStatus = (cleanup.status || 'UNKNOWN').toUpperCase();
+                    const isFail = cStatus !== 'PASS' && cStatus !== 'SKIP';
+                    if (isFail) {
+                      const cleanupId = `cleanup-details-${className.replace(/[^a-zA-Z0-9]/g, '')}-${cleanupIndex}`;
+                      treeHtml += `
+                        <div class="p-4 bg-red-50/80 border border-red-200 rounded-2xl text-xs shadow-sm">
+                          <div class="flex justify-between items-center cursor-pointer font-bold text-red-800" onclick="document.getElementById('${cleanupId}').classList.toggle('hidden')">
+                            <span class="flex items-center gap-1.5">⚠️ Cleanup / Fixture Failure: <code class="font-mono bg-white px-1.5 py-0.5 rounded border border-red-200">${cleanup.name}</code></span>
+                            <div class="flex items-center gap-2">
+                              <span class="bg-red-100 text-red-800 px-2 py-0.5 rounded-full uppercase font-bold text-[10px]">${cStatus}</span>
+                              <span class="text-red-400 text-xs">▼</span>
+                            </div>
+                          </div>
+                          <div id="${cleanupId}" class="hidden mt-2.5 p-3.5 bg-white text-red-700 border border-red-200 rounded-xl font-mono overflow-x-auto whitespace-pre-wrap leading-relaxed shadow-sm">
+                            ${cleanup.stacktrace || cleanup.details || 'Fixture / Cleanup failed with no stacktrace.'}
+                          </div>
+                        </div>
+                      `;
+                    }
+                  });
+                }
+
+                treeHtml += `</div>`;
+            }
+
+            if (Object.keys(classes).length === 0) {
+                treeHtml = '<div class="text-gray-500 text-center py-8 bg-white rounded-2xl border">No test classes found.</div>';
+                tableHtml = '<tr><td colspan="6" class="text-center py-4 text-gray-400">No test classes available.</td></tr>';
+            }
+
+            document.getElementById('dashboard-class-table').innerHTML = tableHtml;
+            document.getElementById('hierarchical-tree').innerHTML = treeHtml;
+            document.getElementById('artifacts-target-name').textContent = primaryTargetName;
+
+            // Render Artifacts Tab Tree
+            renderArtifacts(data.artifacts || []);
+        }
+    });
+  </script>
+</body>
+</html>

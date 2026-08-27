@@ -109,6 +109,39 @@ def get_betocq_device_specific_info(
   return device_specific_dict
 
 
+def get_snippet_client(
+    ad: android_device.AndroidDevice, method_name: str | None = None
+) -> Any:
+  """Gets the snippet client from the device."""
+  if hasattr(ad, 'services') and hasattr(ad.services, 'snippets'):
+    # Iterate over all loaded snippets to find one supporting the method
+    for client in ad.services.snippets._snippet_clients.values():  # pylint: disable=protected-access
+      if method_name is None:
+        return client
+
+      # Mobly Snippet Clients implement dynamic RPC routing via __getattr__,
+      # so hasattr() always returns True. We must check available methods
+      # explicitly.
+      if not isinstance(
+          getattr(client, '_betocq_cached_methods', None), str  # pylint: disable=protected-access
+      ):
+        try:
+          help_text = client.help(print_output=False)
+        except Exception:  # pylint: disable=broad-except
+          help_text = ''
+        client._betocq_cached_methods = help_text if help_text else ''  # pylint: disable=protected-access
+
+      if re.search(
+          r'\b' + method_name + r'\b',
+          client._betocq_cached_methods,  # pylint: disable=protected-access
+      ):
+        return client
+
+  raise AttributeError(
+      f'No loaded snippet found supporting method {method_name or "any"}'
+  )
+
+
 def get_snippet_apk_path(
     user_params: dict[str, Any], snippet_name: str
 ) -> str | None:
@@ -212,10 +245,26 @@ def _do_set_country_code(
     force_telephony_cc: bool = False,
 ) -> None:
   """Sets Wi-Fi and Telephony country code."""
-  ad.log.info('Set Wi-Fi country code to %s.', country_code)
+  wifi_was_enabled = wifi_is_enabled(ad)
+  driver_cc = _get_driver_country_code(ad)
+  skip_wifi = (
+      driver_cc is not None and driver_cc.upper() == country_code.upper()
+  )
+
+  if skip_wifi:
+    ad.log.info(
+        'Driver country code is already %s. Skipping Wi-Fi country code set.',
+        country_code,
+    )
+  else:
+    ad.log.info('Set Wi-Fi country code to %s.', country_code)
+
   try:
-    ad.adb.shell('cmd wifi set-wifi-enabled disabled')
-    time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+    if not skip_wifi and not wifi_was_enabled:
+      ad.log.info('WiFi was disabled, enabling it before setting country code')
+      ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+      time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+
     if force_telephony_cc:
       ad.log.info('Set Telephony country code to %s.', country_code)
       ad.adb.shell(
@@ -223,61 +272,69 @@ def _do_set_country_code(
           ' com.android.internal.telephony.action.COUNTRY_OVERRIDE --es'
           f' country {country_code}'
       )
-      toggle_airplane_mode(ad)
-    ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
-    ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+      toggle_airplane_mode(ad, toggle_wifi=False)
 
-    if country_code == '00':
-      max_retries = 5
-      delay = 0.1
-      verified = False
-      driver_cc = None
-      for attempt in range(max_retries):
-        driver_cc = _get_driver_country_code(ad)
+    if not skip_wifi:
+      ad.adb.shell(f'cmd wifi force-country-code enabled {country_code}')
+      ad.log.info('Disabling and re-enabling WiFi after setting country code')
+      ad.adb.shell('cmd wifi set-wifi-enabled disabled')
+      time.sleep(WIFI_COUNTRYCODE_CONFIG_TIME_SEC)
+      if wifi_was_enabled:
+        ad.adb.shell('cmd wifi set-wifi-enabled enabled')
+
+      if country_code == '00':
+        max_retries = 5
+        delay = 0.1
+        verified = False
+        driver_cc = None
+        for attempt in range(max_retries):
+          driver_cc = _get_driver_country_code(ad)
+          if driver_cc is None:
+            ad.log.warning(
+                'mDriverCountryCode is not available in dumpsys wifi'
+            )
+            break
+          if driver_cc == '00':
+            ad.log.info(
+                'Successfully verified mDriverCountryCode is 00 after %d'
+                ' attempts',
+                attempt + 1,
+            )
+            verified = True
+            break
+          if attempt < max_retries - 1:
+            ad.log.warning(
+                (
+                    'mDriverCountryCode is %s (expected 00), attempt %d,'
+                    ' waiting %ss to retry'
+                ),
+                driver_cc,
+                attempt + 1,
+                delay,
+            )
+            time.sleep(delay)
+            delay *= 2
+          else:
+            ad.log.warning(
+                'mDriverCountryCode is %s (expected 00), attempt %d (last'
+                ' attempt)',
+                driver_cc,
+                attempt + 1,
+            )
+
         if driver_cc is None:
-          ad.log.warning('mDriverCountryCode is not available in dumpsys wifi')
-          break
-        if driver_cc == '00':
-          ad.log.info(
-              'Successfully verified mDriverCountryCode is 00 after %d'
-              ' attempts',
-              attempt + 1,
-          )
-          verified = True
-          break
-        if attempt < max_retries - 1:
           ad.log.warning(
+              'mDriverCountryCode is not available, skipping XY fallback.'
+          )
+        elif not verified:
+          ad.log.info(
               (
-                  'mDriverCountryCode is %s (expected 00), attempt %d, waiting'
-                  ' %ss to retry'
+                  'Failed to verify mDriverCountryCode as 00 (last seen: %s),'
+                  ' trying XY'
               ),
               driver_cc,
-              attempt + 1,
-              delay,
           )
-          time.sleep(delay)
-          delay *= 2
-        else:
-          ad.log.warning(
-              'mDriverCountryCode is %s (expected 00), attempt %d (last'
-              ' attempt)',
-              driver_cc,
-              attempt + 1,
-          )
-
-      if driver_cc is None:
-        ad.log.warning(
-            'mDriverCountryCode is not available, skipping XY fallback.'
-        )
-      elif not verified:
-        ad.log.info(
-            (
-                'Failed to verify mDriverCountryCode as 00 (last seen: %s),'
-                ' trying XY'
-            ),
-            driver_cc,
-        )
-        _do_set_country_code(ad, 'XY')
+          _do_set_country_code(ad, 'XY')
 
     if force_telephony_cc:
       telephony_country_code = (
@@ -406,12 +463,14 @@ def _do_dump_gms_version(ad: android_device.AndroidDevice) -> int | None:
   return get_int_between_prefix_postfix(out, prefix, postfix, search_last)
 
 
-def toggle_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def toggle_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Toggles airplane mode on the given device."""
   ad.log.info('turn on airplane mode')
-  enable_airplane_mode(ad)
+  enable_airplane_mode(ad, toggle_wifi)
   ad.log.info('turn off airplane mode')
-  disable_airplane_mode(ad)
+  disable_airplane_mode(ad, toggle_wifi)
 
 
 def connect_to_wifi_sta_till_success(
@@ -430,7 +489,24 @@ def connect_to_wifi_sta_till_success(
 
 def wifi_is_enabled(ad: android_device.AndroidDevice) -> bool:
   """Checks if wifi is enabled on the given device."""
-  return ad.nearby.wifiCheckState(constants.WifiState.ENABLED)
+  try:
+    snippet = get_snippet_client(ad, 'wifiCheckState')
+    return snippet.wifiCheckState(constants.WifiState.ENABLED)
+  except AttributeError:
+    ad.log.warning("WifiManagerSnippet wasn't loaded in the mobly snippet.")
+    pass
+  except Exception:  # pylint: disable=broad-exception-caught
+    pass
+  try:
+    out = ad.adb.shell('dumpsys wifi').decode('utf-8')
+    return (
+        'Current wifi mode: ConnectedState' in out
+        or 'Current wifi mode: DisconnectedState' in out
+        or 'Wi-Fi is enabled' in out
+        or 'WifiState 1' in out
+    )
+  except Exception:  # pylint: disable=broad-exception-caught
+    return False
 
 
 def connect_to_wifi(
@@ -440,14 +516,15 @@ def connect_to_wifi(
     num_retries: int = 1,
 ) -> None:
   """Connects to the specified wifi AP and raise exception if failed."""
+  snippet = get_snippet_client(ad, 'wifiConnectSimple')
   if not wifi_is_enabled(ad):
-    ad.nearby.wifiEnable()
+    snippet.wifiEnable()
   # return until the wifi is connected.
   wifi_password = password or None
   ad.log.info('Connect to wifi: ssid: %r, password: %r', ssid, wifi_password)
   for i in range(num_retries):
     try:
-      ad.nearby.wifiConnectSimple(ssid, wifi_password)
+      snippet.wifiConnectSimple(ssid, wifi_password)
       return
     except errors.ApiError:
       ad.log.warning(
@@ -455,8 +532,8 @@ def connect_to_wifi(
       )
       if i < num_retries - 1:
         # Reset wifi to make sure the wifi state is clean.
-        ad.nearby.wifiDisable()
-        ad.nearby.wifiEnable()
+        snippet.wifiDisable()
+        snippet.wifiEnable()
         time.sleep(_WIFI_CONNECT_INTERVAL_SEC)
       else:
         ad.log.error(
@@ -479,7 +556,8 @@ def remove_current_connected_wifi_network(
   Returns:
     True if a network was found and removed, False otherwise.
   """
-  wifi_info = ad.nearby.wifiGetConnectionInfo()
+  snippet = get_snippet_client(ad, 'wifiGetConnectionInfo')
+  wifi_info = snippet.wifiGetConnectionInfo()
   if (
       not wifi_info
       or wifi_info.get('SupplicantState', '')
@@ -491,7 +569,7 @@ def remove_current_connected_wifi_network(
   network_id = get_sta_network_id_from_wifi_info(wifi_info)
   if network_id != constants.INVALID_NETWORK_ID:
     ad.log.info('disconnecting from %r', wifi_info.get('SSID', ''))
-    ad.nearby.wifiRemoveNetwork(network_id)
+    snippet.wifiRemoveNetwork(network_id)
   else:
     ad.log.warning(
         'No valid network id for %r, try to remove all networks.',
@@ -504,18 +582,19 @@ def remove_current_connected_wifi_network(
 
 def remove_disconnect_wifi_network(ad: android_device.AndroidDevice) -> None:
   """Removes and disconnects all wifi network on the given device."""
-  was_wifi_enabled = ad.nearby.wifiIsEnabled()
+  snippet = get_snippet_client(ad, 'wifiClearConfiguredNetworks')
+  was_wifi_enabled = snippet.wifiIsEnabled()
   if was_wifi_enabled:
     # wifiClearConfiguredNetworks() calls getConfiguredNetworks() and
     # removeNetworks() which could take a long time to complete because these
     # calls have the complicated ownership check and wifi thread could be busy
     # with other tasks. Wifi thread is optimized in V but not in old releases.
     # Therefore let's disable wifi so that these calls can be completed on time.
-    ad.nearby.wifiDisable()
+    snippet.wifiDisable()
   ad.log.info('Clear wifi configured networks')
-  ad.nearby.wifiClearConfiguredNetworks()
+  snippet.wifiClearConfiguredNetworks()
   if was_wifi_enabled:
-    ad.nearby.wifiEnable()
+    snippet.wifiEnable()
   time.sleep(constants.WIFI_DISCONNECTION_DELAY.total_seconds())
 
 
@@ -525,14 +604,15 @@ def wait_for_wifi_auto_join(
     wifi_password: str,
 ) -> None:
   """Waits for the wifi connection after disruptive test."""
+  snippet = get_snippet_client(ad, 'wifiIsConnected')
   initial_max_wait_time_sec = 6
   max_wait_time_sec = initial_max_wait_time_sec
-  wifi_is_connected = ad.nearby.wifiIsConnected(wifi_ssid)
+  wifi_is_connected = snippet.wifiIsConnected(wifi_ssid)
   while not wifi_is_connected and max_wait_time_sec > 0:
     time.sleep(1)
-    wifi_is_connected = ad.nearby.wifiIsConnected(wifi_ssid)
+    wifi_is_connected = snippet.wifiIsConnected(wifi_ssid)
     if not wifi_is_connected:
-      ad.nearby.wifiConnectSimple(wifi_ssid, wifi_password)
+      snippet.wifiConnectSimple(wifi_ssid, wifi_password)
     max_wait_time_sec -= 1
   ad.log.info(
       'Waiting %d seconds for'
@@ -572,19 +652,23 @@ def _grant_manage_external_storage_permission(
     ad.log.info('Failed to grant MANAGE_EXTERNAL_STORAGE permission.')
 
 
-def enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def enable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Enables airplane mode on the given device."""
   try:
-    _do_enable_airplane_mode(ad)
+    _do_enable_airplane_mode(ad, toggle_wifi)
   except adb.AdbError:
     ad.log.exception(
         'Failed to enable airplane mode on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
-    _do_enable_airplane_mode(ad)
+    _do_enable_airplane_mode(ad, toggle_wifi)
 
 
-def _do_enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def _do_enable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Enables airplane mode on the given device."""
   if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '1'])
@@ -597,24 +681,29 @@ def _do_enable_airplane_mode(ad: android_device.AndroidDevice) -> None:
         'state',
         'true',
     ])
-  ad.adb.shell(['svc', 'wifi', 'disable'])
+  if toggle_wifi:
+    ad.adb.shell(['svc', 'wifi', 'disable'])
   ad.adb.shell(['svc', 'bluetooth', 'disable'])
   time.sleep(TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC)
 
 
-def disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def disable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Disables airplane mode on the given device."""
   try:
-    _do_disable_airplane_mode(ad)
+    _do_disable_airplane_mode(ad, toggle_wifi)
   except adb.AdbError:
     ad.log.exception(
         'Failed to disable airplane mode on device %r, try again.', ad.serial
     )
     time.sleep(ADB_RETRY_WAIT_TIME_SEC)
-    _do_disable_airplane_mode(ad)
+    _do_disable_airplane_mode(ad, toggle_wifi)
 
 
-def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
+def _do_disable_airplane_mode(
+    ad: android_device.AndroidDevice, toggle_wifi: bool = True
+) -> None:
   """Disables airplane mode on the given device."""
   if ad.is_adb_root:
     ad.adb.shell(['settings', 'put', 'global', 'airplane_mode_on', '0'])
@@ -627,7 +716,8 @@ def _do_disable_airplane_mode(ad: android_device.AndroidDevice) -> None:
         'state',
         'false',
     ])
-  ad.adb.shell(['svc', 'wifi', 'enable'])
+  if toggle_wifi:
+    ad.adb.shell(['svc', 'wifi', 'enable'])
   ad.adb.shell(['svc', 'bluetooth', 'enable'])
   time.sleep(TOGGLE_AIRPLANE_MODE_WAIT_TIME_SEC)
 
@@ -719,7 +809,7 @@ def get_sta_max_link_speed_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   return max_link_speed
 
 
-def _get_wifi_sta_frequency_from_dumpsys(
+def get_wifi_sta_frequency_from_dumpsys(
     ad: android_device.AndroidDevice,
 ) -> int:
   """Get wifi STA frequency on the given device."""
@@ -791,23 +881,21 @@ def dump_wifi_p2p_status(ad: android_device.AndroidDevice) -> str:
 
 def is_5g_band_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if 5G band is supported on the given device."""
-  if hasattr(ad, 'services') and hasattr(ad.services, 'snippets'):
-    for client in ad.services.snippets._snippet_clients.values():  # pylint: disable=protected-access
-      if hasattr(client, 'wifiIs5GHzBandSupported'):
-        try:
-          return client.wifiIs5GHzBandSupported()
-        except Exception as e:  # pylint: disable=broad-except
-          ad.log.warning('Failed to check 5G support via snippet: %s', e)
-  raise RuntimeError(
-      'No snippet found supporting wifiIs5GHzBandSupported. '
-      'Ensure snippets are loaded before calling this check.'
-  )
+  try:
+    return get_snippet_client(
+        ad, 'wifiIs5GHzBandSupported'
+    ).wifiIs5GHzBandSupported()
+  except AttributeError as e:
+    raise RuntimeError(
+        'No snippet found supporting wifiIs5GHzBandSupported. '
+        'Ensure snippets are loaded before calling this check.'
+    ) from e
 
 
 def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
   """Checks if WiFi Direct is supported on the given device."""
   try:
-    return ad.nearby.wifiIsP2pSupported()
+    return get_snippet_client(ad, 'wifiIsP2pSupported').wifiIsP2pSupported()
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('WiFi Direct is not supported due to %s', e)
     return False
@@ -1206,7 +1294,9 @@ def get_sta_frequency_and_max_link_speed(
 ) -> tuple[int, int]:
   """Gets the STA frequency and max link speed."""
   if connection_info is None:
-    connection_info = ad.nearby.wifiGetConnectionInfo()
+    connection_info = get_snippet_client(
+        ad, 'wifiGetConnectionInfo'
+    ).wifiGetConnectionInfo()
   sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
   sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
       connection_info
@@ -1214,7 +1304,7 @@ def get_sta_frequency_and_max_link_speed(
 
   # If the info is not available, try getting them by adb wifi status command.
   if sta_frequency == constants.INVALID_INT:
-    sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
+    sta_frequency = get_wifi_sta_frequency_from_dumpsys(ad)
     sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
 
@@ -1223,7 +1313,9 @@ def get_target_sta_frequency_and_max_link_speed(
     ad: android_device.AndroidDevice,
 ) -> tuple[int, int]:
   """Gets the STA frequency and max link speed."""
-  connection_info = ad.nearby.wifiGetConnectionInfo()
+  connection_info = get_snippet_client(
+      ad, 'wifiGetConnectionInfo'
+  ).wifiGetConnectionInfo()
   sta_frequency = get_sta_frequency_from_wifi_info(connection_info)
   sta_max_link_speed_mbps = get_sta_max_link_speed_from_wifi_info(
       connection_info
@@ -1231,11 +1323,12 @@ def get_target_sta_frequency_and_max_link_speed(
 
   # If the info is not available, try getting them by adb wifi status command.
   if sta_frequency == constants.INVALID_INT:
-    sta_frequency = _get_wifi_sta_frequency_from_dumpsys(ad)
+    sta_frequency = get_wifi_sta_frequency_from_dumpsys(ad)
     sta_max_link_speed_mbps = _get_wifi_sta_max_link_speed_from_dumpsys(ad)
   return (sta_frequency, sta_max_link_speed_mbps)
 
 
+# TODO: rename this as load_android_snippet
 def load_nearby_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
@@ -1253,10 +1346,13 @@ def load_nearby_snippet(
     ad.log.warning(
         ' apk path is not specified, make sure it is installed in the device'
     )
-  if not device_specific_dict.get('external_storage_permission_granted', False):
+  key_permission_granted = (
+      f'external_storage_permission_granted_{config.package_name}'
+  )
+  if not device_specific_dict.get(key_permission_granted, False):
     ad.log.info('grant manage external storage permission')
     grant_manage_external_storage_permission(ad, config.package_name)
-    device_specific_dict['external_storage_permission_granted'] = True
+    device_specific_dict[key_permission_granted] = True
 
   ad.load_snippet(config.snippet_name, config.package_name)
   if not hasattr(ad, 'loaded_snippet_packages'):
@@ -1271,6 +1367,13 @@ def unload_nearby_snippet(
   """Unloads a nearby snippet with the given snippet config."""
   device_specific_dict = get_betocq_device_specific_info(ad)
   key_apk_installed = config.package_name + '_installed'
+  key_permission_granted = (
+      f'external_storage_permission_granted_{config.package_name}'
+  )
+
+  # Clean up permission flag
+  device_specific_dict.pop(key_permission_granted, None)
+
   try:
     ad.unload_snippet(config.snippet_name)
     if hasattr(ad, 'loaded_snippet_packages'):
@@ -1563,6 +1666,41 @@ def abort_if_wifi_aware_pairing_not_supported(
     )
 
 
+def abort_if_extension_less_than(
+    ads: list[android_device.AndroidDevice],
+    extension_name: str,
+    min_version: int,
+) -> None:
+  """Aborts test class if any device has specified Mainline extension less than min_version.
+
+  See https://developer.android.com/guide/sdk-extensions for more details about
+  Mainline extension versions.
+
+  Args:
+    ads: A list of AndroidDevice instances.
+    extension_name: The name of the Mainline extension (e.g., 's', 't').
+    min_version: The minimum required version of the extension.
+  """
+  for ad in ads:
+    try:
+      ext_version = ad.adb.getprop(f'build.version.extensions.{extension_name}')
+      ext_version_val = int(ext_version) if ext_version else 0
+    except (adb.AdbError, ValueError):
+      ad.log.exception(
+          'Failed to get or parse Android %s Extension Version. Skipping'
+          ' version check.',
+          extension_name.upper(),
+      )
+      continue
+
+    asserts.abort_class_if(
+        ext_version_val < min_version,
+        f'Android {extension_name.upper()} Extension Version is'
+        f' {ext_version_val}, which is less than {min_version}. Device {ad}'
+        ' does not support required features.',
+    )
+
+
 def abort_if_device_cap_not_match(
     ads: list[android_device.AndroidDevice],
     attribute_name: str,
@@ -1579,26 +1717,6 @@ def abort_if_device_cap_not_match(
             ' match test case requirement.'
         ),
     )
-
-
-def reset_nearby_connection(
-    ad: android_device.AndroidDevice,
-) -> None:
-  """Resets Nearby Connection on the given device.
-
-  Safe guard for the failure test, in case the previous test failed in the
-  middle of the NC, this function makes the NC be reset in best effort properly.
-
-  Args:
-    ad: A AndroidDevice instances.
-  """
-  ad.log.info('reset_nearby_connection')
-  for prop in ['nearby', 'nearby2', 'nearby3']:
-    if nearby := getattr(ad, prop, None):
-      nearby.stopAdvertising()
-      nearby.stopDiscovery()
-      nearby.stopAllEndpoints()
-  time.sleep(constants.NEARBY_RESET_WAIT_TIME.total_seconds())
 
 
 _Priority = Literal['d', 'e', 'f', 'i', 'v', 'w', 's']
@@ -1641,6 +1759,24 @@ def is_gms_version_above_required_version(
     )
     return False
   return int(gms_version) >= required_version
+
+
+def abort_if_gms_version_less_than(
+    ads: list[android_device.AndroidDevice],
+    min_version: int,
+) -> None:
+  """Aborts test class if any device has GMS version less than min_version.
+
+  Args:
+    ads: The Android devices to check.
+    min_version: The minimum required GMS version code.
+  """
+  for ad in ads:
+    asserts.abort_class_if(
+        not is_gms_version_above_required_version(ad, min_version),
+        f'GMS version on device {ad} is less than {min_version} (or could not'
+        ' be obtained). Device does not support required features.',
+    )
 
 
 def is_nc_wlan_file_transfer_flaky_issue_fixed(
@@ -1830,10 +1966,8 @@ def unlock_screen(
     return
 
   device.log.info('Screen is locked. Attempting to unlock.')
-  if is_cuttlefish(device):
-    device.adb.shell('wm dismiss-keyguard')
-  else:
-    device.adb.shell('input keyevent KEYCODE_MENU')
+  device.adb.shell('input keyevent KEYCODE_WAKEUP')
+  device.adb.shell('wm dismiss-keyguard')
 
   if not wait_for_predicate(
       lambda: not is_screen_locked(device),

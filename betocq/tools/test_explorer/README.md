@@ -1,0 +1,72 @@
+# BeToCQ Test Explorer
+
+The **BeToCQ Test Explorer** is a lightweight, zero-dependency local web
+application designed to parse, visualize, and triage Mobly test execution
+results across BeToCQ projects, including Osmosis connection testing
+(Wi-Fi STA, Wi-Fi Aware, BLE, USB NCM).
+
+## Goal & Purpose
+
+When running Mobly tests locally or at partner OEM test stations, raw output
+directories contain multi-document `test_summary.yaml` files, hundreds of
+repeated test iterations, and deeply nested device logs.
+
+BeToCQ Test Explorer provides an instant local web dashboard to:
+
+1.  **Aggregate Repeats**: Group repeated test iterations (`test_case_0` ...
+    `test_case_19`) into base test cards with green (`✓`) and red (`!`)
+    iteration chips.
+2.  **KPI Metrics & Progress**: Display visual pass-rate progress bars and
+    high-level KPIs (Total, Passed, Failed, Skipped).
+3.  **Hierarchical Breakdown**: Automatically format test suite names in clean
+    CamelCase / TitleCase (e.g. `OsmosisSuwAwareTest`) with click-to-expand log
+    drawers for failure stacktraces.
+4.  **Sponge/BTX-Style Artifacts Tree**: Render a hierarchical, collapsible
+    directory tree (`📁`) with clickable individual file download links and
+    in-browser modal previews for test logs and YAML artifacts.
+5.  **Universal & Hermetic**: Run natively across macOS and Linux with zero
+    external web framework dependencies (`pip`, `flask`, `npm`, etc.).
+
+## Architecture
+
+-   **`server.py`**: A pure Python 3 standard library HTTP server
+    (`http.server`) exposing REST endpoints for metrics (`/api/results`), zip
+    uploads (`/api/upload`), in-browser text previews (`/api/artifact`), and
+    direct file downloads (`/api/download`). Can be executed directly with
+    `python3`.
+-   **`mobly_parser.py`**: Mobly YAML stream parser, repeat iteration
+    aggregator, and recursive artifact indexer.
+-   **`templates/index.html`**: Material 3 / Tailwind single-page application
+    dashboard.
+-   **`BUILD`**: Blaze build rules defining targets and unit tests.
+
+## Usage
+
+Launch the server directly using `python3`:
+
+### 1. Launch with Results Directory or Zip File
+
+```bash
+# Pass a zip file directly (positional argument)
+python3 server.py /path/to/mobly_results.zip
+
+# Pass a zip file via flag
+python3 server.py --results_dir /path/to/mobly_results.zip
+
+# Pass an extracted results directory
+python3 server.py /path/to/mobly_results/
+
+# Specify a custom port (optional, defaults to an available port)
+python3 server.py /path/to/mobly_results.zip --port 8080
+```
+
+### 2. Launch in Interactive Upload Mode
+
+```bash
+python3 server.py
+```
+
+The server will automatically select an available port (or run on a port
+specified via `--port <port>`), open your default browser, and display the
+dashboard. Drag and drop any Mobly `.zip` test result archive to view the
+dashboard.

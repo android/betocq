@@ -42,3 +42,4 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 #          'the metrics collection and fix some bugs.')
 # '3.1.0': ('Adjust the test cases, remove most compound tests and the world
 #          'mode test cases.')
+# '3.1.1': ('Fix some bugs.')
