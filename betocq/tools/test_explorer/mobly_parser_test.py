@@ -17,13 +17,13 @@
 import os
 import zipfile
 
-from absl.testing import absltest
 import yaml
 
+from google3.testing.pybase import googletest
 from betocq.tools.test_explorer import mobly_parser
 
 
-class MoblyParserTest(absltest.TestCase):
+class MoblyParserTest(googletest.TestCase):
 
   def test_is_fixture_or_cleanup(self) -> None:
     self.assertTrue(mobly_parser.is_fixture_or_cleanup("setup_class"))
@@ -229,4 +229,4 @@ class MoblyParserTest(absltest.TestCase):
 
 
 if __name__ == "__main__":
-  absltest.main()
+  googletest.main()
