@@ -23,8 +23,7 @@ import tempfile
 from unittest import mock
 import zipfile
 
-from absl.testing import absltest
-
+from google3.testing.pybase import googletest
 from betocq.tools.test_explorer import server
 from betocq.tools.test_explorer import version
 
@@ -61,7 +60,7 @@ class DummyRequestHandler(server.TestExplorerRequestHandler):
     self.response_status = code
 
 
-class ServerTest(absltest.TestCase):
+class ServerTest(googletest.TestCase):
 
   def setUp(self) -> None:
     super().setUp()
@@ -427,6 +426,18 @@ class ServerTest(absltest.TestCase):
       self.assertGreater(port, 0)
       self.assertLessEqual(port, 65535)
 
+  def test_internal_dependencies_present(self) -> None:
+    """Ensures optional internal dependencies are present in Google3 builds.
+
+    Because server.py catches ImportError to support standalone/external runs,
+    missing dependencies in BUILD will silently degrade functionality without
+    failing module imports. This test catches BuildCleaner removals early.
+    """
+    self.assertIsNotNone(server.portpicker)
+    self.assertIsNotNone(server.issuetracker_builders)
+    self.assertIsNotNone(server.issuetracker_client)
+    self.assertIsNotNone(server.pywraprpc)
+
 
 if __name__ == "__main__":
-  absltest.main()
+  googletest.main()
