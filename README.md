@@ -436,7 +436,7 @@ Depending on your validation target, execute the appropriate test suite command:
 
 You can view and analyze test execution results locally using **BeToCQ Test Explorer**, or upload them using **`results_uploader`**.
 
-#### Option 1: Using BeToCQ Test Explorer (Local Web Dashboard)
+#### Option 1: Using BeToCQ Test Explorer (Local Web Dashboard) (Recommended)
 
 You can use `betocq_test_explorer` (located in `betocq/tools/test_explorer`) to launch a lightweight, zero-dependency local web dashboard that parses, visualizes, and helps triage Mobly test results:
 
@@ -452,7 +452,7 @@ You can use `betocq_test_explorer` (located in `betocq/tools/test_explorer`) to 
 
 For more details and options (such as specifying a custom `--port`), refer to the [BeToCQ Test Explorer README](./betocq/tools/test_explorer/README.md).
 
-#### Option 2: Using `results_uploader`
+#### Option 2: Using `results_uploader` (Optional)
 
 Alternatively, you can use [`results_uploader`](https://github.com/android/mobly-android-partner-tools) to upload and view test results:
 
