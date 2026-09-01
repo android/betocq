@@ -26,6 +26,7 @@ import zipfile
 from absl.testing import absltest
 
 from betocq.tools.test_explorer import server
+from betocq.tools.test_explorer import version
 
 
 class DummyRequestHandler(server.TestExplorerRequestHandler):
@@ -75,6 +76,7 @@ class ServerTest(absltest.TestCase):
     self.assertIn(b"getIterationArtifacts", html_bytes)
     self.assertIn(b"Logcat", html_bytes)
     self.assertIn(b"Bugreport", html_bytes)
+    self.assertIn(b"v{{VERSION}}", html_bytes)
 
   def test_send_json(self) -> None:
     handler = DummyRequestHandler()
@@ -96,6 +98,19 @@ class ServerTest(absltest.TestCase):
     self.assertEqual(handler.response_status, 200)
     self.assertIn("text/html", handler.response_headers.get("Content-Type", ""))
     self.assertNotEmpty(handler.wfile.getvalue())
+    response_body = handler.wfile.getvalue().decode("utf-8")
+    self.assertIn(f"v{version.VERSION}", response_body)
+
+  def test_get_version_api(self) -> None:
+    handler = DummyRequestHandler(path="/api/version")
+    handler.do_GET()
+
+    self.assertEqual(handler.response_status, 200)
+    self.assertIn(
+        "application/json", handler.response_headers.get("Content-Type", "")
+    )
+    output = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertEqual(output, {"version": version.VERSION})
 
   def test_handle_artifact_success(self) -> None:
     with tempfile.TemporaryDirectory() as temp_dir:
