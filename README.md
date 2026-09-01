@@ -438,17 +438,20 @@ You can view and analyze test execution results locally using **BeToCQ Test Expl
 
 #### Option 1: Using BeToCQ Test Explorer (Local Web Dashboard) (Recommended)
 
-You can use `betocq_test_explorer` (located in `betocq/tools/test_explorer`) to launch a lightweight, zero-dependency local web dashboard that parses, visualizes, and helps triage Mobly test results:
+When you install the `betocq` package via `pip`, it includes the `betocq-result-viewer` command-line tool (powered by `betocq_test_explorer` in `betocq/tools/test_explorer`),
+which launches a lightweight local web dashboard to parse, visualize, and triage Mobly test results:
 
 1.  **Launch with a results directory or `.zip` file:**
     ```bash
-    python3 betocq/tools/test_explorer/server.py /path/to/mobly_results/
+    betocq-result-viewer /path/to/mobly_results/
     ```
 2.  **Or launch in interactive upload mode:**
     ```bash
-    python3 betocq/tools/test_explorer/server.py
+    betocq-result-viewer
     ```
     This opens your default browser where you can drag and drop any Mobly `.zip` test result archive.
+
+*Note: If running directly from a source checkout without installing the wheel, you can invoke the script directly via `python3 betocq/tools/test_explorer/server.py`.*
 
 For more details and options (such as specifying a custom `--port`), refer to the [BeToCQ Test Explorer README](./betocq/tools/test_explorer/README.md).
 
