@@ -414,9 +414,6 @@ python -m pip install <betocq_x.y.z-py3-none-any.whl>
       Check with the Wi-Fi engineering team about device capabilities details.
 
 
-### Set up results uploader  (first time use only)
-Follow instructions in [`results_uploader`](https://github.com/android/mobly-android-partner-tools) to get the test results.
-
 ### Run the test
 
 Depending on your validation target, execute the appropriate test suite command:
@@ -433,6 +430,34 @@ Depending on your validation target, execute the appropriate test suite command:
     ```
 
 *Note: The `-u` flag is optional and is used to upload results if you have configured the `results_uploader`.*
+
+
+### Viewing test results
+
+You can view and analyze test execution results locally using **BeToCQ Test Explorer**, or upload them using **`results_uploader`**.
+
+#### Option 1: Using BeToCQ Test Explorer (Local Web Dashboard)
+
+You can use `betocq_test_explorer` (located in `betocq/tools/test_explorer`) to launch a lightweight, zero-dependency local web dashboard that parses, visualizes, and helps triage Mobly test results:
+
+1.  **Launch with a results directory or `.zip` file:**
+    ```bash
+    python3 betocq/tools/test_explorer/server.py /path/to/mobly_results/
+    ```
+2.  **Or launch in interactive upload mode:**
+    ```bash
+    python3 betocq/tools/test_explorer/server.py
+    ```
+    This opens your default browser where you can drag and drop any Mobly `.zip` test result archive.
+
+For more details and options (such as specifying a custom `--port`), refer to the [BeToCQ Test Explorer README](./betocq/tools/test_explorer/README.md).
+
+#### Option 2: Using `results_uploader`
+
+Alternatively, you can use [`results_uploader`](https://github.com/android/mobly-android-partner-tools) to upload and view test results:
+
+1.  **First-time setup:** Follow the setup instructions in [`results_uploader`](https://github.com/android/mobly-android-partner-tools).
+2.  **Upload results:** Pass the `-u` flag when running `mobly_runner` to automatically upload results upon test completion, or run `results_uploader` directly on your output directory.
 
 
 ### Debugging test failures
