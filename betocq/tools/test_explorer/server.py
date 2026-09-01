@@ -73,6 +73,7 @@ except ImportError:
   _RpcException: type[Exception] = _DummyRpcError
 
 from betocq.tools.test_explorer import mobly_parser  # pylint: disable=g-import-not-at-top
+from betocq.tools.test_explorer import version  # pylint: disable=g-import-not-at-top
 
 
 class ApiEndpoint(enum.StrEnum):
@@ -80,6 +81,7 @@ class ApiEndpoint(enum.StrEnum):
 
   INDEX = "/"
   RESULTS = "/api/results"
+  VERSION = "/api/version"
   ARTIFACT = "/api/artifact"
   DOWNLOAD = "/api/download"
   UPLOAD = "/api/upload"
@@ -414,8 +416,11 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     return None
 
   def _handle_index(self) -> None:
-    """Serves the main HTML UI page."""
+    """Serves the main HTML UI page with version placeholder replaced."""
     html_bytes = get_template_html()
+    html_bytes = html_bytes.replace(
+        b"{{VERSION}}", version.VERSION.encode("utf-8")
+    )
     self.send_response(200)
     self.send_header("Content-Type", ContentType.HTML.value)
     self.send_header("Content-Length", str(len(html_bytes)))
@@ -479,6 +484,8 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
       self._handle_index()
     elif self.path == ApiEndpoint.RESULTS.value:
       self._send_json(TEST_RESULTS)
+    elif self.path == ApiEndpoint.VERSION.value:
+      self._send_json({"version": version.VERSION})
     elif self.path.startswith(ApiEndpoint.ARTIFACT.value):
       self._handle_artifact()
     elif self.path.startswith(ApiEndpoint.DOWNLOAD.value):
@@ -643,6 +650,12 @@ def pick_unused_port() -> int:
 def main() -> None:
   """Parses CLI flags and launches the Test Explorer HTTP web server."""
   parser = argparse.ArgumentParser(description="BeToCQ Test Explorer")
+  parser.add_argument(
+      "--version",
+      "-v",
+      action="version",
+      version=f"BeToCQ Test Explorer v{version.VERSION}",
+  )
   parser.add_argument(
       "results_path",
       nargs="?",
