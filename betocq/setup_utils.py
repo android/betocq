@@ -1251,6 +1251,20 @@ def install_overrides(
     ad.log.info('Skipped installing hermetic overrides on unrooted device.')
     return
 
+  try:
+    build_tags = ad.adb.getprop('ro.build.tags')
+    build_fingerprint = ad.adb.getprop('ro.build.fingerprint')
+    if 'release-keys' in build_tags or 'release-keys' in build_fingerprint:
+      ad.log.warning(
+          'Device %s build is signed with release-keys (%s). Phenotype'
+          ' HermeticFileOverridesReader requires dev-keys or test-keys;'
+          ' file-based overrides will be silently rejected by GMS Core.',
+          ad.serial,
+          build_fingerprint or build_tags,
+      )
+  except Exception as e:  # pylint: disable=broad-exception-caught
+    ad.log.warning('Could not check build tags: %s', e)
+
   template_content = _get_resource_contents(_FLAG_SETUP_TEMPLATE_KEY)
   ad.log.info('Installing hermetic overrides from %s', target)
   hermetic_overrides_partner.install_hermetic_overrides(
