@@ -25,6 +25,7 @@ import zipfile
 
 from google3.testing.pybase import googletest
 from betocq.tools.test_explorer import server
+from betocq.tools.test_explorer import setup_wizard
 from betocq.tools.test_explorer import version
 
 
@@ -437,6 +438,75 @@ class ServerTest(googletest.TestCase):
     self.assertIsNotNone(server.issuetracker_builders)
     self.assertIsNotNone(server.issuetracker_client)
     self.assertIsNotNone(server.pywraprpc)
+
+  def test_get_check_env_script(self) -> None:
+    script_bytes = setup_wizard.get_check_env_script()
+    self.assertIsInstance(script_bytes, bytes)
+    script_str = script_bytes.decode("utf-8")
+    self.assertIn("#!/bin/bash", script_str)
+    self.assertIn("sw_vers", script_str)
+    self.assertIn("uname -a", script_str)
+    self.assertIn("xcodebuild", script_str)
+    self.assertIn("security find-identity", script_str)
+    self.assertIn("xcrun devicectl", script_str)
+    self.assertIn("python3", script_str)
+    self.assertIn("adb version", script_str)
+    self.assertIn("socketfilterfw", script_str)
+
+  def test_run_environment_checks(self) -> None:
+    results = setup_wizard.run_environment_checks()
+    self.assertTrue(results["success"])
+    self.assertIn("timestamp", results)
+    self.assertIn("overall_status", results)
+    self.assertIn("raw_output", results)
+    sections = results["sections"]
+    self.assertLen(sections, 7)
+    section_ids = [s["id"] for s in sections]
+    self.assertIn("host_os", section_ids)
+    self.assertIn("xcode_tools", section_ids)
+    self.assertIn("codesigning", section_ids)
+    self.assertIn("devices", section_ids)
+    self.assertIn("python_runtime", section_ids)
+    self.assertIn("utilities_services", section_ids)
+    self.assertIn("firewall_tunnels", section_ids)
+
+  def test_get_check_env_api(self) -> None:
+    handler = DummyRequestHandler(path="/api/check_env")
+    handler.do_GET()
+    self.assertEqual(handler.response_status, 200)
+    self.assertIn(
+        "application/json", handler.response_headers.get("Content-Type", "")
+    )
+    data = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertTrue(data.get("success"))
+    self.assertIn("sections", data)
+    self.assertLen(data["sections"], 7)
+
+  def test_post_check_env_api(self) -> None:
+    handler = DummyRequestHandler(path="/api/check_env")
+    handler.do_POST()
+    self.assertEqual(handler.response_status, 200)
+    self.assertIn(
+        "application/json", handler.response_headers.get("Content-Type", "")
+    )
+    data = json.loads(handler.wfile.getvalue().decode("utf-8"))
+    self.assertTrue(data.get("success"))
+    self.assertIn("sections", data)
+
+  def test_get_check_env_script_api(self) -> None:
+    handler = DummyRequestHandler(path="/api/check_env_script")
+    handler.do_GET()
+    self.assertEqual(handler.response_status, 200)
+    self.assertIn(
+        "text/x-shellscript", handler.response_headers.get("Content-Type", "")
+    )
+    self.assertIn(
+        'filename="check_env.sh"',
+        handler.response_headers.get("Content-Disposition", ""),
+    )
+    content = handler.wfile.getvalue().decode("utf-8")
+    self.assertIn("#!/bin/bash", content)
+    self.assertIn("sw_vers", content)
 
 
 if __name__ == "__main__":
