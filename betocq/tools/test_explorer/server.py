@@ -73,6 +73,7 @@ except ImportError:
   _RpcException: type[Exception] = _DummyRpcError
 
 from betocq.tools.test_explorer import mobly_parser  # pylint: disable=g-import-not-at-top
+from betocq.tools.test_explorer import setup_wizard  # pylint: disable=g-import-not-at-top
 from betocq.tools.test_explorer import version  # pylint: disable=g-import-not-at-top
 
 
@@ -86,6 +87,8 @@ class ApiEndpoint(enum.StrEnum):
   DOWNLOAD = "/api/download"
   UPLOAD = "/api/upload"
   FILE_BUG = "/api/file_bug"
+  CHECK_ENV = "/api/check_env"
+  CHECK_ENV_SCRIPT = "/api/check_env_script"
 
 
 class ContentType(enum.StrEnum):
@@ -95,6 +98,7 @@ class ContentType(enum.StrEnum):
   HTML = "text/html; charset=utf-8"
   OCTET_STREAM = "application/octet-stream"
   MULTIPART_FORM_DATA = "multipart/form-data"
+  SHELL_SCRIPT = "text/x-shellscript; charset=utf-8"
 
 
 @dataclasses.dataclass
@@ -478,6 +482,23 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     except OSError as e:
       self.send_error(500, f"Download error: {e}")
 
+  def _handle_check_env(self) -> None:
+    """Runs station environment checks and serves JSON report."""
+    results = setup_wizard.run_environment_checks()
+    self._send_json(results)
+
+  def _handle_check_env_script(self) -> None:
+    """Serves the check_env.sh script as a downloadable shell script."""
+    script_bytes = setup_wizard.get_check_env_script()
+    self.send_response(200)
+    self.send_header("Content-Type", ContentType.SHELL_SCRIPT.value)
+    self.send_header(
+        "Content-Disposition", 'attachment; filename="check_env.sh"'
+    )
+    self.send_header("Content-Length", str(len(script_bytes)))
+    self.end_headers()
+    self.wfile.write(script_bytes)
+
   def do_GET(self) -> None:  # pylint: disable=invalid-name
     """Handles HTTP GET requests."""
     if self.path == ApiEndpoint.INDEX.value or self.path.startswith("/?"):
@@ -490,6 +511,15 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
       self._handle_artifact()
     elif self.path.startswith(ApiEndpoint.DOWNLOAD.value):
       self._handle_download()
+    elif self.path == ApiEndpoint.CHECK_ENV.value or self.path.startswith(
+        ApiEndpoint.CHECK_ENV.value + "?"
+    ):
+      self._handle_check_env()
+    elif (
+        self.path == ApiEndpoint.CHECK_ENV_SCRIPT.value
+        or self.path.startswith(ApiEndpoint.CHECK_ENV_SCRIPT.value + "?")
+    ):
+      self._handle_check_env_script()
     else:
       self.send_error(404, "Not Found")
 
@@ -577,6 +607,11 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     """Handles HTTP POST requests for result uploads."""
     if self.path == ApiEndpoint.FILE_BUG.value:
       self._handle_file_bug()
+      return
+    if self.path == ApiEndpoint.CHECK_ENV.value or self.path.startswith(
+        ApiEndpoint.CHECK_ENV.value + "?"
+    ):
+      self._handle_check_env()
       return
     if self.path != ApiEndpoint.UPLOAD.value:
       self.send_error(404, "Not Found")

@@ -14,9 +14,11 @@
 
 """Define the BeToCQ Test Explorer version."""
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 __version__ = VERSION
 
 # VERSION_LOG (only add new description for new version, keep the history log)
+# '1.1.0': 'Add Environment Status diagnostic tab, setup_wizard module, and
+#           check_env.sh support.'
 # '1.0.0': 'Initial release with dashboard KPIs, repeat aggregator, and
 #           artifacts tree.'
