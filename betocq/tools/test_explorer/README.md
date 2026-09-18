@@ -29,8 +29,10 @@ BeToCQ Test Explorer provides an instant local web dashboard to:
 
 ## Architecture
 
--   **`version.py`**: Semantic version definition (`VERSION = "1.0.0"`) and
+-   **`version.py`**: Semantic version definition (`VERSION = "1.1.0"`) and
     version history log.
+-   **`setup_wizard.py`**: Testbed and station readiness diagnostics, command
+    execution routines, and device discovery.
 -   **`server.py`**: A pure Python 3 standard library HTTP server
     (`http.server`) exposing REST endpoints for metrics (`/api/results`), zip
     uploads (`/api/upload`), in-browser text previews (`/api/artifact`), and
