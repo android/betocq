@@ -324,6 +324,7 @@ public class ConnectionsClientSnippet implements Snippet {
           toThrow = e;
           SystemClock.sleep(1000);
         } else {
+          Log.e("Failed to call Nearby API on attempt " + (i + 1) + " with non-retryable error", e);
           throw e;
         }
       }
