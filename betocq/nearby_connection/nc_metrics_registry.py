@@ -99,9 +99,6 @@ NC_METRICS_REGISTRY: immutabledict.immutabledict[str, MetricDefinition] = (
         'wlan_throughput_cap_mbps': MetricDefinition(
             AggregatorType.EXCLUDE_AGGREGATING, None
         ),
-        'all_tests_should_be_skipped': MetricDefinition(
-            AggregatorType.EXCLUDE_AGGREGATING, None
-        ),
         'd2d_type': MetricDefinition(AggregatorType.EXCLUDE_AGGREGATING, None),
         'medium_frequency': MetricDefinition(
             AggregatorType.EXCLUDE_AGGREGATING, None

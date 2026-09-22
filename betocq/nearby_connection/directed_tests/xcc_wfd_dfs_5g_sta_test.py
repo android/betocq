@@ -53,11 +53,9 @@ Expected results:
 
 import time
 
-from mobly import asserts
 from mobly import test_runner
 from mobly import utils
 from mobly.controllers import android_device
-
 from typing_extensions import override
 
 from betocq import constants
@@ -66,7 +64,6 @@ from betocq.nearby_connection import nc_constants
 from betocq.nearby_connection import nc_performance_test_base
 from betocq.nearby_connection import nc_test_result_utils
 from betocq.nearby_connection import utils as nc_utils
-
 
 # Use MCC strategy for iteration number and max consecutive error,
 # as most devices do not support SCC_5G mode in this case.
@@ -148,8 +145,7 @@ class XccWfdDfs5gStaTest(nc_performance_test_base.NcPerformanceTestBase):
     """Aborts the test class if any test condition is not met."""
     # Check rooted devices.
     setup_utils.abort_if_on_unrooted_device(
-        [self.discoverer, self.advertiser],
-        'the country code can not be set.'
+        [self.discoverer, self.advertiser], 'the country code can not be set.'
     )
     # Check WiFi AP.
     setup_utils.abort_if_dfs_5g_ap_not_ready(self.test_parameters)
@@ -165,11 +161,6 @@ class XccWfdDfs5gStaTest(nc_performance_test_base.NcPerformanceTestBase):
     supported) and MCC (otherwise) scenarios.
     """
     # Test Step: Disconnect discoverer from the current connected wifi sta.
-    if getattr(self.test_runtime, 'all_tests_should_be_skipped', False):
-      asserts.skip(
-          'medium_frequency is equal to sta_frequency, skipping all following'
-          ' iterations. duplicate test case with SCC_5G_WFD_STA_TEST.'
-      )
     discoverer_sta_op = setup_utils.remove_current_connected_wifi_network(
         self.discoverer
     )
@@ -252,13 +243,12 @@ class XccWfdDfs5gStaTest(nc_performance_test_base.NcPerformanceTestBase):
         p2p_frequency == sta_frequency
         and sta_frequency is not constants.INVALID_INT
     ):
-      self.test_runtime.all_tests_should_be_skipped = True
       prior_bt_snippet.disconnect_endpoint()
       active_snippet.disconnect_endpoint()
 
-      asserts.skip(
-          'medium_frequency is equal to sta_frequency, skipping all following'
-          ' iterations. duplicate test case with SCC_5G_WFD_STA_TEST.'
+      self.skip_remaining_iterations(
+          'p2p_frequency is equal to sta_frequency, duplicate test case with'
+          ' SCC_5G_WFD_STA_TEST.'
       )
 
     file_transfer_size_kb = (
