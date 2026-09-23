@@ -15,7 +15,7 @@
 """Unit tests for setup_wizard module."""
 
 from google3.testing.pybase import googletest
-from betocq.tools.test_explorer import setup_wizard
+from betocq.tools.results_viewer import setup_wizard
 
 
 class SetupWizardTest(googletest.TestCase):

@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""HTTP server and API handlers for the BeToCQ Test Explorer."""
+"""HTTP server and API handlers for the BeToCQ Results Viewer."""
 
 import argparse
 import atexit
@@ -72,13 +72,13 @@ except ImportError:
   pywraprpc = None
   _RpcException: type[Exception] = _DummyRpcError
 
-from betocq.tools.test_explorer import mobly_parser  # pylint: disable=g-import-not-at-top
-from betocq.tools.test_explorer import setup_wizard  # pylint: disable=g-import-not-at-top
-from betocq.tools.test_explorer import version  # pylint: disable=g-import-not-at-top
+from betocq.tools.results_viewer import mobly_parser  # pylint: disable=g-import-not-at-top
+from betocq.tools.results_viewer import setup_wizard  # pylint: disable=g-import-not-at-top
+from betocq.tools.results_viewer import version  # pylint: disable=g-import-not-at-top
 
 
 class ApiEndpoint(enum.StrEnum):
-  """REST API endpoints supported by Test Explorer HTTP server."""
+  """REST API endpoints supported by Results Viewer HTTP server."""
 
   INDEX = "/"
   RESULTS = "/api/results"
@@ -135,14 +135,14 @@ class FileBugResponse:
   issue_url: str | None = None
 
 
-PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.test_explorer"
+PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.results_viewer"
 TEMPLATE_RESOURCE_PATH = "templates/index.html"
 DEFAULT_COMPONENT_ID = "2105900"
 _MAX_DESCRIPTION_URL_CHARS = 1800
 _MAX_ARTIFACT_READ_BYTES = 2 * 1024 * 1024  # 2MB
 _ISSUETRACKER_NEW_ISSUE_URL = "https://issuetracker.google.com/issues/new?"
 _ISSUETRACKER_ISSUE_URL_PREFIX = "https://issuetracker.google.com/issues/"
-_TEMP_DIR_PREFIX = "betocq_explorer_"
+_TEMP_DIR_PREFIX = "betocq_results_viewer_"
 _BROWSER_OPEN_DELAY_SECONDS = 1.25
 
 # In-memory store for MVP
@@ -379,8 +379,8 @@ def _create_buganizer_issue(
   )
 
 
-class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
-  """Request handler for serving the Test Explorer UI and API endpoints."""
+class ResultsViewerRequestHandler(http.server.BaseHTTPRequestHandler):
+  """Request handler for serving the Results Viewer UI and API endpoints."""
 
   def _send_json(self, data: Any, status_code: int = 200) -> None:
     """Serializes data object or dataclass to JSON and sends HTTP response."""
@@ -673,6 +673,10 @@ class TestExplorerRequestHandler(http.server.BaseHTTPRequestHandler):
     """Overrides BaseHTTPRequestHandler.log_message to suppress console log noise."""
 
 
+# Backward-compatibility alias
+TestExplorerRequestHandler = ResultsViewerRequestHandler
+
+
 def pick_unused_port() -> int:
   """Picks an unused TCP port using portpicker if available, otherwise stdlib socket."""
   if portpicker is not None:
@@ -683,13 +687,13 @@ def pick_unused_port() -> int:
 
 
 def main() -> None:
-  """Parses CLI flags and launches the Test Explorer HTTP web server."""
-  parser = argparse.ArgumentParser(description="BeToCQ Test Explorer")
+  """Parses CLI flags and launches the Results Viewer HTTP web server."""
+  parser = argparse.ArgumentParser(description="BeToCQ Results Viewer")
   parser.add_argument(
       "--version",
       "-v",
       action="version",
-      version=f"BeToCQ Test Explorer v{version.VERSION}",
+      version=f"BeToCQ Results Viewer v{version.VERSION}",
   )
   parser.add_argument(
       "results_path",
@@ -723,7 +727,7 @@ def main() -> None:
       print(f"[!] Error parsing: {parsed['error']}")
 
   port = args.port or pick_unused_port()
-  print(f"[*] Starting BeToCQ Test Explorer at http://localhost:{port}/ ...")
+  print(f"[*] Starting BeToCQ Results Viewer at http://localhost:{port}/ ...")
   threading.Timer(
       _BROWSER_OPEN_DELAY_SECONDS,
       lambda: webbrowser.open(f"http://localhost:{port}/"),
@@ -734,7 +738,7 @@ def main() -> None:
 
     allow_reuse_address = True
 
-  with ReusableTCPServer(("", port), TestExplorerRequestHandler) as httpd:
+  with ReusableTCPServer(("", port), ResultsViewerRequestHandler) as httpd:
     try:
       httpd.serve_forever()
     except KeyboardInterrupt:

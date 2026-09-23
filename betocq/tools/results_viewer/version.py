@@ -12,12 +12,13 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Define the BeToCQ Test Explorer version."""
+"""Define the BeToCQ Results Viewer version."""
 
-VERSION = "1.1.0"
+VERSION = "1.2.0"
 __version__ = VERSION
 
 # VERSION_LOG (only add new description for new version, keep the history log)
+# '1.2.0': 'Rename BeToCQ Test Explorer to BeToCQ Results Viewer.'
 # '1.1.0': 'Add Environment Status diagnostic tab, setup_wizard module, and
 #           check_env.sh support.'
 # '1.0.0': 'Initial release with dashboard KPIs, repeat aggregator, and
