@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Setup wizard and station environment diagnostics for BeToCQ Test Explorer.
+"""Setup wizard and station environment diagnostics for BeToCQ Results Viewer.
 
 Provides station readiness diagnostics, hardware checks, and setup verification
 by running environment checks (via check_env.sh or modular diagnostic commands).
@@ -29,7 +29,7 @@ import sys
 from typing import Any
 import zipfile
 
-PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.test_explorer"
+PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.results_viewer"
 CHECK_ENV_RESOURCE_PATH = "check_env.sh"
 
 _IOS_DEVICECTL_PATTERN = re.compile(

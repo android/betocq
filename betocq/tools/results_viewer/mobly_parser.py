@@ -168,7 +168,7 @@ class ArtifactInfo:
 
 @dataclasses.dataclass(frozen=True)
 class ParseResult:
-  """Overall test explorer parsed results structure.
+  """Overall results viewer parsed results structure.
 
   Attributes:
     summary: Summary of test execution metrics.
