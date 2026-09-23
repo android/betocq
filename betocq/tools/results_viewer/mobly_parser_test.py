@@ -20,7 +20,7 @@ import zipfile
 import yaml
 
 from google3.testing.pybase import googletest
-from betocq.tools.test_explorer import mobly_parser
+from betocq.tools.results_viewer import mobly_parser
 
 
 class MoblyParserTest(googletest.TestCase):

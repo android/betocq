@@ -13,7 +13,7 @@
 #  limitations under the License.
 
 from google3.testing.pybase import googletest
-from betocq.tools.test_explorer import version
+from betocq.tools.results_viewer import version
 
 
 class VersionTest(googletest.TestCase):
@@ -30,4 +30,3 @@ class VersionTest(googletest.TestCase):
 
 if __name__ == "__main__":
   googletest.main()
-

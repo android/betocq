@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Unit tests for BeToCQ Test Explorer HTTP server."""
+"""Unit tests for BeToCQ Results Viewer HTTP server."""
 
 import email.message
 import io
@@ -24,12 +24,12 @@ from unittest import mock
 import zipfile
 
 from google3.testing.pybase import googletest
-from betocq.tools.test_explorer import server
-from betocq.tools.test_explorer import setup_wizard
-from betocq.tools.test_explorer import version
+from betocq.tools.results_viewer import server
+from betocq.tools.results_viewer import setup_wizard
+from betocq.tools.results_viewer import version
 
 
-class DummyRequestHandler(server.TestExplorerRequestHandler):
+class DummyRequestHandler(server.ResultsViewerRequestHandler):
 
   rfile: io.BytesIO
   wfile: io.BytesIO

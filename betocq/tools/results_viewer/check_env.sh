@@ -1,5 +1,5 @@
 #!/bin/bash
-# BeToCQ Test Explorer - Environment Status Check Script
+# BeToCQ Results Viewer - Environment Status Check Script
 # Checks host OS, Xcode & command line tools, codesigning identities,
 # CoreDevice & connected devices, Python runtime, background services, and firewall tunnels.
 
