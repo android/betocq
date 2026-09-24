@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Setup wizard and station environment diagnostics for BeToCQ Results Viewer.
+"""Setup wizard and station environment diagnostics for BeToCQ Result Viewer.
 
 Provides station readiness diagnostics, hardware checks, and setup verification
 by running environment checks (via check_env.sh or modular diagnostic commands).

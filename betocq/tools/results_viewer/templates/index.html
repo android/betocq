@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BeToCQ Results Viewer</title>
+  <title>BeToCQ Result Viewer</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     /* Custom scrollbars */
@@ -44,7 +44,7 @@
       <div class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-semibold text-2xl shadow-md">B</div>
       <div>
         <div class="flex items-center gap-2.5">
-          <h1 class="text-xl font-semibold tracking-tight">BeToCQ Results Viewer</h1>
+          <h1 class="text-xl font-semibold tracking-tight">BeToCQ Result Viewer</h1>
           <span id="app-version" class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200 shadow-xs">v{{VERSION}}</span>
         </div>
         <p class="text-sm text-gray-500 mt-0.5">Local results dashboard, hierarchical breakdown & hierarchical artifacts tree</p>
@@ -61,12 +61,12 @@
   <!-- Top Notification / Status Banner (Visible when replacing/uploading a new folder) -->
   <div id="top-upload-status" class="hidden mb-6 p-4 rounded-2xl text-sm font-semibold flex items-center justify-between border shadow-sm transition-all"></div>
 
-  <!-- High-Level Primary Navigation: 2 High-Level Tabs (Results Viewer & Setup Wizard) -->
+  <!-- High-Level Primary Navigation: 2 High-Level Tabs (Result Viewer & Setup Wizard) -->
   <div class="flex items-center justify-between border-b-2 border-gray-200 mb-5">
     <div class="flex items-center gap-2">
       <button onclick="switchMainTab('results_viewer')" id="main-tab-results" class="main-tab-btn px-6 py-3 font-bold text-sm tracking-tight transition-all text-blue-600 border-b-2 border-blue-600 -mb-[2px] flex items-center gap-2.5 cursor-pointer">
         <span class="text-base">📊</span>
-        <span>Results Viewer</span>
+        <span>Result Viewer</span>
       </button>
       <button onclick="switchMainTab('setup_wizard')" id="main-tab-setup" class="main-tab-btn px-6 py-3 font-bold text-sm tracking-tight transition-all text-gray-500 hover:text-gray-900 border-b-2 border-transparent -mb-[2px] flex items-center gap-2.5 cursor-pointer">
         <span class="text-base">🧙</span>
@@ -79,10 +79,10 @@
   <!-- Main Content Panels -->
   <main class="flex-1 flex flex-col">
     <!-- ======================================================== -->
-    <!-- 1. RESULTS VIEWER (Primary Section) -->
+    <!-- 1. RESULT VIEWER (Primary Section) -->
     <!-- ======================================================== -->
     <div id="section-results_viewer" class="main-section flex-1 flex flex-col">
-      <!-- Sub-Navigation for Results Viewer -->
+      <!-- Sub-Navigation for Result Viewer -->
       <nav class="flex space-x-1 border-b border-gray-200 mb-6 overflow-x-auto relative">
         <button onclick="switchResultsSubTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-5 py-2.5 relative font-semibold text-sm transition-all text-blue-600 m3-tab-active cursor-pointer">
           📊 Results Dashboard
@@ -211,7 +211,7 @@
         </div>
       </div>
     </div>
-    <!-- END RESULTS VIEWER SECTION -->
+    <!-- END RESULT VIEWER SECTION -->
 
     <!-- ======================================================== -->
     <!-- 2. SETUP WIZARD (Primary Section) -->
