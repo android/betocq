@@ -1,6 +1,6 @@
-# BeToCQ Results Viewer
+# BeToCQ Result Viewer
 
-The **BeToCQ Results Viewer** is a lightweight, zero-dependency local web
+The **BeToCQ Result Viewer** is a lightweight, zero-dependency local web
 application designed to parse, visualize, and triage Mobly test execution
 results across BeToCQ projects, including Osmosis connection testing (Wi-Fi STA,
 Wi-Fi Aware, BLE, USB NCM).
@@ -11,7 +11,7 @@ When running Mobly tests locally or at partner OEM test stations, raw output
 directories contain multi-document `test_summary.yaml` files, hundreds of
 repeated test iterations, and deeply nested device logs.
 
-BeToCQ Results Viewer provides an instant local web dashboard to:
+BeToCQ Result Viewer provides an instant local web dashboard to:
 
 1.  **Aggregate Repeats**: Group repeated test iterations (`test_case_0` ...
     `test_case_19`) into base test cards with green (`✓`) and red (`!`)
@@ -29,7 +29,7 @@ BeToCQ Results Viewer provides an instant local web dashboard to:
 
 ## Architecture
 
--   **`version.py`**: Semantic version definition (`VERSION = "1.2.0"`) and
+-   **`version.py`**: Semantic version definition (`VERSION = "1.2.1"`) and
     version history log.
 -   **`setup_wizard.py`**: Testbed and station readiness diagnostics, command
     execution routines, and device discovery.
