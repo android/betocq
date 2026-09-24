@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""HTTP server and API handlers for the BeToCQ Results Viewer."""
+"""HTTP server and API handlers for the BeToCQ Result Viewer."""
 
 import argparse
 import atexit
@@ -78,7 +78,7 @@ from betocq.tools.results_viewer import version  # pylint: disable=g-import-not-
 
 
 class ApiEndpoint(enum.StrEnum):
-  """REST API endpoints supported by Results Viewer HTTP server."""
+  """REST API endpoints supported by Result Viewer HTTP server."""
 
   INDEX = "/"
   RESULTS = "/api/results"
@@ -379,8 +379,8 @@ def _create_buganizer_issue(
   )
 
 
-class ResultsViewerRequestHandler(http.server.BaseHTTPRequestHandler):
-  """Request handler for serving the Results Viewer UI and API endpoints."""
+class ResultViewerRequestHandler(http.server.BaseHTTPRequestHandler):
+  """Request handler for serving the Result Viewer UI and API endpoints."""
 
   def _send_json(self, data: Any, status_code: int = 200) -> None:
     """Serializes data object or dataclass to JSON and sends HTTP response."""
@@ -673,8 +673,9 @@ class ResultsViewerRequestHandler(http.server.BaseHTTPRequestHandler):
     """Overrides BaseHTTPRequestHandler.log_message to suppress console log noise."""
 
 
-# Backward-compatibility alias
-TestExplorerRequestHandler = ResultsViewerRequestHandler
+# Backward-compatibility aliases
+ResultsViewerRequestHandler = ResultViewerRequestHandler
+TestExplorerRequestHandler = ResultViewerRequestHandler
 
 
 def pick_unused_port() -> int:
@@ -687,13 +688,13 @@ def pick_unused_port() -> int:
 
 
 def main() -> None:
-  """Parses CLI flags and launches the Results Viewer HTTP web server."""
-  parser = argparse.ArgumentParser(description="BeToCQ Results Viewer")
+  """Parses CLI flags and launches the Result Viewer HTTP web server."""
+  parser = argparse.ArgumentParser(description="BeToCQ Result Viewer")
   parser.add_argument(
       "--version",
       "-v",
       action="version",
-      version=f"BeToCQ Results Viewer v{version.VERSION}",
+      version=f"BeToCQ Result Viewer v{version.VERSION}",
   )
   parser.add_argument(
       "results_path",
@@ -727,7 +728,7 @@ def main() -> None:
       print(f"[!] Error parsing: {parsed['error']}")
 
   port = args.port or pick_unused_port()
-  print(f"[*] Starting BeToCQ Results Viewer at http://localhost:{port}/ ...")
+  print(f"[*] Starting BeToCQ Result Viewer at http://localhost:{port}/ ...")
   threading.Timer(
       _BROWSER_OPEN_DELAY_SECONDS,
       lambda: webbrowser.open(f"http://localhost:{port}/"),
@@ -738,7 +739,7 @@ def main() -> None:
 
     allow_reuse_address = True
 
-  with ReusableTCPServer(("", port), ResultsViewerRequestHandler) as httpd:
+  with ReusableTCPServer(("", port), ResultViewerRequestHandler) as httpd:
     try:
       httpd.serve_forever()
     except KeyboardInterrupt:

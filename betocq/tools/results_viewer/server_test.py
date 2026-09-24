@@ -12,7 +12,7 @@
 #  See the License for the specific language governing permissions and
 #  limitations under the License.
 
-"""Unit tests for BeToCQ Results Viewer HTTP server."""
+"""Unit tests for BeToCQ Result Viewer HTTP server."""
 
 import email.message
 import io
@@ -29,7 +29,7 @@ from betocq.tools.results_viewer import setup_wizard
 from betocq.tools.results_viewer import version
 
 
-class DummyRequestHandler(server.ResultsViewerRequestHandler):
+class DummyRequestHandler(server.ResultViewerRequestHandler):
 
   rfile: io.BytesIO
   wfile: io.BytesIO
@@ -67,10 +67,19 @@ class ServerTest(googletest.TestCase):
     super().setUp()
     server.TEST_RESULTS = {"summary": {}, "test_classes": {}}
 
+  def test_handler_backward_compatibility_alias(self) -> None:
+    self.assertIs(
+        server.ResultsViewerRequestHandler, server.ResultViewerRequestHandler
+    )
+    self.assertIs(
+        server.TestExplorerRequestHandler, server.ResultViewerRequestHandler
+    )
+
   def test_get_template_html(self) -> None:
     html_bytes = server.get_template_html()
     self.assertIsInstance(html_bytes, bytes)
     self.assertIn(b"<!DOCTYPE html>", html_bytes)
+    self.assertIn(b"BeToCQ Result Viewer", html_bytes)
     self.assertIn(b"bg-white text-red-700", html_bytes)
     self.assertNotIn(b"bg-gray-900", html_bytes)
     self.assertIn(b"getIterationArtifacts", html_bytes)
@@ -99,6 +108,7 @@ class ServerTest(googletest.TestCase):
     self.assertIn("text/html", handler.response_headers.get("Content-Type", ""))
     self.assertNotEmpty(handler.wfile.getvalue())
     response_body = handler.wfile.getvalue().decode("utf-8")
+    self.assertIn("BeToCQ Result Viewer", response_body)
     self.assertIn(f"v{version.VERSION}", response_body)
 
   def test_get_version_api(self) -> None:
