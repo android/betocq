@@ -768,6 +768,17 @@ def enable_location_on_device(ad: android_device.AndroidDevice) -> None:
     )
 
 
+def disable_location_on_device(ad: android_device.AndroidDevice) -> None:
+  """Disable location on the given device."""
+  try:
+    ad.adb.shell('cmd location set-location-enabled false')
+  except adb.AdbError:
+    ad.log.exception(
+        'Failed to disable location on the device. Make sure'
+        ' location is disabled in the settings.'
+    )
+
+
 def get_sta_network_id_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   """Get wifi STA network id on the given device."""
   # introduced for unrooted device.
