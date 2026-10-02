@@ -14,11 +14,13 @@
 
 """Android Nearby device setup."""
 
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+import contextlib
 import datetime
 import logging
 import pprint
 import re
+import sys
 import time
 from typing import Any, Literal
 
@@ -1365,7 +1367,8 @@ def load_nearby_snippet(
     key_apk_installed = config.package_name + '_installed'
     if not device_specific_dict.get(key_apk_installed, False):
       ad.log.info('try to install snippet apk')
-      apk_utils.install(ad, config.apk_path)
+      with emulator_package_verifier_guard(ad):
+        apk_utils.install(ad, config.apk_path)
       device_specific_dict[key_apk_installed] = True
   else:
     ad.log.warning(
@@ -1951,7 +1954,46 @@ def enable_package_verifiers(ad: android_device.AndroidDevice):
 
 def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
   """Returns true if the device is a cuttlefish emulator."""
-  return device.build_info['hardware'] == 'cutf_cvm'
+  return (device.build_info or {}).get('hardware') == 'cutf_cvm'
+
+
+def is_emulator(ad: android_device.AndroidDevice) -> bool:
+  """Returns True if the device is an emulator."""
+  build_info = ad.build_info or {}
+  return (
+      bool(getattr(ad, 'is_emulator', False))
+      or is_cuttlefish(ad)
+      or build_info.get('hardware') in ('ranchu', 'goldfish')
+      or build_info.get('build_characteristics') == 'emulator'
+  )
+
+
+@contextlib.contextmanager
+def emulator_package_verifier_guard(
+    ad: android_device.AndroidDevice,
+) -> Iterator[None]:
+  """Temporarily disables package verifiers on emulators during APK installation."""
+  is_emulator_device = is_emulator(ad)
+  if is_emulator_device:
+    if not ad.is_adb_root:
+      ad.adb.root()
+    disable_package_verifiers(ad)
+  try:
+    yield
+  finally:
+    if is_emulator_device:
+      has_active_exception = sys.exc_info()[0] is not None
+      try:
+        enable_package_verifiers(ad)
+      except Exception as e:  # pylint: disable=broad-except
+        if not has_active_exception:
+          raise
+        ad.log.warning(
+            'Failed to re-enable package verifiers on %s during error'
+            ' cleanup: %s',
+            ad.serial,
+            e,
+        )
 
 
 def is_screen_locked(device: android_device.AndroidDevice) -> bool:
