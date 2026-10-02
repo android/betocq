@@ -16,30 +16,27 @@
 
 import logging
 import sys
-
-import os
 import traceback
 
-from mobly import base_test
+import os
 from mobly import records
 from mobly import signals
 from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import errors
-
 from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
 import yaml
 
-from betocq import ap_utils
+from betocq import apa_utils
 from betocq import constants
 from betocq import setup_utils
 
+
 # TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
-_CUTTLEFISH_VIRTUALIZATION_TYPE = 6
 
 
 def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
@@ -61,7 +58,7 @@ def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
       setattr(ad, key, value)
 
 
-class BaseTestClass(base_test.BaseTestClass):
+class BaseTestClass(apa_utils.EdiCollectionMixin, apa_utils.ApaInfoMixin):
   """The base test class of all BeToCQ tests."""
 
   _run_identifier_is_set = False
@@ -299,7 +296,6 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def reset_device(self, ad: android_device.AndroidDevice) -> None:
     """Resets the device protocol state. Can be overridden by subclasses."""
-    pass
 
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
@@ -461,10 +457,12 @@ class BaseTestClass(base_test.BaseTestClass):
     ]
     run_identifier = '-'.join(run_identifier_items)
     self.user_params['combined_suite_name'] = suite_name
-    self.record_data({
-        'properties': {
-            'suite_name': f'[{suite_name}]',
-            'run_identifier': run_identifier,
-        }
-    })
+    properties = {
+        'suite_name': f'[{suite_name}]',
+        'run_identifier': run_identifier,
+    }
+    if 'suite_version' in self.user_params:
+      properties['suite_version'] = self.user_params['suite_version']
+
+    self.record_data({'properties': properties})
     BaseTestClass._run_identifier_is_set = True
