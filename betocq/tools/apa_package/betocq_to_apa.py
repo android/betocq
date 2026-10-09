@@ -16,7 +16,7 @@ r"""Converts BeToCQ test results and metrics into an APA-compatible ZIP package.
 
 Usage (Internal/Blaze):
   blaze run //wireless/android/platform/testing/bettertogether/betocq/tools/apa_package:betocq_to_apa -- \
-    --input_dir=/path/to/mobly_logs \
+    --input_dir=/path/to/suite1_logs,/path/to/suite2_logs \
     [--output_dir=/path/to/output/dir] \
     [--resultstore_link=https://btx.cloud.google.com/invocations/...]
 
@@ -26,12 +26,12 @@ Usage (Independent Script for OEMs):
 
   Command:
     python3 betocq_to_apa.py \
-      --input_dir=/path/to/mobly_logs \
-      [--output_dir=/path/to/output/dir]
+      --input_dir=/path/to/suite1_logs,/path/to/suite2_logs \
+      [--output_dir=/path/to/output/dir] \
       [--resultstore_link=https://btx.cloud.google.com/invocations/...]
 
-Expected Input Directory Structure:
-  <input_dir>/
+Expected Input Directory Structure (single dir or comma-separated/parent dir of runs):
+  <run_dir>/
     test_summary.yaml
     report-log-files/
       <apa_module_name>.reportlog.json
@@ -40,16 +40,17 @@ Output ZIP Structure (named <end_time>.zip):
   test_result.xml
   test_result.html
   report-log-files/
-    <apa_module_name>.reportlog.json
+    <apa_module_name>.reportlog.json  # Merged if the same suite was run multiple times
   non-tradefed_results/
-    <apa_module_name>/test_summary.yaml
+    <apa_module_name>/
+      <run_time>/test_summary.yaml  # Each run's original test_summary.yaml in its run-time subfolder
 
 Library Usage:
   from betocq.tools.apa_package import betocq_to_apa
 
   betocq_to_apa.package_for_apa(
-      input_dir="/path/to/mobly_logs",
-      output_dir="/path/to/output/dir", # Optional
+      input_dir=["/path/to/suite1_logs", "/path/to/suite2_logs"],
+      output_dir="/path/to/output/dir",  # Optional
       resultstore_link="https://btx.cloud.google.com/invocations/...",
       start_time=1700000000000,
       end_time=1700000010000,
@@ -87,6 +88,15 @@ _STATUS_PRIORITY = (
     _APA_STATUS_WARNING,
     _APA_STATUS_IGNORED,
     _APA_STATUS_PASS,
+)
+# When merging multiple executions (retries) of the same scenario across runs,
+# a passing retry supersedes a warning/failure, and an executed result
+# supersedes an ignored/skipped result. Ties favor the newer run.
+_RETRY_MERGE_PRIORITY = (
+    _APA_STATUS_PASS,
+    _APA_STATUS_WARNING,
+    _APA_STATUS_FAIL,
+    _APA_STATUS_IGNORED,
 )
 _METRIC_BUCKETS = ("numeric_metrics", "boolean_metrics", "text_metrics")
 
@@ -151,7 +161,6 @@ _INPUT_DIR = flags.DEFINE_string(
     "input_dir",
     None,
     "Path to BeToCQ/Mobly output directory",
-    required=True,
 )
 _OUTPUT_DIR = flags.DEFINE_string(
     "output_dir",
@@ -648,6 +657,113 @@ def get_apa_status(
   return _APA_STATUS_FAIL
 
 
+def _populate_module_element(
+    root: ET.Element,
+    summary_data: dict[str, Any],
+    metrics_data: dict[str, Any],
+    include_metrics: bool,
+    aggregate_iterations: bool,
+    all_test_must_pass: bool,
+    total_status_counts: collections.Counter[str],
+) -> bool:
+  """Appends a <Module> element to root and returns True if the module is done."""
+  results = summary_data.get("results", {})
+  apa_info = summary_data.get("apa_info", {})
+  module = ET.SubElement(root, "Module")
+  module.set("name", apa_info.get("apa_module_name", "betocq_test_suite"))
+
+  module_counts: collections.Counter[str] = collections.Counter()
+
+  for class_name, tests in results.items():
+    test_case = ET.SubElement(module, "TestCase")
+    test_case.set("name", class_name)
+
+    display_tests = tests
+    if aggregate_iterations:
+      aggregated_tests = {}
+      for test_name, test_data in tests.items():
+        base_name = _get_base_test_name(test_name)
+
+        raw_result = test_data.get("result", "fail").lower()
+        termination_signal_type = test_data.get("termination_signal_type")
+        apa_status = get_apa_status(
+            raw_result, termination_signal_type, all_test_must_pass
+        )
+
+        if base_name not in aggregated_tests:
+          aggregated_tests[base_name] = {
+              "result": apa_status,
+              "details": test_data.get("details"),
+              "stacktrace": test_data.get("stacktrace"),
+              "raw_result": raw_result,
+              "original_name": test_name,
+          }
+        else:
+          current_status = aggregated_tests[base_name]["result"]
+          if _STATUS_PRIORITY.index(apa_status) < _STATUS_PRIORITY.index(
+              current_status
+          ):
+            aggregated_tests[base_name]["result"] = apa_status
+            aggregated_tests[base_name]["details"] = test_data.get("details")
+            aggregated_tests[base_name]["stacktrace"] = test_data.get(
+                "stacktrace"
+            )
+            aggregated_tests[base_name]["raw_result"] = raw_result
+            aggregated_tests[base_name]["original_name"] = test_name
+      display_tests = aggregated_tests
+
+    for test_name, test_data in display_tests.items():
+      test_element = ET.SubElement(test_case, "Test")
+      test_element.set("name", test_name)
+
+      if aggregate_iterations:
+        apa_status = test_data["result"]
+      else:
+        raw_result = test_data.get("result", "fail").lower()
+        termination_signal_type = test_data.get("termination_signal_type")
+        apa_status = get_apa_status(
+            raw_result, termination_signal_type, all_test_must_pass
+        )
+
+      test_element.set("result", apa_status)
+
+      module_counts[apa_status] += 1
+      total_status_counts[apa_status] += 1
+
+      if apa_status == _APA_STATUS_IGNORED:
+        test_element.set("skipped", "true")
+      elif apa_status in (
+          _APA_STATUS_FAIL,
+          _APA_STATUS_WARNING,
+      ):
+        failure = ET.SubElement(test_element, "Failure")
+        failure.set("message", test_data.get("details") or "")
+        if test_data.get("stacktrace"):
+          stack_trace = ET.SubElement(failure, "StackTrace")
+          stack_trace.text = test_data.get("stacktrace")
+
+      if include_metrics:
+        if aggregate_iterations:
+          test_metrics = get_scenario_metrics(
+              metrics_data, class_name, test_name
+          )
+        else:
+          test_metrics = get_iteration_metrics(
+              metrics_data, class_name, test_name
+          )
+
+        for bucket in _METRIC_BUCKETS:
+          for k, v in test_metrics.get(bucket, {}).items():
+            metric = ET.SubElement(test_element, "Metric")
+            metric.set("key", k)
+            metric.text = str(v)
+
+  module_done = module_counts[_APA_STATUS_FAIL] == 0
+  module.set("done", str(module_done).lower())
+  module.set("pass", str(module_counts[_APA_STATUS_PASS]))
+  return module_done
+
+
 def convert_to_xml(
     summary_data: dict[str, Any],
     metrics_data: dict[str, Any],
@@ -655,14 +771,26 @@ def convert_to_xml(
     include_metrics: bool = False,
     aggregate_iterations: bool = True,
     all_test_must_pass: bool = False,
+    additional_modules: (
+        Sequence[tuple[dict[str, Any], dict[str, Any]]] | None
+    ) = None,
 ) -> None:
-  """Converts results to APA Compatibility Report XML."""
+  """Converts one or more BeToCQ suite results to APA Compatibility Report XML."""
   logging.info("Generating XML report to %s", xml_path)
 
-  results = summary_data.get("results", {})
   build_info = summary_data.get("build_info", {})
-  device_serials = summary_data.get("device_serials", [])
+  device_serials = list(summary_data.get("device_serials", []))
   apa_info = summary_data.get("apa_info", {})
+
+  all_module_entries: list[tuple[dict[str, Any], dict[str, Any]]] = [
+      (summary_data, metrics_data)
+  ]
+  if additional_modules:
+    all_module_entries.extend(additional_modules)
+    for extra_summary, _ in additional_modules:
+      for s in extra_summary.get("device_serials", []):
+        if s not in device_serials:
+          device_serials.append(s)
 
   root = ET.Element("Result")
 
@@ -673,11 +801,9 @@ def convert_to_xml(
   if not suite_plan:
     raise ValueError("apa_suite_plan cannot be empty in config.")
 
-  # Calculate synthetic suite_version for APA XML
+  # Set suite_version for APA XML from test_script_version
   mobly_properties = summary_data.get("mobly_properties", {})
-  test_script_version = mobly_properties.get("test_script_version", "1.0")
-  suite_version_property = mobly_properties.get("suite_version", "unknown")
-  suite_version = f"{test_script_version}+{suite_version_property}"
+  suite_version = str(mobly_properties.get("test_script_version", "1.0"))
 
   root.set("suite_name", suite_name)
   root.set("suite_variant", suite_name)
@@ -686,8 +812,18 @@ def convert_to_xml(
   root.set("report_version", "5.0")
   root.set("devices", ",".join(device_serials))
 
-  start_time_ms = summary_data.get("start_time", 0)
-  end_time_ms = summary_data.get("end_time", 0)
+  start_times = [
+      int(m_summary.get("start_time", 0) or 0)
+      for m_summary, _ in all_module_entries
+      if int(m_summary.get("start_time", 0) or 0) > 0
+  ]
+  end_times = [
+      int(m_summary.get("end_time", 0) or 0)
+      for m_summary, _ in all_module_entries
+      if int(m_summary.get("end_time", 0) or 0) > 0
+  ]
+  start_time_ms = min(start_times) if start_times else 0
+  end_time_ms = max(end_times) if end_times else 0
 
   root.set("start", str(start_time_ms))
   root.set("end", str(end_time_ms))
@@ -741,167 +877,73 @@ def convert_to_xml(
 
   summary_element = ET.SubElement(root, "Summary")
 
-  # Single Module for BeToCQ
-  module = ET.SubElement(root, "Module")
-  module.set("name", apa_info.get("apa_module_name", "betocq_test_suite"))
+  status_counts: collections.Counter[str] = collections.Counter()
+  modules_done_count = 0
+  for mod_summary, mod_metrics in all_module_entries:
+    mod_apa_info = mod_summary.get("apa_info", {})
+    mod_must_pass = all_test_must_pass or bool(
+        mod_apa_info.get("all_test_must_pass", False)
+    )
+    if _populate_module_element(
+        root=root,
+        summary_data=mod_summary,
+        metrics_data=mod_metrics,
+        include_metrics=include_metrics,
+        aggregate_iterations=aggregate_iterations,
+        all_test_must_pass=mod_must_pass,
+        total_status_counts=status_counts,
+    ):
+      modules_done_count += 1
 
-  status_counts = collections.Counter()
-
-  for class_name, tests in results.items():
-    test_case = ET.SubElement(module, "TestCase")
-    test_case.set("name", class_name)
-
-    display_tests = tests
-    if aggregate_iterations:
-      aggregated_tests = {}
-      for test_name, test_data in tests.items():
-        base_name = _get_base_test_name(test_name)
-
-        raw_result = test_data.get("result", "fail").lower()
-        termination_signal_type = test_data.get("termination_signal_type")
-        apa_status = get_apa_status(
-            raw_result, termination_signal_type, all_test_must_pass
-        )
-
-        if base_name not in aggregated_tests:
-          aggregated_tests[base_name] = {
-              "result": apa_status,
-              "details": test_data.get("details"),
-              "stacktrace": test_data.get("stacktrace"),
-              "raw_result": raw_result,  # Keep for metrics lookup if needed
-              "original_name": (
-                  test_name
-              ),  # Keep one original name for metrics fallback
-          }
-        else:
-          current_status = aggregated_tests[base_name]["result"]
-          # Update status based on priority (FAILED > WARNING > IGNORED > pass)
-          if _STATUS_PRIORITY.index(apa_status) < _STATUS_PRIORITY.index(
-              current_status
-          ):
-            aggregated_tests[base_name]["result"] = apa_status
-            aggregated_tests[base_name]["details"] = test_data.get("details")
-            aggregated_tests[base_name]["stacktrace"] = test_data.get(
-                "stacktrace"
-            )
-            aggregated_tests[base_name]["raw_result"] = raw_result
-            aggregated_tests[base_name]["original_name"] = test_name
-      display_tests = aggregated_tests
-
-    for test_name, test_data in display_tests.items():
-      test_element = ET.SubElement(test_case, "Test")
-      test_element.set("name", test_name)
-
-      if aggregate_iterations:
-        apa_status = test_data["result"]
-      else:
-        raw_result = test_data.get("result", "fail").lower()
-        termination_signal_type = test_data.get("termination_signal_type")
-        apa_status = get_apa_status(
-            raw_result, termination_signal_type, all_test_must_pass
-        )
-
-      test_element.set("result", apa_status)
-
-      status_counts[apa_status] += 1
-
-      if apa_status == _APA_STATUS_IGNORED:
-        test_element.set("skipped", "true")
-      elif apa_status in (
-          _APA_STATUS_FAIL,
-          _APA_STATUS_WARNING,
-      ):
-        failure = ET.SubElement(test_element, "Failure")
-        failure.set("message", test_data.get("details") or "")
-        if test_data.get("stacktrace"):
-          stack_trace = ET.SubElement(failure, "StackTrace")
-          stack_trace.text = test_data.get("stacktrace")
-
-      if include_metrics:
-        if aggregate_iterations:
-          test_metrics = get_scenario_metrics(
-              metrics_data, class_name, test_name
-          )
-        else:
-          test_metrics = get_iteration_metrics(
-              metrics_data, class_name, test_name
-          )
-
-        for bucket in _METRIC_BUCKETS:
-          for k, v in test_metrics.get(bucket, {}).items():
-            metric = ET.SubElement(test_element, "Metric")
-            metric.set("key", k)
-            metric.text = str(v)
-
-  # Update Summary counts
+  # Update Summary counts across all modules in the test plan
   summary_element.set("pass", str(status_counts[_APA_STATUS_PASS]))
   summary_element.set("failed", str(status_counts[_APA_STATUS_FAIL]))
   summary_element.set("warning", str(status_counts[_APA_STATUS_WARNING]))
-
-  # Consider done if no blocking failures (FAIL). Warnings are non-blocking.
-  done = status_counts[_APA_STATUS_FAIL] == 0
-  summary_element.set("modules_done", "1" if done else "0")
-  summary_element.set("modules_total", "1")
-
-  module.set("done", str(done).lower())
-  module.set("pass", str(status_counts[_APA_STATUS_PASS]))
+  summary_element.set("modules_done", str(modules_done_count))
+  summary_element.set("modules_total", str(len(all_module_entries)))
 
   tree = ET.ElementTree(root)
   ET.indent(tree)
   tree.write(xml_path, encoding="utf-8", xml_declaration=True)
 
 
-def package_for_apa(
-    input_dir: str,
-    output_dir: str | None = None,
-    resultstore_link: str | None = None,
-    start_time: int | None = None,
-    end_time: int | None = None,
-    include_metrics: bool = False,
-    aggregate_iterations: bool = True,
-) -> None:
-  """Packages BeToCQ results into an APA-compatible ZIP.
+def _resolve_suite_input_dirs(input_dir: str | Sequence[str]) -> list[str]:
+  """Resolves one or more Mobly suite directories from a path or list of paths."""
+  if isinstance(input_dir, str):
+    raw_dirs = [p.strip() for p in input_dir.split(",") if p.strip()]
+  else:
+    raw_dirs = [str(p).strip() for p in input_dir if str(p).strip()]
 
-  Args:
-    input_dir: Path to BeToCQ/Mobly output directory.
-    output_dir: Optional path to output directory. If None, uses
-      /tmp/betocq/results.
-    resultstore_link: Optional ResultStore link for the test run.
-    start_time: Optional explicit start time (epoch ms). If None, calculated
-      from tests.
-    end_time: Optional explicit end time (epoch ms). If None, calculated from
-      tests.
-    include_metrics: If True, includes detailed per-iteration metrics in the
-      XML.
-    aggregate_iterations: If True, aggregates repeated test iterations to match
-      GTS style.
+  resolved_dirs: list[str] = []
+  for raw_dir in raw_dirs:
+    expanded = os.path.expanduser(raw_dir)
+    yaml_candidate = os.path.join(expanded, "test_summary.yaml")
+    if os.path.isfile(yaml_candidate) or not os.path.isdir(expanded):
+      resolved_dirs.append(expanded)
+      continue
+    # Support passing a parent directory containing multiple suite subdirs.
+    subdir_candidates = sorted(
+        os.path.join(expanded, entry)
+        for entry in os.listdir(expanded)
+        if os.path.isfile(os.path.join(expanded, entry, "test_summary.yaml"))
+    )
+    if subdir_candidates:
+      resolved_dirs.extend(subdir_candidates)
+    else:
+      resolved_dirs.append(expanded)
+  return resolved_dirs
 
-  Raises:
-    FileNotFoundError: If test_summary.yaml is not found in input_dir.
-    ValueError: If the metrics JSON file cannot be parsed or required config is
-      missing.
-  """
-  # Expand user paths
-  input_dir = os.path.expanduser(input_dir)
-  if output_dir:
-    output_dir = os.path.expanduser(output_dir)
 
-  # Parse test_summary.yaml first
-  summary_data = parse_test_summary(input_dir)
-  yaml_results = summary_data["results"]
+def _load_suite_metrics(
+    suite_dir: str,
+    summary_data: dict[str, Any],
+    resultstore_link: str | None,
+) -> tuple[str, dict[str, Any]]:
+  """Loads and enriches the <apa_module_name>.reportlog.json for a suite."""
   apa_info = summary_data.get("apa_info", {})
   apa_module_name = apa_info.get("apa_module_name", "betocq_test_suite")
-  all_test_must_pass = bool(apa_info.get("all_test_must_pass", False))
-
-  # Override start/end time if explicitly provided
-  if start_time is not None:
-    summary_data["start_time"] = start_time
-  if end_time is not None:
-    summary_data["end_time"] = end_time
-
-  # Verify metrics file alignment
   expected_metrics_name = f"{apa_module_name}.reportlog.json"
-  json_path = os.path.join(input_dir, "report-log-files", expected_metrics_name)
+  json_path = os.path.join(suite_dir, "report-log-files", expected_metrics_name)
 
   metrics_data: dict[str, Any] = {}
   try:
@@ -911,11 +953,10 @@ def package_for_apa(
     logging.warning(
         "Expected metrics file '%s' not found in %s",
         expected_metrics_name,
-        os.path.join(input_dir, "report-log-files"),
+        os.path.join(suite_dir, "report-log-files"),
     )
-    # Check if a generic metrics.json exists to provide a better warning
     generic_json_path = os.path.join(
-        input_dir, "report-log-files", "metrics.json"
+        suite_dir, "report-log-files", "metrics.json"
     )
     if os.path.exists(generic_json_path):
       logging.warning(
@@ -933,11 +974,499 @@ def package_for_apa(
 
   mobly_properties = summary_data.get("mobly_properties", {})
   test_script_version = mobly_properties.get("test_script_version", "1.0")
-  suite_version = mobly_properties.get("suite_version", "unknown")
-  metrics_data["test_script_version"] = f"{test_script_version}+{suite_version}"
+  if "test_script_version" not in metrics_data:
+    metrics_data["test_script_version"] = str(test_script_version)
+  return expected_metrics_name, metrics_data
+
+
+def _kv_or_dict_to_ordered_dict(raw: Any) -> collections.OrderedDict[str, Any]:
+  """Normalizes a KV-list ([{'key': k, 'value': v}]) or dict into an OrderedDict."""
+  out: collections.OrderedDict[str, Any] = collections.OrderedDict()
+  if isinstance(raw, list):
+    for item in raw:
+      if isinstance(item, dict) and "key" in item:
+        out[str(item["key"])] = item.get("value")
+  elif isinstance(raw, dict):
+    for k, v in raw.items():
+      out[str(k)] = v
+  return out
+
+
+def _ordered_dict_to_kv_list(
+    mapping: collections.OrderedDict[str, Any] | dict[str, Any],
+) -> list[dict[str, Any]]:
+  """Serializes a mapping into the ProtobufJsonConverter KV-list format."""
+  return [{"key": k, "value": v} for k, v in mapping.items()]
+
+
+def _compute_scenario_apa_status(
+    scenario_tests: dict[str, dict[str, Any]],
+    all_test_must_pass: bool,
+) -> str:
+  """Computes the aggregated APA status for all iterations of a scenario."""
+  best_idx = len(_STATUS_PRIORITY) - 1
+  for test_data in scenario_tests.values():
+    raw_result = str(test_data.get("result", "fail")).lower()
+    term_sig = test_data.get("termination_signal_type")
+    apa_status = get_apa_status(raw_result, term_sig, all_test_must_pass)
+    idx = _STATUS_PRIORITY.index(apa_status)
+    if idx < best_idx:
+      best_idx = idx
+  return _STATUS_PRIORITY[best_idx]
+
+
+def _merge_same_suite_metrics(
+    run_metrics_list: Sequence[dict[str, Any]],
+    winning_run_by_scenario: dict[tuple[str, str], int],
+) -> dict[str, Any]:
+  """Merges multiple `<apa_module_name>.reportlog.json` payloads from the same suite.
+
+  When the same test suite is executed multiple times (e.g., retry of failed
+  test cases or split runs covering different test classes/cases), this function
+  merges `test_classes` and each class's `scenarios` so all test classes and
+  test cases are preserved in a single `<apa_module_name>.reportlog.json` file.
+
+  Args:
+    run_metrics_list: Chronologically ordered metrics dicts for the same suite.
+    winning_run_by_scenario: Mapping of `(class_name, scenario_base_name)` to
+      the winning run index in `run_metrics_list`.
+
+  Returns:
+    A single merged metrics dictionary for `<apa_module_name>.reportlog.json`.
+  """
+  merged_classes: collections.OrderedDict[str, dict[str, Any]] = (
+      collections.OrderedDict()
+  )
+  result_store_links: list[str] = []
+  suite_name_val = ""
+  script_version_val = ""
+  wifi_chipset_val = ""
+  extra_top_level: dict[str, Any] = {}
+
+  for run_idx, m_data in enumerate(run_metrics_list):
+    if not m_data:
+      continue
+    rs_link = str(m_data.get("result_store_link", "") or "").strip()
+    if rs_link and rs_link not in result_store_links:
+      result_store_links.append(rs_link)
+
+    s_name = str(m_data.get("suite_name", "") or "").strip()
+    if s_name:
+      suite_name_val = s_name
+
+    ver = str(m_data.get("test_script_version", "") or "").strip()
+    if ver:
+      script_version_val = ver
+
+    chipset = str(m_data.get("wifi_chipset", "") or "").strip()
+    if chipset:
+      wifi_chipset_val = chipset
+
+    for k, v in m_data.items():
+      if k not in (
+          "test_classes",
+          "suite_name",
+          "result_store_link",
+          "test_script_version",
+          "wifi_chipset",
+      ):
+        extra_top_level[k] = v
+
+    raw_classes = _kv_or_dict_to_ordered_dict(m_data.get("test_classes", []))
+    for cls_key, cls_val in raw_classes.items():
+      if not isinstance(cls_val, dict):
+        continue
+      if cls_key not in merged_classes:
+        cls_copy = dict(cls_val)
+        cls_copy["class_metrics"] = _ordered_dict_to_kv_list(
+            _kv_or_dict_to_ordered_dict(cls_copy.get("class_metrics", []))
+        )
+        cls_copy["scenarios"] = _ordered_dict_to_kv_list(
+            _kv_or_dict_to_ordered_dict(cls_copy.get("scenarios", []))
+        )
+        merged_classes[cls_key] = cls_copy
+        continue
+
+      # Merge into existing TestClassRecord for cls_key
+      existing_cls = merged_classes[cls_key]
+      old_info = dict(existing_cls.get("test_info", {}) or {})
+      new_info = dict(cls_val.get("test_info", {}) or {})
+      merged_info = dict(old_info)
+      merged_info.update(new_info)
+      old_start = str(old_info.get("start_time", "") or "")
+      new_start = str(new_info.get("start_time", "") or "")
+      if old_start and new_start:
+        merged_info["start_time"] = min(old_start, new_start)
+      elif old_start or new_start:
+        merged_info["start_time"] = old_start or new_start
+
+      old_end = str(old_info.get("end_time", "") or "")
+      new_end = str(new_info.get("end_time", "") or "")
+      if old_end and new_end:
+        merged_info["end_time"] = max(old_end, new_end)
+      elif old_end or new_end:
+        merged_info["end_time"] = old_end or new_end
+      if merged_info:
+        existing_cls["test_info"] = merged_info
+
+      existing_cls_metrics = _kv_or_dict_to_ordered_dict(
+          existing_cls.get("class_metrics", [])
+      )
+      new_cls_metrics = _kv_or_dict_to_ordered_dict(
+          cls_val.get("class_metrics", [])
+      )
+      for k, v in new_cls_metrics.items():
+        existing_cls_metrics[k] = v
+      existing_cls["class_metrics"] = _ordered_dict_to_kv_list(
+          existing_cls_metrics
+      )
+
+      existing_scenarios = _kv_or_dict_to_ordered_dict(
+          existing_cls.get("scenarios", [])
+      )
+      new_scenarios = _kv_or_dict_to_ordered_dict(cls_val.get("scenarios", []))
+      for scen_key, scen_val in new_scenarios.items():
+        winner_idx = winning_run_by_scenario.get((cls_key, scen_key), run_idx)
+        if scen_key not in existing_scenarios or winner_idx == run_idx:
+          existing_scenarios[scen_key] = scen_val
+      existing_cls["scenarios"] = _ordered_dict_to_kv_list(existing_scenarios)
+
+  merged: dict[str, Any] = dict(extra_top_level)
+  if merged_classes:
+    merged["test_classes"] = _ordered_dict_to_kv_list(merged_classes)
+  if result_store_links:
+    non_placeholder = [
+        l for l in result_store_links if l.upper() != "PLACEHOLDER"
+    ]
+    chosen_links = non_placeholder or result_store_links
+    merged["result_store_link"] = ",".join(chosen_links)
+  if suite_name_val:
+    merged["suite_name"] = suite_name_val
+  if script_version_val:
+    merged["test_script_version"] = script_version_val
+  if wifi_chipset_val:
+    merged["wifi_chipset"] = wifi_chipset_val
+  return merged
+
+
+def _merge_same_suite_runs(
+    module_runs: Sequence[tuple[str, dict[str, Any], str, dict[str, Any]]],
+) -> tuple[
+    list[tuple[str, dict[str, Any]]], dict[str, Any], str, dict[str, Any]
+]:
+  """Merges 1 or more runs of the same `apa_module_name` into a single bundle.
+
+  Args:
+    module_runs: Sequence of `(suite_dir, summary_data, m_filename, m_data)` for
+      the same `apa_module_name`.
+
+  Returns:
+    Tuple of `(ordered_run_summaries, merged_summary_data, m_filename,
+    merged_metrics_data)`.
+
+  Raises:
+    ValueError: If runs have different `build_fingerprint` values.
+  """
+  fingerprints = {
+      str(s_data.get("build_info", {}).get("build_fingerprint", "") or "")
+      for _, s_data, _, _ in module_runs
+  }
+  if len(fingerprints) > 1:
+    raise ValueError(
+        "Cannot merge runs with different build_fingerprint values: "
+        f"{sorted(fingerprints)}"
+    )
+
+  if len(module_runs) == 1:
+    s_dir, s_data, m_filename, m_data = module_runs[0]
+    return [(s_dir, s_data)], s_data, m_filename, m_data
+
+  # Sort chronologically by (start_time, end_time, original_index) so later
+  # retry runs naturally supersede earlier runs.
+  indexed_runs = list(enumerate(module_runs))
+  indexed_runs.sort(
+      key=lambda item: (
+          int(item[1][1].get("start_time", 0) or 0),
+          int(item[1][1].get("end_time", 0) or 0),
+          item[0],
+      )
+  )
+  ordered_runs = [r for _, r in indexed_runs]
+  ordered_run_summaries = [(r[0], r[1]) for r in ordered_runs]
+  m_filename = ordered_runs[-1][2]
+
+  # Track winning run per (class_name, scenario_base_name):
+  # value is (run_idx, scenario_apa_status, OrderedDict[test_name, test_data])
+  scenario_winners: collections.OrderedDict[
+      tuple[str, str],
+      tuple[int, str, collections.OrderedDict[str, dict[str, Any]]],
+  ] = collections.OrderedDict()
+  class_order: list[str] = []
+
+  for run_idx, (_, s_data, _, _) in enumerate(ordered_runs):
+    must_pass = bool(
+        s_data.get("apa_info", {}).get("all_test_must_pass", False)
+    )
+    for cls_name, cls_tests in s_data.get("results", {}).items():
+      if cls_name not in class_order:
+        class_order.append(cls_name)
+      scenarios_in_run: collections.OrderedDict[
+          str, collections.OrderedDict[str, dict[str, Any]]
+      ] = collections.OrderedDict()
+      for test_name, test_data in cls_tests.items():
+        base_name = _get_base_test_name(test_name)
+        if base_name not in scenarios_in_run:
+          scenarios_in_run[base_name] = collections.OrderedDict()
+        scenarios_in_run[base_name][test_name] = test_data
+
+      for base_name, scen_tests in scenarios_in_run.items():
+        scen_status = _compute_scenario_apa_status(scen_tests, must_pass)
+        key = (cls_name, base_name)
+        if key not in scenario_winners:
+          scenario_winners[key] = (run_idx, scen_status, scen_tests)
+        else:
+          _, prev_status, _ = scenario_winners[key]
+          if _RETRY_MERGE_PRIORITY.index(
+              scen_status
+          ) <= _RETRY_MERGE_PRIORITY.index(prev_status):
+            scenario_winners[key] = (run_idx, scen_status, scen_tests)
+
+  merged_results: dict[str, dict[str, dict[str, Any]]] = {
+      cls_name: {} for cls_name in class_order
+  }
+  winning_run_by_scenario: dict[tuple[str, str], int] = {}
+  for (cls_name, base_name), (
+      win_idx,
+      _,
+      scen_tests,
+  ) in scenario_winners.items():
+    winning_run_by_scenario[(cls_name, base_name)] = win_idx
+    merged_results[cls_name].update(scen_tests)
+
+  # Merge summary metadata across runs
+  base_summary = dict(ordered_runs[-1][1])
+  device_serials: list[str] = []
+  start_times: list[int] = []
+  end_times: list[int] = []
+  merged_build_info: dict[str, Any] = {}
+  merged_mobly_props: dict[str, Any] = {}
+  merged_apa_info: dict[str, Any] = {}
+
+  for _, s_data, _, _ in ordered_runs:
+    for s in s_data.get("device_serials", []):
+      if s not in device_serials:
+        device_serials.append(s)
+    st = int(s_data.get("start_time", 0) or 0)
+    if st > 0:
+      start_times.append(st)
+    et = int(s_data.get("end_time", 0) or 0)
+    if et > 0:
+      end_times.append(et)
+    merged_build_info.update(s_data.get("build_info", {}))
+    merged_mobly_props.update(s_data.get("mobly_properties", {}))
+    merged_apa_info.update(s_data.get("apa_info", {}))
+
+  base_summary["results"] = merged_results
+  base_summary["device_serials"] = device_serials
+  base_summary["build_info"] = merged_build_info
+  base_summary["mobly_properties"] = merged_mobly_props
+  base_summary["apa_info"] = merged_apa_info
+  base_summary["start_time"] = min(start_times) if start_times else 0
+  base_summary["end_time"] = max(end_times) if end_times else 0
+
+  merged_metrics = _merge_same_suite_metrics(
+      [r[3] for r in ordered_runs],
+      winning_run_by_scenario,
+  )
+  return (
+      ordered_run_summaries,
+      base_summary,
+      m_filename,
+      merged_metrics,
+  )
+
+
+def _format_run_time_subfolder(
+    summary_data: dict[str, Any], run_index: int
+) -> str:
+  """Formats a run's timestamp into a UTC run-time subfolder name."""
+  ts = int(
+      summary_data.get("start_time", 0) or summary_data.get("end_time", 0) or 0
+  )
+  if ts > 0:
+    dt = datetime.datetime.fromtimestamp(ts / 1000.0, datetime.timezone.utc)
+    return dt.strftime("%Y.%m.%d_%H.%M.%S.%f")[:-3]
+  return f"run_{run_index + 1}"
+
+
+def _stage_module_test_summaries(
+    ordered_run_summaries: Sequence[tuple[str, dict[str, Any]]],
+    mod_name: str,
+    non_tf_module_dir: str,
+) -> list[tuple[str, str]]:
+  """Copies each run's `test_summary.yaml` into its own run-time subfolder."""
+  staged: list[tuple[str, str]] = []
+  used_subfolders: set[str] = set()
+  for idx, (suite_dir, s_data) in enumerate(ordered_run_summaries):
+    src_yaml = os.path.join(suite_dir, "test_summary.yaml")
+    if not os.path.isfile(src_yaml):
+      continue
+    base_subfolder = _format_run_time_subfolder(s_data, idx)
+    subfolder = base_subfolder
+    collision_idx = 2
+    while subfolder in used_subfolders:
+      subfolder = f"{base_subfolder}_{collision_idx}"
+      collision_idx += 1
+    used_subfolders.add(subfolder)
+
+    run_dir = os.path.join(non_tf_module_dir, subfolder)
+    os.makedirs(run_dir, exist_ok=True)
+    dest_yaml_path = os.path.join(run_dir, "test_summary.yaml")
+    shutil.copy(src_yaml, dest_yaml_path)
+    staged.append((
+        dest_yaml_path,
+        f"non-tradefed_results/{mod_name}/{subfolder}/test_summary.yaml",
+    ))
+  return staged
+
+
+def package_for_apa(
+    input_dir: str | Sequence[str],
+    output_dir: str | None = None,
+    resultstore_link: str | None = None,
+    start_time: int | None = None,
+    end_time: int | None = None,
+    include_metrics: bool = False,
+    aggregate_iterations: bool = True,
+) -> None:
+  """Packages one or more BeToCQ suite runs into an APA-compatible ZIP.
+
+  Args:
+    input_dir: Path (or comma-separated paths / sequence of paths) to BeToCQ/
+      Mobly output directory(ies) belonging to the same test plan. If the same
+      test suite (`apa_module_name`) was executed multiple times (e.g., retry or
+      split runs across different test cases), its results and
+      `<apa_module_name>.reportlog.json` metrics are automatically merged, while
+      each run's original `test_summary.yaml` is preserved in its own run-time
+      subfolder under `non-tradefed_results/<apa_module_name>/`.
+    output_dir: Optional path to output directory. If None, uses
+      /tmp/betocq/results.
+    resultstore_link: Optional ResultStore link for the test run.
+    start_time: Optional explicit start time (epoch ms). If None, calculated
+      from tests.
+    end_time: Optional explicit end time (epoch ms). If None, calculated from
+      tests.
+    include_metrics: If True, includes detailed per-iteration metrics in the
+      XML.
+    aggregate_iterations: If True, aggregates repeated test iterations to match
+      GTS style.
+
+  Raises:
+    FileNotFoundError: If test_summary.yaml is not found in input_dir.
+    ValueError: If the metrics JSON file cannot be parsed, required config is
+      missing, or multiple runs/suites have mismatched test plans or
+      build_fingerprint values.
+  """
+  suite_dirs = _resolve_suite_input_dirs(input_dir)
+  if not suite_dirs:
+    raise ValueError("input_dir must specify at least one directory.")
+  if output_dir:
+    output_dir = os.path.expanduser(output_dir)
+
+  raw_runs_by_module: collections.OrderedDict[
+      str, list[tuple[str, dict[str, Any], str, dict[str, Any]]]
+  ] = collections.OrderedDict()
+  suite_plans: set[str] = set()
+  target_fingerprints: set[str] = set()
+
+  for suite_dir in suite_dirs:
+    s_data = parse_test_summary(suite_dir)
+    if start_time is not None:
+      s_data["start_time"] = start_time
+    if end_time is not None:
+      s_data["end_time"] = end_time
+    m_filename, m_data = _load_suite_metrics(
+        suite_dir, s_data, resultstore_link
+    )
+    plan_name = str(
+        s_data.get("apa_info", {}).get("apa_suite_plan", "") or ""
+    ).strip()
+    if not plan_name:
+      raise ValueError(
+          f"apa_suite_plan cannot be empty in config for input: {suite_dir}"
+      )
+    suite_plans.add(plan_name)
+    fp = str(s_data.get("build_info", {}).get("build_fingerprint", "") or "")
+    target_fingerprints.add(fp)
+    mod_name = str(
+        s_data.get("apa_info", {}).get("apa_module_name", "betocq_test_suite")
+        or "betocq_test_suite"
+    )
+    raw_runs_by_module.setdefault(mod_name, []).append(
+        (suite_dir, s_data, m_filename, m_data)
+    )
+
+  if len(suite_plans) > 1:
+    raise ValueError(
+        "All suites packaged into a single APA ZIP must share the same "
+        f"apa_suite_plan, but found: {sorted(suite_plans)}"
+    )
+  if len(target_fingerprints) > 1:
+    raise ValueError(
+        "All runs packaged into a single APA ZIP must target the same "
+        f"build_fingerprint, but found: {sorted(target_fingerprints)}"
+    )
+
+  # Consolidate multiple executions of the same test suite (retries / split
+  # runs).
+  suite_bundles: list[
+      tuple[
+          list[tuple[str, dict[str, Any]]],
+          dict[str, Any],
+          str,
+          dict[str, Any],
+      ]
+  ] = []
+  for mod_name, module_runs in raw_runs_by_module.items():
+    if len(module_runs) > 1:
+      logging.info(
+          "Merging %d runs for test suite '%s'", len(module_runs), mod_name
+      )
+    suite_bundles.append(_merge_same_suite_runs(module_runs))
+
+  _, primary_summary, _, primary_metrics = suite_bundles[0]
+  apa_info = primary_summary.get("apa_info", {})
+  all_test_must_pass = bool(apa_info.get("all_test_must_pass", False))
+  additional_modules = [
+      (s_data, m_data) for _, s_data, _, m_data in suite_bundles[1:]
+  ]
+  if len(suite_bundles) == 1:
+    merged_html_metrics = primary_metrics
+  else:
+    all_html_winners: dict[tuple[str, str], int] = {}
+    for b_idx, (_, s_data, _, _) in enumerate(suite_bundles):
+      for cls_name, cls_tests in s_data.get("results", {}).items():
+        for t_name in cls_tests:
+          all_html_winners[(cls_name, _get_base_test_name(t_name))] = b_idx
+    merged_html_metrics = _merge_same_suite_metrics(
+        [m_data for _, _, _, m_data in suite_bundles],
+        all_html_winners,
+    )
+
+  # Combine yaml_results across all consolidated suites for HTML rendering
+  combined_yaml_results: dict[str, dict[str, dict[str, Any]]] = {}
+  for _, s_data, _, _ in suite_bundles:
+    for cls_name, cls_tests in s_data.get("results", {}).items():
+      if cls_name not in combined_yaml_results:
+        combined_yaml_results[cls_name] = dict(cls_tests)
+      else:
+        combined_yaml_results[cls_name].update(cls_tests)
 
   # Determine output paths
-  actual_end_time = summary_data.get("end_time", 0)
+  end_times = [
+      int(s_data.get("end_time", 0) or 0) for _, s_data, _, _ in suite_bundles
+  ]
+  actual_end_time = max(end_times) if end_times else 0
 
   if output_dir is None:
     output_dir = "/tmp/betocq/results"
@@ -947,9 +1476,7 @@ def package_for_apa(
     dt = datetime.datetime.fromtimestamp(
         actual_end_time / 1000.0, datetime.timezone.utc
     )
-    # Format as YYYY.MM.DD_HH.MM.SS.SSS
     base_formatted_time = dt.strftime("%Y.%m.%d_%H.%M.%S.%f")[:-3]
-    # Append a 4-digit random suffix like _1799
     random_suffix = random.randint(1000, 9999)
     formatted_end_time = f"{base_formatted_time}_{random_suffix}"
   else:
@@ -966,56 +1493,74 @@ def package_for_apa(
 
   # Generate XML and HTML directly in output dir
   convert_to_xml(
-      summary_data,
-      metrics_data,
+      primary_summary,
+      primary_metrics,
       xml_path,
       include_metrics,
       aggregate_iterations,
       all_test_must_pass,
+      additional_modules=additional_modules,
   )
   generate_simple_html(
-      yaml_results,
-      metrics_data,
+      combined_yaml_results,
+      merged_html_metrics,
       html_path,
       all_test_must_pass,
       aggregate_iterations,
   )
 
-  # Prepare report-log-files in output dir
   report_log_dir = os.path.join(run_output_dir, "report-log-files")
   os.makedirs(report_log_dir, exist_ok=True)
-  metrics_output_path = os.path.join(report_log_dir, expected_metrics_name)
-  with open(metrics_output_path, "w", encoding="utf-8") as f:
-    json.dump(metrics_data, f, indent=2)
+  staged_metrics_files: list[tuple[str, str]] = []
+  staged_yaml_files: list[tuple[str, str]] = []
 
-  # Prepare non-tradefed_results in output dir
-  non_tf_dir = os.path.join(
-      run_output_dir, "non-tradefed_results", apa_module_name
-  )
-  os.makedirs(non_tf_dir, exist_ok=True)
-  yaml_path = os.path.join(input_dir, "test_summary.yaml")
-  dest_yaml_path = os.path.join(non_tf_dir, "test_summary.yaml")
-  if os.path.exists(yaml_path):
-    shutil.copy(yaml_path, dest_yaml_path)
+  for (
+      ordered_run_summaries,
+      s_data,
+      m_filename,
+      m_data,
+  ) in suite_bundles:
+    mod_name = s_data.get("apa_info", {}).get(
+        "apa_module_name", "betocq_test_suite"
+    )
+    metrics_output_path = os.path.join(report_log_dir, m_filename)
+    with open(metrics_output_path, "w", encoding="utf-8") as f:
+      json.dump(m_data, f, indent=2)
+    staged_metrics_files.append(
+        (metrics_output_path, f"report-log-files/{m_filename}")
+    )
+
+    non_tf_dir = os.path.join(run_output_dir, "non-tradefed_results", mod_name)
+    os.makedirs(non_tf_dir, exist_ok=True)
+    staged_yaml_files.extend(
+        _stage_module_test_summaries(
+            ordered_run_summaries, mod_name, non_tf_dir
+        )
+    )
 
   # Prepare device-info-files in output dir
   dest_edi_dir = os.path.join(run_output_dir, "device-info-files")
   os.makedirs(dest_edi_dir, exist_ok=True)
 
-  # Find EDI files in input_dir
   found_edi = False
-  for root, dirs, _ in os.walk(input_dir):
-    if "device-info-files" not in dirs:
-      continue
-    src_edi_dir = os.path.join(root, "device-info-files")
-    for filename in os.listdir(src_edi_dir):
-      if filename.endswith(".json"):
-        src_filepath = os.path.join(src_edi_dir, filename)
-        dest_filepath = os.path.join(dest_edi_dir, filename)
-        shutil.copy(src_filepath, dest_filepath)
-        logging.info("Staged EDI file: %s", filename)
-        found_edi = True
-    break  # Assume only one such directory is needed or take the first one
+  for ordered_run_summaries, _, _, _ in suite_bundles:
+    for suite_dir, _ in ordered_run_summaries:
+      for root_dir, dirs, _ in os.walk(suite_dir):
+        if "device-info-files" not in dirs:
+          continue
+        src_edi_dir = os.path.join(root_dir, "device-info-files")
+        for filename in os.listdir(src_edi_dir):
+          if filename.endswith(".json"):
+            src_filepath = os.path.join(src_edi_dir, filename)
+            dest_filepath = os.path.join(dest_edi_dir, filename)
+            shutil.copy(src_filepath, dest_filepath)
+            logging.info("Staged EDI file: %s", filename)
+            found_edi = True
+        break
+      if found_edi:
+        break
+    if found_edi:
+      break
 
   if not found_edi:
     logging.warning("device-info-files directory not found in input_dir tree.")
@@ -1025,20 +1570,17 @@ def package_for_apa(
   with zipfile.ZipFile(output_zip, "w", zipfile.ZIP_DEFLATED) as zipf:
     zipf.write(xml_path, "test_result.xml")
     zipf.write(html_path, "test_result.html")
-    zipf.write(metrics_output_path, f"report-log-files/{expected_metrics_name}")
+    for src_path, arc_path in staged_metrics_files:
+      zipf.write(src_path, arc_path)
 
-    # Add staged EDI files
     if found_edi:
       for filename in os.listdir(dest_edi_dir):
         filepath = os.path.join(dest_edi_dir, filename)
         zipf.write(filepath, f"device-info-files/{filename}")
         logging.info("Added EDI file to ZIP: %s", filename)
 
-    if os.path.exists(dest_yaml_path):
-      zipf.write(
-          dest_yaml_path,
-          f"non-tradefed_results/{apa_module_name}/test_summary.yaml",
-      )
+    for src_path, arc_path in staged_yaml_files:
+      zipf.write(src_path, arc_path)
 
   logging.info("Successfully packaged results for APA.")
   logging.info("ZIP report: %s", output_zip)
@@ -1048,6 +1590,8 @@ def package_for_apa(
 def main(argv: Sequence[str]) -> None:
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
+  if not _INPUT_DIR.value:
+    raise app.UsageError("--input_dir is required.")
 
   package_for_apa(
       input_dir=_INPUT_DIR.value,
@@ -1059,5 +1603,6 @@ def main(argv: Sequence[str]) -> None:
 
 
 if __name__ == "__main__":
+  flags.mark_flag_as_required("input_dir")
   logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
   app.run(main)
