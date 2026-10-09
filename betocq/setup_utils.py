@@ -72,6 +72,16 @@ NEARBY_LOG_TAGS = [
     'NearbySetup',
 ]
 
+_NEARBY_SERVICE_COMPONENT = (
+    'com.google.android.gms/.chimera.PersistentApiServiceNoInstantApps'
+)
+_WIFI_HOTSPOT_AVAILABLE_PATTERN = re.compile(
+    r'\[WifiHotspot\]:\s*\n\s*Is Available:\s*(true|false)', re.IGNORECASE
+)
+_SUPPORTS_WIFI_HOTSPOT_FLAG_PATTERN = re.compile(
+    r'\|\s*supports_wifi_hotspot\s*\|\s*(true|false)\s*\|', re.IGNORECASE
+)
+
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
         ([0-9a-f:]{17})  # Captures BSSID
@@ -914,6 +924,115 @@ def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
     return False
 
 
+def _parse_wifi_hotspot_nc_dumpsys(
+    ad: android_device.AndroidDevice, out: str
+) -> bool | None:
+  """Parses NearbyConnections dumpsys output for Wi-Fi Hotspot availability."""
+  available_match = _WIFI_HOTSPOT_AVAILABLE_PATTERN.search(out)
+  if available_match and available_match.group(1).lower() == 'false':
+    ad.log.info(
+        'Wi-Fi Hotspot is not available in NearbyConnections dumpsys on %s.',
+        ad.serial,
+    )
+    return False
+  flag_match = _SUPPORTS_WIFI_HOTSPOT_FLAG_PATTERN.search(out)
+  if flag_match and flag_match.group(1).lower() == 'false':
+    ad.log.info(
+        'Flag supports_wifi_hotspot is false in NearbyConnections dumpsys'
+        ' on %s.',
+        ad.serial,
+    )
+    return False
+  if available_match or flag_match:
+    return True
+  return None
+
+
+def is_wifi_hotspot_supported_in_nc_config(
+    ad: android_device.AndroidDevice,
+) -> bool:
+  """Checks if Wi-Fi Hotspot is enabled in GMSCore Nearby Connections config.
+
+  Inspects the NearbyConnectionsChimeraService dumpsys output for the
+  `[WifiHotspot]: Is Available` state and the `supports_wifi_hotspot` Phenotype
+  flag (waking up the service via snippet if needed), falling back to querying
+  phenotype.db on rooted devices if the service has not dumped state yet.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    False if Wi-Fi Hotspot is explicitly disabled or unavailable in GMSCore
+    Nearby Connections configuration; True otherwise.
+  """
+  dumpsys_cmd = f'dumpsys activity service {_NEARBY_SERVICE_COMPONENT}'
+  try:
+    out = ad.adb.shell(dumpsys_cmd).decode('utf-8', errors='ignore')
+    parsed = _parse_wifi_hotspot_nc_dumpsys(ad, out)
+    if parsed is not None:
+      return parsed
+
+    # If NearbyConnectionsChimeraService has not been bound yet (e.g. right
+    # after restart_gms), trigger a no-op call on the loaded snippet to bind
+    # the service and re-query dumpsys.
+    try:
+      get_snippet_client(ad, 'stopAllEndpoints').stopAllEndpoints()
+      out = ad.adb.shell(dumpsys_cmd).decode('utf-8', errors='ignore')
+      parsed = _parse_wifi_hotspot_nc_dumpsys(ad, out)
+      if parsed is not None:
+        return parsed
+    except Exception:  # pylint: disable=broad-except
+      pass
+  except adb.AdbError:
+    ad.log.warning(
+        'Failed to query NearbyConnections service dump on %s.',
+        ad.serial,
+        exc_info=True,
+    )
+
+  if ad.is_adb_root:
+    try:
+      sql = (
+          'SELECT boolVal FROM ('
+          'SELECT boolVal, 1 AS priority FROM FlagOverrides '
+          "WHERE packageName LIKE 'com.google.android.gms.nearby%' "
+          "AND name='supports_wifi_hotspot' AND committed=1 "
+          'UNION ALL '
+          'SELECT boolVal, 2 AS priority FROM Flags '
+          "WHERE packageName LIKE 'com.google.android.gms.nearby%' "
+          "AND name='supports_wifi_hotspot' "
+          'ORDER BY priority ASC LIMIT 1);'
+      )
+      res = (
+          ad.adb.shell(
+              'sqlite3 /data/data/com.google.android.gms/databases/phenotype.db'
+              f' "{sql}"'
+          )
+          .decode('utf-8', errors='ignore')
+          .strip()
+      )
+      if res == '0':
+        ad.log.info(
+            'Flag supports_wifi_hotspot is 0 in phenotype.db on %s.', ad.serial
+        )
+        return False
+    except adb.AdbError:
+      ad.log.debug(
+          'Failed to query phenotype.db for supports_wifi_hotspot on %s.',
+          ad.serial,
+          exc_info=True,
+      )
+
+  return True
+
+
+def is_wifi_hotspot_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if Wi-Fi Hotspot is supported by hardware and NC configuration."""
+  return is_wifi_direct_supported(
+      ad
+  ) and is_wifi_hotspot_supported_in_nc_config(ad)
+
+
 def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
   """Parses the output of 'cmd wifi list-scan-results'.
 
@@ -1660,10 +1779,10 @@ def abort_if_wifi_hotspot_not_supported(
 ) -> None:
   """Aborts test class if any device does not support Wi-Fi Hotspot."""
   for ad in ads:
-    # We are checking Wi-Fi Direct capability here because Wi-Fi Hotspot is
-    # implemented using Wi-Fi Direct in NC.
+    # Wi-Fi Hotspot in NC is implemented using Wi-Fi Direct (SoftAP/P2P GO) and
+    # gated by the Nearby Connections `supports_wifi_hotspot` configuration.
     asserts.abort_class_if(
-        not is_wifi_direct_supported(ad),
+        not is_wifi_hotspot_supported(ad),
         f'Wifi Hotspot is not supported on the device {ad}.',
     )
 

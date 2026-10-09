@@ -300,7 +300,7 @@ class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
     """Test the NC with the HOTSPOT medium and payload type FILE.
 
     Test requirements:
-      WiFi Direct is supported on both devices.
+      WiFi Hotspot is supported on both devices.
 
     Test steps:
       1. Set up a nearby connection with the HOTSPOT medium and transfer payload
@@ -325,7 +325,7 @@ class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
     """Test the NC with the HOTSPOT medium and payload type STREAM.
 
     Test requirements:
-      WiFi Direct is supported on both devices.
+      WiFi Hotspot is supported on both devices.
 
     Test steps
       1. Set up a nearby connection with the HOTSPOT medium and transfer payload
@@ -492,10 +492,10 @@ class BetoCqFunctionGroupTest(nc_performance_test_base.NcFunctionTestBase):
     prior_bt_snippet.disconnect_endpoint()
 
   def _skip_if_wifi_hotspot_not_supported(self):
-    # Check Direct capability because Hotspot is implemented using Direct in NC.
-    if not setup_utils.is_wifi_direct_supported(
+    # Check both Direct hardware capability and NC Hotspot configuration.
+    if not setup_utils.is_wifi_hotspot_supported(
         self.advertiser
-    ) or not setup_utils.is_wifi_direct_supported(self.discoverer):
+    ) or not setup_utils.is_wifi_hotspot_supported(self.discoverer):
       message = 'Wifi Hotspot is not supported in the device'
       self.get_current_iteration_metrics().record(
           'active_nc_fail_reason',
