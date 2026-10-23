@@ -2029,6 +2029,22 @@ def get_wifi_firmware_version(
   return version
 
 
+def is_wifi_chipset_model_resolvable(wifi_fw: str) -> bool:
+  """Returns whether the Wi-Fi chipset model is resolvable from `wifi_fw`."""
+  cleaned = wifi_fw.strip()
+  if not cleaned or cleaned.lower() in (
+      'adb error',
+      'na',
+      'n/a',
+      'none',
+      'null',
+      'unknown',
+      'value',
+  ):
+    return False
+  return any(char.isalpha() for char in cleaned)
+
+
 def disable_package_verifiers(ad: android_device.AndroidDevice):
   """Disables package verifier and Play Protect for ADB installs."""
   try:

@@ -34,7 +34,6 @@ from betocq import apa_utils
 from betocq import constants
 from betocq import setup_utils
 
-
 # TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
 
@@ -125,17 +124,18 @@ class BaseTestClass(apa_utils.EdiCollectionMixin, apa_utils.ApaInfoMixin):
           'The result may not be expected.'
       )
       self.advertiser, self.discoverer = self.ads
-    # use the wifi chipset model from the test parameters if it is not empty.
-    if self.test_parameters.wifi_chipset_model:
+    # use the wifi chipset model from the test parameters if it is resolvable.
+    wifi_chipset_model = (self.test_parameters.wifi_chipset_model or '').strip()
+    if setup_utils.is_wifi_chipset_model_resolvable(wifi_chipset_model):
       setattr(
           self.advertiser,
           'wifi_chipset',
-          self.test_parameters.wifi_chipset_model.upper(),
+          wifi_chipset_model.upper(),
       )
       setattr(
           self.discoverer,
           'wifi_chipset',
-          self.test_parameters.wifi_chipset_model.upper(),
+          wifi_chipset_model.upper(),
       )
     self.advertiser.debug_tag = '{serial}({model})'.format(
         serial=self.advertiser.serial,
@@ -179,16 +179,28 @@ class BaseTestClass(apa_utils.EdiCollectionMixin, apa_utils.ApaInfoMixin):
           'The test is running on unrooted device; most of tests may be'
           ' skipped.'
       )
-    if self.test_parameters.is_wifi_chipset_model_mandatory:
-      if not self.test_parameters.wifi_chipset_model:
-        if not getattr(self.advertiser, 'wifi_chipset', '') or not getattr(
-            self.discoverer, 'wifi_chipset', ''
-        ):
-          setup_utils.report_error_on_setup_class(
-              self,
-              'wifi_chipset is empty in the config file',
-              error_class=constants.MissingConfigError,
-          )
+    wifi_chipset_model = (self.test_parameters.wifi_chipset_model or '').strip()
+    if not setup_utils.is_wifi_chipset_model_resolvable(wifi_chipset_model):
+      for ad in (self.advertiser, self.discoverer):
+        wifi_chipset = str(getattr(ad, 'wifi_chipset', None) or '').strip()
+        if not setup_utils.is_wifi_chipset_model_resolvable(wifi_chipset):
+          if self.test_parameters.is_wifi_chipset_model_mandatory:
+            setup_utils.report_error_on_setup_class(
+                self,
+                'wifi_chipset is empty in the config file',
+                error_class=constants.MissingConfigError,
+            )
+          wifi_fw = setup_utils.get_wifi_firmware_version(ad)
+          if not setup_utils.is_wifi_chipset_model_resolvable(wifi_fw):
+            setup_utils.report_error_on_setup_class(
+                self,
+                f'wifi_fw ({wifi_fw!r}) is empty or digits-only and'
+                f' wifi_chipset is not specified for device {ad.serial}. For'
+                ' GTS runs, specify wifi_chipset_model using:'
+                " 'run gts-interactive -m GtsBetocqAqtTests --module-arg"
+                " GtsBetocqAqtTests:wifi_chipset_model:VALUE'",
+                error_class=constants.MissingConfigError,
+            )
 
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
