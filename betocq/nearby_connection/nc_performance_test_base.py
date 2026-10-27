@@ -142,6 +142,12 @@ class NcMetricsHelper(metrics_base.MetricsHelper):
         'wifi_concurrency_mode',
         concurrency_mode,
     )
+    if concurrency_mode in (
+        constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA,
+        constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA,
+        constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA,
+    ):
+      metrics_collector.record('is_mcc_mode', True)
 
   @override
   def get_failed_iteration_details(

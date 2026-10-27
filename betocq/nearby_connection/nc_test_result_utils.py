@@ -365,6 +365,23 @@ def assert_5g_wifi_throughput(
   )
 
 
+def _is_mcc_mode(
+    metrics: MetricsCollector,
+    wifi_info: constants.WifiInfo,
+) -> bool:
+  """Returns whether the current test iteration is in MCC mode."""
+  if wifi_info.is_mcc:
+    return True
+  concurrency_mode = metrics.get_value(
+      'wifi_concurrency_mode', constants.WifiConcurrencyMode.UNKNOWN
+  )
+  return concurrency_mode in (
+      constants.WifiConcurrencyMode.MCC_2G_P2P_5G_STA,
+      constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA,
+      constants.WifiConcurrencyMode.MCC_5G_P2P_5G_STA,
+  )
+
+
 def _get_5g_wifi_throughput_benchmark(
     metrics: MetricsCollector,
     nc_test_runtime: constants.NcTestRuntime,
@@ -375,7 +392,7 @@ def _get_5g_wifi_throughput_benchmark(
   advertiser = nc_test_runtime.advertiser
   if nc_test_runtime.wifi_info is None:
     return constants.SpeedTarget(constants.INVALID_INT, constants.INVALID_INT)
-  is_mcc = nc_test_runtime.wifi_info.is_mcc
+  is_mcc = _is_mcc_mode(metrics, nc_test_runtime.wifi_info)
   is_dbs_mode = nc_test_runtime.is_dbs_mode
   is_wlan_medium = (
       nc_test_runtime.upgrade_medium_under_test
@@ -601,7 +618,7 @@ def _run_iperf_test(
 ) -> float:
   """Runs iperf test and returns the throughput. Returns 0 if not needed."""
   wifi_info = nc_test_runtime.wifi_info
-  if wifi_info is None or wifi_info.is_mcc:
+  if wifi_info is None or _is_mcc_mode(metrics, wifi_info):
     return 0
   upgrade_medium_under_test = nc_test_runtime.upgrade_medium_under_test
   if upgrade_medium_under_test not in [

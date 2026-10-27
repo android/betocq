@@ -22,10 +22,10 @@ channels.
 """
 
 from mobly import asserts
-from mobly import base_suite
 from mobly import suite_runner
 
 from betocq import constants
+from betocq import performance_test_base_v2
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
 from betocq.nearby_connection.directed_tests import scc_2g_wlan_sta_test
@@ -39,13 +39,13 @@ _SUITE_NAME = 'AQT'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '10'
+_SUITE_VERSION = '11'
 # LINT.ThenChange()
 
 
 # Test for GTS AQT.
 # LINT.IfChange
-class BetoCqAqtTestSuite(base_suite.BaseSuite):
+class BetoCqAqtTestSuite(performance_test_base_v2.BaseTestSuite):
   """Add all BetoCQ tests to run in sequence."""
 
   def _assert_config_parameters(self, config):

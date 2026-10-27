@@ -25,6 +25,7 @@ import types
 from typing import NoReturn
 
 from mobly import asserts
+from mobly import base_suite
 from mobly import base_test
 from mobly import records
 from mobly import signals
@@ -66,6 +67,28 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   metrics_helper_class = metrics.MetricsHelper
   script_version: str = version.TEST_SCRIPT_VERSION
+  _registered_test_classes: set[str] = set()
+
+  @classmethod
+  def register_test_class(
+      cls, test_class: type[base_test.BaseTestClass] | str
+  ) -> None:
+    """Registers a test class in the suite-wide registry."""
+    name = test_class if isinstance(test_class, str) else test_class.__name__
+    cls._registered_test_classes.add(name)
+
+  @classmethod
+  def is_test_class_registered(
+      cls, test_class: type[base_test.BaseTestClass] | str
+  ) -> bool:
+    """Returns whether `test_class` is registered in the current test run."""
+    name = test_class if isinstance(test_class, str) else test_class.__name__
+    return name in cls._registered_test_classes
+
+  @classmethod
+  def clear_registered_test_classes(cls) -> None:
+    """Clears all registered test classes."""
+    cls._registered_test_classes.clear()
 
   # Configuration parameters
 
@@ -207,6 +230,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
     return 1.0
 
   def setup_class(self) -> None:
+    self.register_test_class(self.__class__)
     self.metrics_manager = metrics.MetricsManager(
         self.TAG, metric_registry=self._metric_registry  # pyrefly: ignore[bad-argument-type]
     )
@@ -892,3 +916,25 @@ class FunctionTestBase(PerformanceTestBase):
     return self.metrics_helper.get_mobly_formatter(
         include_scenario_metrics=False
     )
+
+
+class BaseTestSuite(base_suite.BaseSuite):
+  """Base suite class that registers active test classes in the registry."""
+
+  def __init__(self, runner, config) -> None:
+    super().__init__(runner, config)
+    PerformanceTestBase.clear_registered_test_classes()
+
+  @override
+  def add_test_class(
+      self, clazz, config=None, tests=None, name_suffix=None
+  ) -> None:
+    super().add_test_class(
+        clazz, config=config, tests=tests, name_suffix=name_suffix
+    )
+    if (
+        not self._test_selector
+        or (clazz.__name__, name_suffix) in self._test_selector
+        or clazz.__name__ in self._test_selector
+    ):
+      PerformanceTestBase.register_test_class(clazz)

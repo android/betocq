@@ -320,7 +320,6 @@ class WifiD2DType(enum.IntEnum):
   MCC_2G_WFD_5G_STA = 4
   MCC_2G_WFD_5G_INDOOR_STA = 5
   MCC_5G_WFD_2G_STA = 6
-  MCC_5G_WFD_5G_DFS_STA = 7
   MCC_5G_HS_5G_DFS_STA = 8
   # 2 Android devices connected to different APs.
   MCC_5G_AND_5G_DFS_STA = 9
@@ -395,8 +394,7 @@ def get_wifi_concurrency_mode_from_d2d_type(
     case WifiD2DType.MCC_5G_WFD_2G_STA:
       return WifiConcurrencyMode.MCC_5G_P2P_2G_STA
     case (
-        WifiD2DType.MCC_5G_WFD_5G_DFS_STA
-        | WifiD2DType.MCC_5G_HS_5G_DFS_STA
+        WifiD2DType.MCC_5G_HS_5G_DFS_STA
         | WifiD2DType.MCC_5G_AND_5G_DFS_STA
     ):
       return WifiConcurrencyMode.MCC_5G_P2P_5G_STA
@@ -407,7 +405,6 @@ def get_wifi_concurrency_mode_from_d2d_type(
 _WIFI_D2D_TYPES_MCC = (
     WifiD2DType.MCC_2G_WFD_5G_STA,
     WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
-    WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
     WifiD2DType.MCC_5G_HS_5G_DFS_STA,
     WifiD2DType.MCC_5G_WFD_2G_STA,
     WifiD2DType.MCC_5G_AND_5G_DFS_STA,
@@ -441,7 +438,6 @@ _WIFI_D2D_TYPES_5G_STA = (
 
 _WIFI_D2D_TYPES_DFS_5G_STA = (
     WifiD2DType.SCC_5G_DFS,
-    WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
     WifiD2DType.MCC_5G_HS_5G_DFS_STA,
     WifiD2DType.XCC_5G_DFS_STA,
 )
