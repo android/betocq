@@ -67,15 +67,24 @@ import platform
 import random
 import shutil
 import socket
+import sys
 import textwrap
 from typing import Any
 import xml.ElementTree as ET
 import zipfile
 
-from absl import app
-from absl import flags
-from mobly import records
-import yaml
+# Bootstrap sys.path when running standalone .par binaries built with
+# no_launcher so zipimport finds third-party libraries (absl, mobly, yaml)
+# stored inside the archive under google3/third_party/py/.
+for _search_path in list(sys.path):
+  _third_party_path = os.path.join(_search_path, "google3/third_party/py")
+  if _third_party_path not in sys.path:
+    sys.path.append(_third_party_path)
+
+from absl import app  # pylint: disable=g-import-not-at-top
+from absl import flags  # pylint: disable=g-import-not-at-top
+from mobly import records  # pylint: disable=g-import-not-at-top
+import yaml  # pylint: disable=g-import-not-at-top
 
 _APA_STATUS_PASS = "pass"
 _APA_STATUS_FAIL = "fail"
