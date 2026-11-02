@@ -81,6 +81,17 @@ _WIFI_HOTSPOT_AVAILABLE_PATTERN = re.compile(
 _SUPPORTS_WIFI_HOTSPOT_FLAG_PATTERN = re.compile(
     r'\|\s*supports_wifi_hotspot\s*\|\s*(true|false)\s*\|', re.IGNORECASE
 )
+_ACTIVE_INSTRUMENTATION_PATTERN = re.compile(
+    r'ActiveInstrumentation\{[^\s}]+\s+([a-zA-Z0-9._]+)/'
+)
+_ACTIVE_INSTRUMENTATION_TARGET_PATTERN = re.compile(
+    r'targetInfo=ApplicationInfo\{[^\s}]+\s+([a-zA-Z0-9._]+)\}'
+)
+_SNIPPET_INSTRUMENTATION_PATTERN = re.compile(
+    r'^instrumentation:([a-zA-Z0-9._]+)/'
+    r'com\.google\.android\.mobly\.snippet\.SnippetRunner'
+    r'\s+\(target=([a-zA-Z0-9._]+)\)'
+)
 
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
@@ -1474,12 +1485,88 @@ def get_target_sta_frequency_and_max_link_speed(
   return (sta_frequency, sta_max_link_speed_mbps)
 
 
+def _decode_adb_shell_output(raw_output: Any) -> str:
+  """Decodes raw `adb.shell` output into a UTF-8 string."""
+  if isinstance(raw_output, bytes):
+    return raw_output.decode('utf-8', errors='ignore')
+  if isinstance(raw_output, str):
+    return raw_output
+  return ''
+
+
+def _get_active_session_snippet_packages(
+    ad: android_device.AndroidDevice,
+) -> set[str]:
+  """Returns snippet package names currently managed by `ad`."""
+  active_packages = set(getattr(ad, 'loaded_snippet_packages', ()))
+  services = getattr(ad, 'services', None)
+  if services is not None and services.has_service_by_name('snippets'):
+    snippet_clients = getattr(services.snippets, '_snippet_clients', {})
+    for client in snippet_clients.values():
+      if isinstance(client.package, str):
+        active_packages.add(client.package)
+  return active_packages
+
+
+def stop_stale_snippets_and_instrumentations(
+    ad: android_device.AndroidDevice,
+) -> None:
+  """Force-stops orphaned instrumentation/snippet packages not managed by `ad`.
+
+  If a previous test run crashed or timed out, its instrumentation process (such
+  as a Mobly `SnippetRunner` launched under `setsid`/`nohup`) can remain alive
+  holding Android's system-wide `UiAutomationService` singleton, causing
+  subsequent snippet `getUiAutomation()` calls to fail with
+  `IllegalStateException: UiAutomationService ... already registered!`.
+
+  Args:
+    ad: The Mobly `AndroidDevice` to clean up.
+  """
+  active_session_packages = _get_active_session_snippet_packages(ad)
+  stale_packages: set[str] = set()
+
+  try:
+    dumpsys_output = _decode_adb_shell_output(
+        ad.adb.shell(['dumpsys', 'activity', 'processes'])
+    )
+    stale_packages.update(
+        _ACTIVE_INSTRUMENTATION_PATTERN.findall(dumpsys_output)
+    )
+    stale_packages.update(
+        _ACTIVE_INSTRUMENTATION_TARGET_PATTERN.findall(dumpsys_output)
+    )
+  except adb.AdbError as err:
+    ad.log.warning('Failed to query active instrumentations: %s', err)
+
+  try:
+    pm_output = _decode_adb_shell_output(
+        ad.adb.shell(['pm', 'list', 'instrumentation'])
+    )
+    for line in pm_output.splitlines():
+      match = _SNIPPET_INSTRUMENTATION_PATTERN.match(line.strip())
+      if match:
+        stale_packages.update(match.groups())
+  except adb.AdbError as err:
+    ad.log.warning('Failed to list snippet instrumentations: %s', err)
+
+  for package_name in sorted(stale_packages - active_session_packages):
+    ad.log.info(
+        'Force-stopping stale instrumentation/snippet package: %s',
+        package_name,
+    )
+    try:
+      ad.adb.shell(['am', 'force-stop', package_name])
+    except adb.AdbError as err:
+      ad.log.warning('Failed to force-stop %s: %s', package_name, err)
+
+
 # TODO: rename this as load_android_snippet
 def load_nearby_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
 ):
   """Loads a nearby snippet with the given snippet config."""
+  stop_stale_snippets_and_instrumentations(ad)
   device_specific_dict = get_betocq_device_specific_info(ad)
 
   if config.apk_path:
