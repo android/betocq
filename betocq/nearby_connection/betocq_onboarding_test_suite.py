@@ -26,11 +26,10 @@ from mobly import suite_runner
 from betocq import performance_test_base_v2
 from betocq.nearby_connection.compound_tests import bt_2g_wifi_coex_test
 from betocq.nearby_connection.directed_tests import bt_performance_test
-from betocq.nearby_connection.directed_tests import mcc_5g_wfd_non_dbs_2g_sta_test
-from betocq.nearby_connection.directed_tests import scc_5g_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wfd_sta_test
 from betocq.nearby_connection.directed_tests import scc_5g_wlan_sta_test
 from betocq.nearby_connection.directed_tests import scc_indoor_5g_wfd_sta_test
+from betocq.nearby_connection.directed_tests import xcc_wfd_dbs_2g_sta_test
 from betocq.nearby_connection.directed_tests import xcc_wfd_dfs_5g_sta_test
 from betocq.nearby_connection.function_tests import beto_cq_function_group_test
 
@@ -38,7 +37,7 @@ _SUITE_NAME = 'NC'
 # increment this version number when adding new tests or changing the config
 # parameters of existing tests.
 # LINT.IfChange(suite_version)
-_SUITE_VERSION = '5'
+_SUITE_VERSION = '6'
 # LINT.ThenChange()
 
 
@@ -56,13 +55,11 @@ class BetoCqPerformanceTestSuite(performance_test_base_v2.BaseTestSuite):
 
     # Directed test cases:
     self.add_test_class(bt_performance_test.BtPerformanceTest)
-    self.add_test_class(mcc_5g_wfd_non_dbs_2g_sta_test.Mcc5gWfdNonDbs2gStaTest)
-    self.add_test_class(scc_5g_wfd_dbs_2g_sta_test.Scc5gWfdDbs2gStaTest)
     self.add_test_class(scc_5g_wfd_sta_test.Scc5gWfdStaTest)
     self.add_test_class(scc_5g_wlan_sta_test.Scc5gWifiLanStaTest)
     self.add_test_class(scc_indoor_5g_wfd_sta_test.SccIndoor5gWfdStaTest)
     self.add_test_class(xcc_wfd_dfs_5g_sta_test.XccWfdDfs5gStaTest)
-
+    self.add_test_class(xcc_wfd_dbs_2g_sta_test.XccWfdDbs2gStaTest)
     # Compound test cases:
     self.add_test_class(bt_2g_wifi_coex_test.Bt2gWifiCoexTest)
 
