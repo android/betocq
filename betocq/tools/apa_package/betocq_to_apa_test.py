@@ -16,7 +16,7 @@
 
 import json
 import os
-import xml.ElementTree as ET
+from xml.etree import ElementTree as ET
 import zipfile
 
 from absl.testing import absltest
