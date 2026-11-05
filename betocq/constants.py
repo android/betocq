@@ -149,6 +149,10 @@ class TestParameters:
   run_aware_test: bool = False
   requires_bt_multiplex: bool = False
   allow_unrooted_device: bool = False
+  # Whether Google Play Protect (package verifiers) has already been disabled
+  # by the test runner or tester. When True, skips package verifier disable/
+  # enable steps and suppresses package verifier warnings during testing.
+  play_protect_disabled_by_runner_or_tester: bool = False
   do_nc_wlan_file_transfer_test: bool = True
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False

@@ -14,13 +14,11 @@
 
 """Android Nearby device setup."""
 
-from collections.abc import Callable, Iterable, Iterator, Sequence
-import contextlib
+from collections.abc import Callable, Iterable, Sequence
 import datetime
 import logging
 import pprint
 import re
-import sys
 import time
 from typing import Any, Literal
 
@@ -92,6 +90,11 @@ _SNIPPET_INSTRUMENTATION_PATTERN = re.compile(
     r'com\.google\.android\.mobly\.snippet\.SnippetRunner'
     r'\s+\(target=([a-zA-Z0-9._]+)\)'
 )
+_PLAY_PROTECT_DISABLED_BY_RUNNER_OR_TESTER_KEY = (
+    'play_protect_disabled_by_runner_or_tester'
+)
+_PACKAGE_VERIFIERS_CHECKED_KEY = 'package_verifiers_checked'
+_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY = 'package_verifiers_disabled_by_test'
 
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
@@ -1564,8 +1567,17 @@ def stop_stale_snippets_and_instrumentations(
 def load_nearby_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
-):
-  """Loads a nearby snippet with the given snippet config."""
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> None:
+  """Loads a nearby snippet with the given snippet config.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    config: Configuration for the snippet APK and package to load.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+  """
   stop_stale_snippets_and_instrumentations(ad)
   device_specific_dict = get_betocq_device_specific_info(ad)
 
@@ -1573,8 +1585,13 @@ def load_nearby_snippet(
     key_apk_installed = config.package_name + '_installed'
     if not device_specific_dict.get(key_apk_installed, False):
       ad.log.info('try to install snippet apk')
-      with emulator_package_verifier_guard(ad):
-        apk_utils.install(ad, config.apk_path)
+      ensure_package_verifiers_disabled(
+          ad,
+          play_protect_disabled_by_runner_or_tester=(
+              play_protect_disabled_by_runner_or_tester
+          ),
+      )
+      apk_utils.install(ad, config.apk_path)
       device_specific_dict[key_apk_installed] = True
   else:
     ad.log.warning(
@@ -2132,12 +2149,19 @@ def is_wifi_chipset_model_resolvable(wifi_fw: str) -> bool:
   return any(char.isalpha() for char in cleaned)
 
 
-def disable_package_verifiers(ad: android_device.AndroidDevice):
-  """Disables package verifier and Play Protect for ADB installs."""
+def disable_package_verifiers(ad: android_device.AndroidDevice) -> bool:
+  """Disables package verifier and Play Protect for ADB installs.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+
+  Returns:
+    True if package verifiers were disabled, or False if skipped or failed.
+  """
   try:
     if not ad.is_adb_root:
       ad.log.info('Device is not rooted. Skipping disabling package verifiers.')
-      return
+      return False
     ad.log.info(
         'Device is in Root. Disabling package verifier and Play Protect for ADB'
         ' installs.'
@@ -2147,10 +2171,12 @@ def disable_package_verifiers(ad: android_device.AndroidDevice):
         ['settings', 'put', 'global', 'verifier_verify_adb_installs', '0']
     )
     ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '1'])
+    return True
   except adb.AdbError as e:
     ad.log.error(
-        f'Failed to disable package verifiers: {e} on device {ad.serial}.'
+        'Failed to disable package verifiers: %s on device %s.', e, ad.serial
     )
+    return False
 
 
 def enable_package_verifiers(ad: android_device.AndroidDevice):
@@ -2190,32 +2216,194 @@ def is_emulator(ad: android_device.AndroidDevice) -> bool:
   )
 
 
-@contextlib.contextmanager
-def emulator_package_verifier_guard(
+def set_play_protect_disabled_by_runner_or_tester(
     ad: android_device.AndroidDevice,
-) -> Iterator[None]:
-  """Temporarily disables package verifiers on emulators during APK installation."""
-  is_emulator_device = is_emulator(ad)
-  if is_emulator_device:
-    if not ad.is_adb_root:
-      ad.adb.root()
-    disable_package_verifiers(ad)
+    disabled: bool,
+) -> None:
+  """Records whether config says Play Protect was disabled by runner/tester.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    disabled: Whether Play Protect is considered disabled by the test runner or
+      tester.
+  """
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  device_specific_dict[_PLAY_PROTECT_DISABLED_BY_RUNNER_OR_TESTER_KEY] = bool(
+      disabled
+  )
+  if disabled:
+    device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+
+
+def is_play_protect_disabled_by_runner_or_tester(
+    ad: android_device.AndroidDevice,
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> bool:
+  """Returns True if config says Play Protect was disabled by runner/tester.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+
+  Returns:
+    True if Play Protect was recorded or configured as disabled by the test
+    runner or tester, False otherwise.
+  """
+  if play_protect_disabled_by_runner_or_tester is not None:
+    return bool(play_protect_disabled_by_runner_or_tester)
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  return bool(
+      device_specific_dict.get(
+          _PLAY_PROTECT_DISABLED_BY_RUNNER_OR_TESTER_KEY, False
+      )
+  )
+
+
+def are_package_verifiers_disabled(ad: android_device.AndroidDevice) -> bool:
+  """Returns True if ADB install package verification is already disabled."""
   try:
-    yield
-  finally:
-    if is_emulator_device:
-      has_active_exception = sys.exc_info()[0] is not None
-      try:
-        enable_package_verifiers(ad)
-      except Exception as e:  # pylint: disable=broad-except
-        if not has_active_exception:
-          raise
-        ad.log.warning(
-            'Failed to re-enable package verifiers on %s during error'
-            ' cleanup: %s',
-            ad.serial,
-            e,
+    raw_value = _decode_adb_shell_output(
+        ad.adb.shell(
+            ['settings', 'get', 'global', 'verifier_verify_adb_installs']
         )
+    ).strip()
+  except adb.AdbError as err:
+    ad.log.warning(
+        'Failed to query package verifier state on %s: %s', ad.serial, err
+    )
+    return False
+  try:
+    return int(raw_value) <= 0
+  except ValueError:
+    return False
+
+
+def ensure_package_verifiers_disabled(
+    ad: android_device.AndroidDevice,
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> None:
+  """Checks and disables package verifiers on `ad` if enabled.
+
+  When `play_protect_disabled_by_runner_or_tester` is configured as True
+  (indicating the test runner or tester has already disabled Play Protect, such
+  as on Mobile Harness), skips all checks, toggles, and warnings.
+
+  Otherwise, checks `verifier_verify_adb_installs` on `ad`:
+  - If package verifiers are already disabled, leaves them untouched (logging a
+    one-time informational reminder on physical devices).
+  - If enabled on an emulator, roots `ad` if needed and disables package
+    verifiers without recording a manual Play Protect teardown warning.
+  - If enabled on a rooted physical device, disables package verifiers and
+    records that this test run disabled them so `teardown_class` can warn the
+    tester to re-enable Play Protect manually after testing completes.
+  - If enabled on an unrooted physical device, logs a warning without rooting.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+  """
+  if is_play_protect_disabled_by_runner_or_tester(
+      ad, play_protect_disabled_by_runner_or_tester
+  ):
+    ad.log.debug(
+        'Skipping package verifier check on %s'
+        ' (play_protect_disabled_by_runner_or_tester is True in config).',
+        ad.serial,
+    )
+    return
+
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  already_checked = device_specific_dict.get(
+      _PACKAGE_VERIFIERS_CHECKED_KEY, False
+  )
+  is_emulator_device = is_emulator(ad)
+
+  if are_package_verifiers_disabled(ad):
+    if not already_checked:
+      device_specific_dict[_PACKAGE_VERIFIERS_CHECKED_KEY] = True
+      device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+      if is_emulator_device:
+        ad.log.debug(
+            'Package verifiers are already disabled on emulator %s.', ad.serial
+        )
+      else:
+        ad.log.info(
+            'Package verifiers are already disabled on device %s (possibly from'
+            ' a previous test run or disabled by the test runner); leaving as'
+            ' is. You may need to re-enable Google Play Protect manually after'
+            ' testing, or set `play_protect_disabled_by_runner_or_tester: True`'
+            ' in the test config if kept disabled intentionally.',
+            ad.serial,
+        )
+    return
+
+  if not ad.is_adb_root and is_emulator_device:
+    ad.adb.root()
+
+  if not ad.is_adb_root:
+    if not already_checked:
+      device_specific_dict[_PACKAGE_VERIFIERS_CHECKED_KEY] = True
+      ad.log.warning(
+          'Package verifiers are enabled on unrooted device %s; cannot disable'
+          ' automatically without root. Please disable Google Play Protect'
+          ' manually if APK installation fails.',
+          ad.serial,
+      )
+    return
+
+  if disable_package_verifiers(ad):
+    device_specific_dict[_PACKAGE_VERIFIERS_CHECKED_KEY] = True
+    if is_emulator_device:
+      device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+    else:
+      device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = True
+      ad.log.warning(
+          'Package verifiers were enabled on device %s and have been disabled'
+          ' for APK installation. Remember to re-enable Google Play Protect'
+          ' manually after all tests finish (or set'
+          ' `play_protect_disabled_by_runner_or_tester: True` in the test'
+          ' config if you keep them disabled intentionally).',
+          ad.serial,
+      )
+
+
+def warn_if_package_verifiers_disabled_by_test(
+    ad: android_device.AndroidDevice,
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> None:
+  """Logs a warning if this test run disabled package verifiers on `ad`.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+  """
+  if is_emulator(ad) or is_play_protect_disabled_by_runner_or_tester(
+      ad, play_protect_disabled_by_runner_or_tester
+  ):
+    return
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  if device_specific_dict.get(_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY, False):
+    device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+    ad.log.warning(
+        'Package verifiers (Google Play Protect) were disabled by this test run'
+        ' on device %s and remain disabled. Please re-enable them manually'
+        ' after all tests finish (Play Store -> Play Protect, or run `adb -s'
+        ' %s shell settings put global verifier_verify_adb_installs 1`, `adb'
+        ' -s %s shell settings put global package_verifier_enable 1`, and `adb'
+        ' -s %s shell settings put global verifier_engprod 0`), or set'
+        ' `play_protect_disabled_by_runner_or_tester: True` in the test config'
+        ' to suppress this warning if kept disabled intentionally.',
+        ad.serial,
+        ad.serial,
+        ad.serial,
+        ad.serial,
+    )
 
 
 def is_screen_locked(device: android_device.AndroidDevice) -> bool:

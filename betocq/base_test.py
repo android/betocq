@@ -100,6 +100,9 @@ class BaseTestClass(apa_utils.EdiCollectionMixin, apa_utils.ApaInfoMixin):
 
     for ad in self.ads:
       self._log_class_start_on_device(ad)
+      setup_utils.set_play_protect_disabled_by_runner_or_tester(
+          ad, self.test_parameters.play_protect_disabled_by_runner_or_tester
+      )
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']  # pyrefly: ignore[missing-attribute]
       if self.is_using_gms_api:
@@ -345,6 +348,12 @@ class BaseTestClass(apa_utils.EdiCollectionMixin, apa_utils.ApaInfoMixin):
     finally:
       for ad in self.ads:
         self._log_class_end_on_device(ad)
+        setup_utils.warn_if_package_verifiers_disabled_by_test(
+            ad,
+            play_protect_disabled_by_runner_or_tester=(
+                self.test_parameters.play_protect_disabled_by_runner_or_tester
+            ),
+        )
       super().teardown_class()
 
   def on_fail(self, record: records.TestResultRecord) -> None:
