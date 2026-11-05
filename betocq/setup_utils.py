@@ -1563,13 +1563,12 @@ def stop_stale_snippets_and_instrumentations(
       ad.log.warning('Failed to force-stop %s: %s', package_name, err)
 
 
-# TODO: rename this as load_android_snippet
-def load_nearby_snippet(
+def load_android_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
     play_protect_disabled_by_runner_or_tester: bool | None = None,
 ) -> None:
-  """Loads a nearby snippet with the given snippet config.
+  """Loads an Android snippet with the given snippet config.
 
   Args:
     ad: The Mobly `AndroidDevice` instance.
@@ -1611,11 +1610,11 @@ def load_nearby_snippet(
   ad.loaded_snippet_packages.add(config.package_name)
 
 
-def unload_nearby_snippet(
+def unload_android_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
-):
-  """Unloads a nearby snippet with the given snippet config."""
+) -> None:
+  """Unloads an Android snippet with the given snippet config."""
   device_specific_dict = get_betocq_device_specific_info(ad)
   key_apk_installed = config.package_name + '_installed'
   key_permission_granted = (
