@@ -14,10 +14,11 @@
 
 """Define the BeToCQ Result Viewer version."""
 
-VERSION = "1.2.1"
+VERSION = "1.2.2"
 __version__ = VERSION
 
 # VERSION_LOG (only add new description for new version, keep the history log)
+# '1.2.2': 'fix the bug for public release.'
 # '1.2.1': 'Update product branding to BeToCQ Result Viewer.'
 # '1.2.0': 'Rename BeToCQ Test Explorer to BeToCQ Results Viewer.'
 # '1.1.0': 'Add Environment Status diagnostic tab, setup_wizard module, and

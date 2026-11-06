@@ -43,3 +43,5 @@ TEST_SCRIPT_VERSION = importlib.metadata.version('betocq')
 # '3.1.0': ('Adjust the test cases, remove most compound tests and the world
 #          'mode test cases.')
 # '3.1.1': ('Fix some bugs.')
+# '3.2.0': ('Consolidate WFD DFS and DBS tests into XCC tests; add APA '
+#          'packaging support; improve device setup checks and fix bugs.')
