@@ -4,21 +4,26 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "betocq"
-version = "3.1.1"
+version = "3.2.0"
 description = "Better Together Connectivity Quality test suite."
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "mobly==1.13",
+  "PyYAML",
+  "absl-py",
+  "immutabledict",
+  "mobly==1.13.1",
   "mobly-android-partner-tools",
-  "mobly-wifi==1.2.0",
+  "mobly-wifi==1.4.0",
+  "typing-extensions",
 ]
 
 [project.scripts]
 betocq_onboarding_test_suite = "betocq.nearby_connection.betocq_onboarding_test_suite:main"
 betocq_auto_test_suite = "betocq.nearby_connection.betocq_android_auto_test_suite:main"
 betocq_aqt_test_suite = "betocq.nearby_connection.betocq_aqt_test_suite:main"
-betocq-result-viewer = "betocq.tools.test_explorer.server:main"
+betocq-result-viewer = "betocq.tools.results_viewer.server:main"
+betocq_to_apa = "betocq.tools.apa_package.betocq_to_apa:cli_main"
 
 
 [project.urls]
