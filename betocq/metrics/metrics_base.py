@@ -103,6 +103,10 @@ FRAMEWORK_METRICS_REGISTRY: immutabledict.immutabledict[
     'failed_iterations_detail': MetricDefinition(
         AggregatorType.LAST, 'test_stats'
     ),
+    # Set when a test class calls `skip_remaining_iterations`, i.e. the
+    # scenario itself is not applicable to this testbed.
+    'scenario_skipped': MetricDefinition(AggregatorType.LAST, None),
+    'scenario_skip_reason': MetricDefinition(AggregatorType.LAST, None),
 })
 
 

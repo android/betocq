@@ -16,30 +16,27 @@
 
 import logging
 import sys
-
-import os
 import traceback
 
-from mobly import base_test
+import os
 from mobly import records
 from mobly import signals
 from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import errors
+import yaml
 
 from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
-import yaml
-
 from betocq import ap_utils
+from betocq import apa_utils
 from betocq import constants
 from betocq import setup_utils
 
 # TODO: Need to design external path for OEM.
 _CONFIG_EXTERNAL_PATH = 'TBD'
-_CUTTLEFISH_VIRTUALIZATION_TYPE = 6
 
 
 def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
@@ -61,7 +58,7 @@ def _load_android_hw_capability(ad: android_device.AndroidDevice) -> None:
       setattr(ad, key, value)
 
 
-class BaseTestClass(base_test.BaseTestClass):
+class BaseTestClass(apa_utils.EdiCollectionMixin, apa_utils.ApaInfoMixin):
   """The base test class of all BeToCQ tests."""
 
   _run_identifier_is_set = False
@@ -104,6 +101,9 @@ class BaseTestClass(base_test.BaseTestClass):
 
     for ad in self.ads:
       self._log_class_start_on_device(ad)
+      setup_utils.set_play_protect_disabled_by_runner_or_tester(
+          ad, self.test_parameters.play_protect_disabled_by_runner_or_tester
+      )
       if hasattr(ad, 'dimensions') and 'role' in ad.dimensions:
         ad.role = ad.dimensions['role']  # pyrefly: ignore[missing-attribute]
       if self.is_using_gms_api:
@@ -128,17 +128,18 @@ class BaseTestClass(base_test.BaseTestClass):
           'The result may not be expected.'
       )
       self.advertiser, self.discoverer = self.ads
-    # use the wifi chipset model from the test parameters if it is not empty.
-    if self.test_parameters.wifi_chipset_model:
+    # use the wifi chipset model from the test parameters if it is resolvable.
+    wifi_chipset_model = (self.test_parameters.wifi_chipset_model or '').strip()
+    if setup_utils.is_wifi_chipset_model_resolvable(wifi_chipset_model):
       setattr(
           self.advertiser,
           'wifi_chipset',
-          self.test_parameters.wifi_chipset_model.upper(),
+          wifi_chipset_model.upper(),
       )
       setattr(
           self.discoverer,
           'wifi_chipset',
-          self.test_parameters.wifi_chipset_model.upper(),
+          wifi_chipset_model.upper(),
       )
     self.advertiser.debug_tag = '{serial}({model})'.format(
         serial=self.advertiser.serial,
@@ -182,16 +183,28 @@ class BaseTestClass(base_test.BaseTestClass):
           'The test is running on unrooted device; most of tests may be'
           ' skipped.'
       )
-    if self.test_parameters.is_wifi_chipset_model_mandatory:
-      if not self.test_parameters.wifi_chipset_model:
-        if not getattr(self.advertiser, 'wifi_chipset', '') or not getattr(
-            self.discoverer, 'wifi_chipset', ''
-        ):
-          setup_utils.report_error_on_setup_class(
-              self,
-              'wifi_chipset is empty in the config file',
-              error_class=constants.MissingConfigError,
-          )
+    wifi_chipset_model = (self.test_parameters.wifi_chipset_model or '').strip()
+    if not setup_utils.is_wifi_chipset_model_resolvable(wifi_chipset_model):
+      for ad in (self.advertiser, self.discoverer):
+        wifi_chipset = str(getattr(ad, 'wifi_chipset', None) or '').strip()
+        if not setup_utils.is_wifi_chipset_model_resolvable(wifi_chipset):
+          if self.test_parameters.is_wifi_chipset_model_mandatory:
+            setup_utils.report_error_on_setup_class(
+                self,
+                'wifi_chipset is empty in the config file',
+                error_class=constants.MissingConfigError,
+            )
+          wifi_fw = setup_utils.get_wifi_firmware_version(ad)
+          if not setup_utils.is_wifi_chipset_model_resolvable(wifi_fw):
+            setup_utils.report_error_on_setup_class(
+                self,
+                f'wifi_fw ({wifi_fw!r}) is empty or digits-only and'
+                f' wifi_chipset is not specified for device {ad.serial}. For'
+                ' GTS runs, specify wifi_chipset_model using:'
+                " 'run gts-interactive -m GtsBetocqAqtTests --module-arg"
+                " GtsBetocqAqtTests:wifi_chipset_model:VALUE'",
+                error_class=constants.MissingConfigError,
+            )
 
   def _assert_test_conditions(self) -> None:
     """Asserts the test conditions for all devices."""
@@ -299,7 +312,6 @@ class BaseTestClass(base_test.BaseTestClass):
 
   def reset_device(self, ad: android_device.AndroidDevice) -> None:
     """Resets the device protocol state. Can be overridden by subclasses."""
-    pass
 
   def _teardown_device(self, ad: android_device.AndroidDevice) -> None:
     ad.nearby.transferFilesCleanup()
@@ -337,6 +349,12 @@ class BaseTestClass(base_test.BaseTestClass):
     finally:
       for ad in self.ads:
         self._log_class_end_on_device(ad)
+        setup_utils.warn_if_package_verifiers_disabled_by_test(
+            ad,
+            play_protect_disabled_by_runner_or_tester=(
+                self.test_parameters.play_protect_disabled_by_runner_or_tester
+            ),
+        )
       super().teardown_class()
 
   def on_fail(self, record: records.TestResultRecord) -> None:
@@ -461,10 +479,12 @@ class BaseTestClass(base_test.BaseTestClass):
     ]
     run_identifier = '-'.join(run_identifier_items)
     self.user_params['combined_suite_name'] = suite_name
-    self.record_data({
-        'properties': {
-            'suite_name': f'[{suite_name}]',
-            'run_identifier': run_identifier,
-        }
-    })
+    properties = {
+        'suite_name': f'[{suite_name}]',
+        'run_identifier': run_identifier,
+    }
+    if 'suite_version' in self.user_params:
+      properties['suite_version'] = self.user_params['suite_version']
+
+    self.record_data({'properties': properties})
     BaseTestClass._run_identifier_is_set = True

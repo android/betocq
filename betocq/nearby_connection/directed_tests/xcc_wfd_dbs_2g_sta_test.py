@@ -39,9 +39,13 @@ Test steps:
   6. Tear down all Nearby Connections.
 
 Expected results:
-  1. The file transfer completes successfully.
+  1. The file transfer completes successfully. When throughput assertion is
+     enabled, the throughput meets the target calculated according to the
+     device capabilities.
   2. The Wi-Fi STA frequency is a 2G frequency.
-  3. The Wi-Fi P2P frequency is 5G (DBS) or 2G (non-DBS).
+  3. The Wi-Fi P2P frequency is 5G (DBS) or 2G (non-DBS). When
+     `supports_dbs_sta_wfd` is configured on the target device, the P2P
+     frequency is asserted to be different from the STA frequency.
   4. This test will be repeated for `TEST_ITERATION_NUM` times, requiring a
      success rate of no less than `SUCCESS_RATE_TARGET`.
 """
@@ -70,6 +74,19 @@ _FILE_TRANSFER_NUM = 1
 _PAYLOAD_TYPE = constants.PayloadType.FILE
 _COUNTRY_CODE = 'US'
 
+_SCC_THROUGHPUT_LOW_TIP = (
+    'This is a SCC 5G test case with WFD medium operating at 5G and STA'
+    ' operating at 2G. In the configuration file, DBS support is set to true.'
+    ' Check if the device does support DBS with STA + WFD concurrency. Check'
+    ' with the wifi chip vendor about the possible firmware Tx/Rx issues in'
+    ' this mode.'
+)
+
+_MCC_THROUGHPUT_LOW_TIP = (
+    'This is a MCC test case where WFD uses a 5G channel and STA uses a 2G'
+    ' channel. Check with the wifi chip vendor about the possible firmware'
+    ' Tx/Rx issues in MCC mode.'
+)
 
 _FILE_TRANSFER_FAILURE_TIP = (
     'The Wifi Direct connection might be broken, check related logs.'
@@ -102,6 +119,9 @@ class XccWfdDbs2gStaTest(nc_performance_test_base.NcPerformanceTestBase):
         discoverer=self.discoverer,
         upgrade_medium_under_test=(
             constants.NearbyMedium.UPGRADE_TO_WIFIDIRECT
+        ),
+        is_dbs_mode=bool(
+            getattr(self.advertiser, 'supports_dbs_sta_wfd', False)
         ),
         country_code=_COUNTRY_CODE,
         wifi_info=self.wifi_info,
@@ -196,42 +216,85 @@ class XccWfdDbs2gStaTest(nc_performance_test_base.NcPerformanceTestBase):
         test_parameters=self.test_parameters,
     )
 
-    nc_test_result_utils.populate_medium_frequency(
-        self.advertiser,
-        self.get_current_iteration_metrics(),
+    sta_frequency = self.get_current_iteration_metrics().get_value(
+        'advertiser_sta_frequency', constants.INVALID_INT
     )
-    # UNKNOWN concurrency mode as DBS status is not able to be detected.
+    if hasattr(self.advertiser, 'supports_dbs_sta_wfd'):
+      supports_dbs = bool(self.advertiser.supports_dbs_sta_wfd)
+      nc_test_result_utils.set_and_assert_p2p_frequency(
+          self.advertiser,
+          self.get_current_iteration_metrics(),
+          is_mcc=not supports_dbs,
+          is_dbs_mode=supports_dbs,
+          sta_frequency=sta_frequency,
+          additional_error_message=(
+              'Check if supports_dbs_sta_wfd is really'
+              f' {supports_dbs} for the target device. If yes, it is a'
+              ' real issue to be fixed. You may work with the chipset'
+              ' vendor.'
+          ),
+      )
+      wifi_concurrency_mode = (
+          constants.WifiConcurrencyMode.SCC_5G
+          if supports_dbs
+          else constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+      )
+    else:
+      nc_test_result_utils.populate_medium_frequency(
+          self.advertiser,
+          self.get_current_iteration_metrics(),
+      )
+      # UNKNOWN concurrency mode as DBS status is not able to be detected.
+      wifi_concurrency_mode = constants.WifiConcurrencyMode.UNKNOWN
+
     nc_test_result_utils.set_and_assert_concurrency_mode(
-        current_concurrency_mode=constants.WifiConcurrencyMode.UNKNOWN,
+        current_concurrency_mode=wifi_concurrency_mode,
         valid_concurrency_modes=[
             constants.WifiConcurrencyMode.UNKNOWN,
+            constants.WifiConcurrencyMode.SCC_5G,
+            constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA,
         ],
         metrics=self.get_current_iteration_metrics(),
     )
     p2p_frequency = self.get_current_iteration_metrics().get_value(
         'medium_frequency', constants.INVALID_INT
     )
-    sta_frequency = self.get_current_iteration_metrics().get_value(
-        'advertiser_sta_frequency', constants.INVALID_INT
-    )
     self.advertiser.log.info(
         'p2p_frequency: %s, sta_frequency: %s, wifi_concurrency_mode: %s',
         p2p_frequency,
         sta_frequency,
-        constants.WifiConcurrencyMode.UNKNOWN.name,
+        wifi_concurrency_mode.name,
     )
 
     # Test Step: Transfer file on the established NC.
     try:
-      single_file_transfer_throughput_kbps = (
-          active_snippet.transfer_file_for_unknown_concurrency_mode(
-              mcc_file_size_kb=nc_constants.NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB,
-              mcc_timeout=constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
-              scc_file_size_kb=nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
-              scc_timeout=constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
-              payload_type=_PAYLOAD_TYPE,
-          )
-      )
+      if wifi_concurrency_mode == constants.WifiConcurrencyMode.SCC_5G:
+        single_file_transfer_throughput_kbps = active_snippet.transfer_file(
+            file_size_kb=nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
+            timeout=constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
+            payload_type=_PAYLOAD_TYPE,
+            num_files=_FILE_TRANSFER_NUM,
+        )
+      elif (
+          wifi_concurrency_mode
+          == constants.WifiConcurrencyMode.MCC_5G_P2P_2G_STA
+      ):
+        single_file_transfer_throughput_kbps = active_snippet.transfer_file(
+            file_size_kb=(
+                nc_constants.NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB
+            ),
+            timeout=constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
+            payload_type=_PAYLOAD_TYPE,
+            num_files=_FILE_TRANSFER_NUM,
+        )
+      else:
+        single_file_transfer_throughput_kbps = active_snippet.transfer_file_for_unknown_concurrency_mode(
+            mcc_file_size_kb=nc_constants.NC_MCC_5G_D2D_2G_STA_TRANSFER_FILE_SIZE_KB,
+            mcc_timeout=constants.WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT,
+            scc_file_size_kb=nc_constants.NC_SCC_5G_TRANSFER_FILE_SIZE_KB,
+            scc_timeout=constants.WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT,
+            payload_type=_PAYLOAD_TYPE,
+        )
       self.get_current_iteration_metrics().record(
           'file_transfer_throughput_kbps',
           single_file_transfer_throughput_kbps,
@@ -245,6 +308,19 @@ class XccWfdDbs2gStaTest(nc_performance_test_base.NcPerformanceTestBase):
           active_snippet.test_failure_reason,
           self.get_current_iteration_metrics(),
           file_transfer_failure_tip=_FILE_TRANSFER_FAILURE_TIP,
+      )
+
+    # Check the throughput and run iperf if needed.
+    if not self.test_parameters.skip_throughput_assertion:
+      low_throughput_tip = (
+          _SCC_THROUGHPUT_LOW_TIP
+          if wifi_concurrency_mode == constants.WifiConcurrencyMode.SCC_5G
+          else _MCC_THROUGHPUT_LOW_TIP
+      )
+      nc_test_result_utils.assert_5g_wifi_throughput_and_run_iperf_if_needed(
+          metrics=self.get_current_iteration_metrics(),
+          nc_test_runtime=self.test_runtime,
+          low_throughput_tip=low_throughput_tip,
       )
 
     prior_bt_snippet.disconnect_endpoint()

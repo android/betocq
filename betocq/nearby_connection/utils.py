@@ -232,7 +232,7 @@ def setup_android_device_for_nc_tests(
   # restart GMS.
 
   for conf in snippet_confs:
-    setup_utils.load_nearby_snippet(ad, conf)
+    setup_utils.load_android_snippet(ad, conf)
 
   if not skip_flag_override:
     setup_utils.clear_hermetic_overrides(ad, restart_gms_process=False)

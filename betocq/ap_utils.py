@@ -14,10 +14,8 @@
 
 """Utilitiess related to control the WiFi environment."""
 
-from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
-
 from betocq import constants
 
 

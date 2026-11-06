@@ -70,6 +70,32 @@ NEARBY_LOG_TAGS = [
     'NearbySetup',
 ]
 
+_NEARBY_SERVICE_COMPONENT = (
+    'com.google.android.gms/.chimera.PersistentApiServiceNoInstantApps'
+)
+_WIFI_HOTSPOT_AVAILABLE_PATTERN = re.compile(
+    r'\[WifiHotspot\]:\s*\n\s*Is Available:\s*(true|false)', re.IGNORECASE
+)
+_SUPPORTS_WIFI_HOTSPOT_FLAG_PATTERN = re.compile(
+    r'\|\s*supports_wifi_hotspot\s*\|\s*(true|false)\s*\|', re.IGNORECASE
+)
+_ACTIVE_INSTRUMENTATION_PATTERN = re.compile(
+    r'ActiveInstrumentation\{[^\s}]+\s+([a-zA-Z0-9._]+)/'
+)
+_ACTIVE_INSTRUMENTATION_TARGET_PATTERN = re.compile(
+    r'targetInfo=ApplicationInfo\{[^\s}]+\s+([a-zA-Z0-9._]+)\}'
+)
+_SNIPPET_INSTRUMENTATION_PATTERN = re.compile(
+    r'^instrumentation:([a-zA-Z0-9._]+)/'
+    r'com\.google\.android\.mobly\.snippet\.SnippetRunner'
+    r'\s+\(target=([a-zA-Z0-9._]+)\)'
+)
+_PLAY_PROTECT_DISABLED_BY_RUNNER_OR_TESTER_KEY = (
+    'play_protect_disabled_by_runner_or_tester'
+)
+_PACKAGE_VERIFIERS_CHECKED_KEY = 'package_verifiers_checked'
+_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY = 'package_verifiers_disabled_by_test'
+
 _WIFI_SCAN_PATTERN = re.compile(
     r"""
         ([0-9a-f:]{17})  # Captures BSSID
@@ -768,6 +794,17 @@ def enable_location_on_device(ad: android_device.AndroidDevice) -> None:
     )
 
 
+def disable_location_on_device(ad: android_device.AndroidDevice) -> None:
+  """Disable location on the given device."""
+  try:
+    ad.adb.shell('cmd location set-location-enabled false')
+  except adb.AdbError:
+    ad.log.exception(
+        'Failed to disable location on the device. Make sure'
+        ' location is disabled in the settings.'
+    )
+
+
 def get_sta_network_id_from_wifi_info(wifi_info: dict[str, Any]) -> int:
   """Get wifi STA network id on the given device."""
   # introduced for unrooted device.
@@ -899,6 +936,115 @@ def is_wifi_direct_supported(ad: android_device.AndroidDevice) -> bool:
   except Exception as e:  # pylint: disable=broad-except
     ad.log.info('WiFi Direct is not supported due to %s', e)
     return False
+
+
+def _parse_wifi_hotspot_nc_dumpsys(
+    ad: android_device.AndroidDevice, out: str
+) -> bool | None:
+  """Parses NearbyConnections dumpsys output for Wi-Fi Hotspot availability."""
+  available_match = _WIFI_HOTSPOT_AVAILABLE_PATTERN.search(out)
+  if available_match and available_match.group(1).lower() == 'false':
+    ad.log.info(
+        'Wi-Fi Hotspot is not available in NearbyConnections dumpsys on %s.',
+        ad.serial,
+    )
+    return False
+  flag_match = _SUPPORTS_WIFI_HOTSPOT_FLAG_PATTERN.search(out)
+  if flag_match and flag_match.group(1).lower() == 'false':
+    ad.log.info(
+        'Flag supports_wifi_hotspot is false in NearbyConnections dumpsys'
+        ' on %s.',
+        ad.serial,
+    )
+    return False
+  if available_match or flag_match:
+    return True
+  return None
+
+
+def is_wifi_hotspot_supported_in_nc_config(
+    ad: android_device.AndroidDevice,
+) -> bool:
+  """Checks if Wi-Fi Hotspot is enabled in GMSCore Nearby Connections config.
+
+  Inspects the NearbyConnectionsChimeraService dumpsys output for the
+  `[WifiHotspot]: Is Available` state and the `supports_wifi_hotspot` Phenotype
+  flag (waking up the service via snippet if needed), falling back to querying
+  phenotype.db on rooted devices if the service has not dumped state yet.
+
+  Args:
+    ad: AndroidDevice, Mobly Android Device.
+
+  Returns:
+    False if Wi-Fi Hotspot is explicitly disabled or unavailable in GMSCore
+    Nearby Connections configuration; True otherwise.
+  """
+  dumpsys_cmd = f'dumpsys activity service {_NEARBY_SERVICE_COMPONENT}'
+  try:
+    out = ad.adb.shell(dumpsys_cmd).decode('utf-8', errors='ignore')
+    parsed = _parse_wifi_hotspot_nc_dumpsys(ad, out)
+    if parsed is not None:
+      return parsed
+
+    # If NearbyConnectionsChimeraService has not been bound yet (e.g. right
+    # after restart_gms), trigger a no-op call on the loaded snippet to bind
+    # the service and re-query dumpsys.
+    try:
+      get_snippet_client(ad, 'stopAllEndpoints').stopAllEndpoints()
+      out = ad.adb.shell(dumpsys_cmd).decode('utf-8', errors='ignore')
+      parsed = _parse_wifi_hotspot_nc_dumpsys(ad, out)
+      if parsed is not None:
+        return parsed
+    except Exception:  # pylint: disable=broad-except
+      pass
+  except adb.AdbError:
+    ad.log.warning(
+        'Failed to query NearbyConnections service dump on %s.',
+        ad.serial,
+        exc_info=True,
+    )
+
+  if ad.is_adb_root:
+    try:
+      sql = (
+          'SELECT boolVal FROM ('
+          'SELECT boolVal, 1 AS priority FROM FlagOverrides '
+          "WHERE packageName LIKE 'com.google.android.gms.nearby%' "
+          "AND name='supports_wifi_hotspot' AND committed=1 "
+          'UNION ALL '
+          'SELECT boolVal, 2 AS priority FROM Flags '
+          "WHERE packageName LIKE 'com.google.android.gms.nearby%' "
+          "AND name='supports_wifi_hotspot' "
+          'ORDER BY priority ASC LIMIT 1);'
+      )
+      res = (
+          ad.adb.shell(
+              'sqlite3 /data/data/com.google.android.gms/databases/phenotype.db'
+              f' "{sql}"'
+          )
+          .decode('utf-8', errors='ignore')
+          .strip()
+      )
+      if res == '0':
+        ad.log.info(
+            'Flag supports_wifi_hotspot is 0 in phenotype.db on %s.', ad.serial
+        )
+        return False
+    except adb.AdbError:
+      ad.log.debug(
+          'Failed to query phenotype.db for supports_wifi_hotspot on %s.',
+          ad.serial,
+          exc_info=True,
+      )
+
+  return True
+
+
+def is_wifi_hotspot_supported(ad: android_device.AndroidDevice) -> bool:
+  """Checks if Wi-Fi Hotspot is supported by hardware and NC configuration."""
+  return is_wifi_direct_supported(
+      ad
+  ) and is_wifi_hotspot_supported_in_nc_config(ad)
 
 
 def _parse_wifi_scan(scan_results: Iterable[str]) -> Sequence[dict[str, Any]]:
@@ -1251,6 +1397,20 @@ def install_overrides(
     ad.log.info('Skipped installing hermetic overrides on unrooted device.')
     return
 
+  try:
+    build_tags = ad.adb.getprop('ro.build.tags')
+    build_fingerprint = ad.adb.getprop('ro.build.fingerprint')
+    if 'release-keys' in build_tags or 'release-keys' in build_fingerprint:
+      ad.log.warning(
+          'Device %s build is signed with release-keys (%s). Phenotype'
+          ' HermeticFileOverridesReader requires dev-keys or test-keys;'
+          ' file-based overrides will be silently rejected by GMS Core.',
+          ad.serial,
+          build_fingerprint or build_tags,
+      )
+  except Exception as e:  # pylint: disable=broad-exception-caught
+    ad.log.warning('Could not check build tags: %s', e)
+
   template_content = _get_resource_contents(_FLAG_SETUP_TEMPLATE_KEY)
   ad.log.info('Installing hermetic overrides from %s', target)
   hermetic_overrides_partner.install_hermetic_overrides(
@@ -1328,18 +1488,108 @@ def get_target_sta_frequency_and_max_link_speed(
   return (sta_frequency, sta_max_link_speed_mbps)
 
 
-# TODO: rename this as load_android_snippet
-def load_nearby_snippet(
+def _decode_adb_shell_output(raw_output: Any) -> str:
+  """Decodes raw `adb.shell` output into a UTF-8 string."""
+  if isinstance(raw_output, bytes):
+    return raw_output.decode('utf-8', errors='ignore')
+  if isinstance(raw_output, str):
+    return raw_output
+  return ''
+
+
+def _get_active_session_snippet_packages(
+    ad: android_device.AndroidDevice,
+) -> set[str]:
+  """Returns snippet package names currently managed by `ad`."""
+  active_packages = set(getattr(ad, 'loaded_snippet_packages', ()))
+  services = getattr(ad, 'services', None)
+  if services is not None and services.has_service_by_name('snippets'):
+    snippet_clients = getattr(services.snippets, '_snippet_clients', {})
+    for client in snippet_clients.values():
+      if isinstance(client.package, str):
+        active_packages.add(client.package)
+  return active_packages
+
+
+def stop_stale_snippets_and_instrumentations(
+    ad: android_device.AndroidDevice,
+) -> None:
+  """Force-stops orphaned instrumentation/snippet packages not managed by `ad`.
+
+  If a previous test run crashed or timed out, its instrumentation process (such
+  as a Mobly `SnippetRunner` launched under `setsid`/`nohup`) can remain alive
+  holding Android's system-wide `UiAutomationService` singleton, causing
+  subsequent snippet `getUiAutomation()` calls to fail with
+  `IllegalStateException: UiAutomationService ... already registered!`.
+
+  Args:
+    ad: The Mobly `AndroidDevice` to clean up.
+  """
+  active_session_packages = _get_active_session_snippet_packages(ad)
+  stale_packages: set[str] = set()
+
+  try:
+    dumpsys_output = _decode_adb_shell_output(
+        ad.adb.shell(['dumpsys', 'activity', 'processes'])
+    )
+    stale_packages.update(
+        _ACTIVE_INSTRUMENTATION_PATTERN.findall(dumpsys_output)
+    )
+    stale_packages.update(
+        _ACTIVE_INSTRUMENTATION_TARGET_PATTERN.findall(dumpsys_output)
+    )
+  except adb.AdbError as err:
+    ad.log.warning('Failed to query active instrumentations: %s', err)
+
+  try:
+    pm_output = _decode_adb_shell_output(
+        ad.adb.shell(['pm', 'list', 'instrumentation'])
+    )
+    for line in pm_output.splitlines():
+      match = _SNIPPET_INSTRUMENTATION_PATTERN.match(line.strip())
+      if match:
+        stale_packages.update(match.groups())
+  except adb.AdbError as err:
+    ad.log.warning('Failed to list snippet instrumentations: %s', err)
+
+  for package_name in sorted(stale_packages - active_session_packages):
+    ad.log.info(
+        'Force-stopping stale instrumentation/snippet package: %s',
+        package_name,
+    )
+    try:
+      ad.adb.shell(['am', 'force-stop', package_name])
+    except adb.AdbError as err:
+      ad.log.warning('Failed to force-stop %s: %s', package_name, err)
+
+
+def load_android_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
-):
-  """Loads a nearby snippet with the given snippet config."""
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> None:
+  """Loads an Android snippet with the given snippet config.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    config: Configuration for the snippet APK and package to load.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+  """
+  stop_stale_snippets_and_instrumentations(ad)
   device_specific_dict = get_betocq_device_specific_info(ad)
 
   if config.apk_path:
     key_apk_installed = config.package_name + '_installed'
     if not device_specific_dict.get(key_apk_installed, False):
       ad.log.info('try to install snippet apk')
+      ensure_package_verifiers_disabled(
+          ad,
+          play_protect_disabled_by_runner_or_tester=(
+              play_protect_disabled_by_runner_or_tester
+          ),
+      )
       apk_utils.install(ad, config.apk_path)
       device_specific_dict[key_apk_installed] = True
   else:
@@ -1360,11 +1610,11 @@ def load_nearby_snippet(
   ad.loaded_snippet_packages.add(config.package_name)
 
 
-def unload_nearby_snippet(
+def unload_android_snippet(
     ad: android_device.AndroidDevice,
     config: constants.SnippetConfig,
-):
-  """Unloads a nearby snippet with the given snippet config."""
+) -> None:
+  """Unloads an Android snippet with the given snippet config."""
   device_specific_dict = get_betocq_device_specific_info(ad)
   key_apk_installed = config.package_name + '_installed'
   key_permission_granted = (
@@ -1632,10 +1882,10 @@ def abort_if_wifi_hotspot_not_supported(
 ) -> None:
   """Aborts test class if any device does not support Wi-Fi Hotspot."""
   for ad in ads:
-    # We are checking Wi-Fi Direct capability here because Wi-Fi Hotspot is
-    # implemented using Wi-Fi Direct in NC.
+    # Wi-Fi Hotspot in NC is implemented using Wi-Fi Direct (SoftAP/P2P GO) and
+    # gated by the Nearby Connections `supports_wifi_hotspot` configuration.
     asserts.abort_class_if(
-        not is_wifi_direct_supported(ad),
+        not is_wifi_hotspot_supported(ad),
         f'Wifi Hotspot is not supported on the device {ad}.',
     )
 
@@ -1882,12 +2132,35 @@ def get_wifi_firmware_version(
   return version
 
 
-def disable_package_verifiers(ad: android_device.AndroidDevice):
-  """Disables package verifier and Play Protect for ADB installs."""
+def is_wifi_chipset_model_resolvable(wifi_fw: str) -> bool:
+  """Returns whether the Wi-Fi chipset model is resolvable from `wifi_fw`."""
+  cleaned = wifi_fw.strip()
+  if not cleaned or cleaned.lower() in (
+      'adb error',
+      'na',
+      'n/a',
+      'none',
+      'null',
+      'unknown',
+      'value',
+  ):
+    return False
+  return any(char.isalpha() for char in cleaned)
+
+
+def disable_package_verifiers(ad: android_device.AndroidDevice) -> bool:
+  """Disables package verifier and Play Protect for ADB installs.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+
+  Returns:
+    True if package verifiers were disabled, or False if skipped or failed.
+  """
   try:
     if not ad.is_adb_root:
       ad.log.info('Device is not rooted. Skipping disabling package verifiers.')
-      return
+      return False
     ad.log.info(
         'Device is in Root. Disabling package verifier and Play Protect for ADB'
         ' installs.'
@@ -1897,10 +2170,12 @@ def disable_package_verifiers(ad: android_device.AndroidDevice):
         ['settings', 'put', 'global', 'verifier_verify_adb_installs', '0']
     )
     ad.adb.shell(['settings', 'put', 'global', 'verifier_engprod', '1'])
+    return True
   except adb.AdbError as e:
     ad.log.error(
-        f'Failed to disable package verifiers: {e} on device {ad.serial}.'
+        'Failed to disable package verifiers: %s on device %s.', e, ad.serial
     )
+    return False
 
 
 def enable_package_verifiers(ad: android_device.AndroidDevice):
@@ -1926,7 +2201,208 @@ def enable_package_verifiers(ad: android_device.AndroidDevice):
 
 def is_cuttlefish(device: android_device.AndroidDevice) -> bool:
   """Returns true if the device is a cuttlefish emulator."""
-  return device.build_info['hardware'] == 'cutf_cvm'
+  return (device.build_info or {}).get('hardware') == 'cutf_cvm'
+
+
+def is_emulator(ad: android_device.AndroidDevice) -> bool:
+  """Returns True if the device is an emulator."""
+  build_info = ad.build_info or {}
+  return (
+      bool(getattr(ad, 'is_emulator', False))
+      or is_cuttlefish(ad)
+      or build_info.get('hardware') in ('ranchu', 'goldfish')
+      or build_info.get('build_characteristics') == 'emulator'
+  )
+
+
+def set_play_protect_disabled_by_runner_or_tester(
+    ad: android_device.AndroidDevice,
+    disabled: bool,
+) -> None:
+  """Records whether config says Play Protect was disabled by runner/tester.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    disabled: Whether Play Protect is considered disabled by the test runner or
+      tester.
+  """
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  device_specific_dict[_PLAY_PROTECT_DISABLED_BY_RUNNER_OR_TESTER_KEY] = bool(
+      disabled
+  )
+  if disabled:
+    device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+
+
+def is_play_protect_disabled_by_runner_or_tester(
+    ad: android_device.AndroidDevice,
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> bool:
+  """Returns True if config says Play Protect was disabled by runner/tester.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+
+  Returns:
+    True if Play Protect was recorded or configured as disabled by the test
+    runner or tester, False otherwise.
+  """
+  if play_protect_disabled_by_runner_or_tester is not None:
+    return bool(play_protect_disabled_by_runner_or_tester)
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  return bool(
+      device_specific_dict.get(
+          _PLAY_PROTECT_DISABLED_BY_RUNNER_OR_TESTER_KEY, False
+      )
+  )
+
+
+def are_package_verifiers_disabled(ad: android_device.AndroidDevice) -> bool:
+  """Returns True if ADB install package verification is already disabled."""
+  try:
+    raw_value = _decode_adb_shell_output(
+        ad.adb.shell(
+            ['settings', 'get', 'global', 'verifier_verify_adb_installs']
+        )
+    ).strip()
+  except adb.AdbError as err:
+    ad.log.warning(
+        'Failed to query package verifier state on %s: %s', ad.serial, err
+    )
+    return False
+  try:
+    return int(raw_value) <= 0
+  except ValueError:
+    return False
+
+
+def ensure_package_verifiers_disabled(
+    ad: android_device.AndroidDevice,
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> None:
+  """Checks and disables package verifiers on `ad` if enabled.
+
+  When `play_protect_disabled_by_runner_or_tester` is configured as True
+  (indicating the test runner or tester has already disabled Play Protect, such
+  as on Mobile Harness), skips all checks, toggles, and warnings.
+
+  Otherwise, checks `verifier_verify_adb_installs` on `ad`:
+  - If package verifiers are already disabled, leaves them untouched (logging a
+    one-time informational reminder on physical devices).
+  - If enabled on an emulator, roots `ad` if needed and disables package
+    verifiers without recording a manual Play Protect teardown warning.
+  - If enabled on a rooted physical device, disables package verifiers and
+    records that this test run disabled them so `teardown_class` can warn the
+    tester to re-enable Play Protect manually after testing completes.
+  - If enabled on an unrooted physical device, logs a warning without rooting.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+  """
+  if is_play_protect_disabled_by_runner_or_tester(
+      ad, play_protect_disabled_by_runner_or_tester
+  ):
+    ad.log.debug(
+        'Skipping package verifier check on %s'
+        ' (play_protect_disabled_by_runner_or_tester is True in config).',
+        ad.serial,
+    )
+    return
+
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  already_checked = device_specific_dict.get(
+      _PACKAGE_VERIFIERS_CHECKED_KEY, False
+  )
+  is_emulator_device = is_emulator(ad)
+
+  if are_package_verifiers_disabled(ad):
+    if not already_checked:
+      device_specific_dict[_PACKAGE_VERIFIERS_CHECKED_KEY] = True
+      device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+      if is_emulator_device:
+        ad.log.debug(
+            'Package verifiers are already disabled on emulator %s.', ad.serial
+        )
+      else:
+        ad.log.info(
+            'Package verifiers are already disabled on device %s (possibly from'
+            ' a previous test run or disabled by the test runner); leaving as'
+            ' is. You may need to re-enable Google Play Protect manually after'
+            ' testing, or set `play_protect_disabled_by_runner_or_tester: True`'
+            ' in the test config if kept disabled intentionally.',
+            ad.serial,
+        )
+    return
+
+  if not ad.is_adb_root and is_emulator_device:
+    ad.adb.root()
+
+  if not ad.is_adb_root:
+    if not already_checked:
+      device_specific_dict[_PACKAGE_VERIFIERS_CHECKED_KEY] = True
+      ad.log.warning(
+          'Package verifiers are enabled on unrooted device %s; cannot disable'
+          ' automatically without root. Please disable Google Play Protect'
+          ' manually if APK installation fails.',
+          ad.serial,
+      )
+    return
+
+  if disable_package_verifiers(ad):
+    device_specific_dict[_PACKAGE_VERIFIERS_CHECKED_KEY] = True
+    if is_emulator_device:
+      device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+    else:
+      device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = True
+      ad.log.warning(
+          'Package verifiers were enabled on device %s and have been disabled'
+          ' for APK installation. Remember to re-enable Google Play Protect'
+          ' manually after all tests finish (or set'
+          ' `play_protect_disabled_by_runner_or_tester: True` in the test'
+          ' config if you keep them disabled intentionally).',
+          ad.serial,
+      )
+
+
+def warn_if_package_verifiers_disabled_by_test(
+    ad: android_device.AndroidDevice,
+    play_protect_disabled_by_runner_or_tester: bool | None = None,
+) -> None:
+  """Logs a warning if this test run disabled package verifiers on `ad`.
+
+  Args:
+    ad: The Mobly `AndroidDevice` instance.
+    play_protect_disabled_by_runner_or_tester: Optional override for the config
+      flag. If None, falls back to querying the device customized info
+      dictionary.
+  """
+  if is_emulator(ad) or is_play_protect_disabled_by_runner_or_tester(
+      ad, play_protect_disabled_by_runner_or_tester
+  ):
+    return
+  device_specific_dict = get_betocq_device_specific_info(ad)
+  if device_specific_dict.get(_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY, False):
+    device_specific_dict[_PACKAGE_VERIFIERS_DISABLED_BY_TEST_KEY] = False
+    ad.log.warning(
+        'Package verifiers (Google Play Protect) were disabled by this test run'
+        ' on device %s and remain disabled. Please re-enable them manually'
+        ' after all tests finish (Play Store -> Play Protect, or run `adb -s'
+        ' %s shell settings put global verifier_verify_adb_installs 1`, `adb'
+        ' -s %s shell settings put global package_verifier_enable 1`, and `adb'
+        ' -s %s shell settings put global verifier_engprod 0`), or set'
+        ' `play_protect_disabled_by_runner_or_tester: True` in the test config'
+        ' to suppress this warning if kept disabled intentionally.',
+        ad.serial,
+        ad.serial,
+        ad.serial,
+        ad.serial,
+    )
 
 
 def is_screen_locked(device: android_device.AndroidDevice) -> bool:

@@ -21,8 +21,11 @@ from collections.abc import Mapping
 import dataclasses
 import datetime
 import logging
+import types
+from typing import NoReturn
 
 from mobly import asserts
+from mobly import base_suite
 from mobly import base_test
 from mobly import records
 from mobly import signals
@@ -64,6 +67,28 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
   metrics_helper_class = metrics.MetricsHelper
   script_version: str = version.TEST_SCRIPT_VERSION
+  _registered_test_classes: set[str] = set()
+
+  @classmethod
+  def register_test_class(
+      cls, test_class: type[base_test.BaseTestClass] | str
+  ) -> None:
+    """Registers a test class in the suite-wide registry."""
+    name = test_class if isinstance(test_class, str) else test_class.__name__
+    cls._registered_test_classes.add(name)
+
+  @classmethod
+  def is_test_class_registered(
+      cls, test_class: type[base_test.BaseTestClass] | str
+  ) -> bool:
+    """Returns whether `test_class` is registered in the current test run."""
+    name = test_class if isinstance(test_class, str) else test_class.__name__
+    return name in cls._registered_test_classes
+
+  @classmethod
+  def clear_registered_test_classes(cls) -> None:
+    """Clears all registered test classes."""
+    cls._registered_test_classes.clear()
 
   # Configuration parameters
 
@@ -115,6 +140,82 @@ class PerformanceTestBase(base_test.BaseTestClass):
     super().__init__(configs)
     self.is_using_gms_api = False
     self.metrics_helper = self.metrics_helper_class(self)
+    # Populated by `setup_class`, but initialized here so that the teardown
+    # path can rely on it even when `setup_class` aborted before reaching it.
+    self._scenario_configs = {}
+    # Scenarios (i.e. test methods) that decided at runtime that their
+    # remaining iterations must not be executed, mapped to the skip reason.
+    # See `skip_remaining_iterations`.
+    self._skip_reason_by_scenario: dict[str, str] = {}
+
+  @property
+  def skipped_scenarios(self) -> Mapping[str, str]:
+    """Scenarios that asked to skip their remaining iterations, and why."""
+    return types.MappingProxyType(self._skip_reason_by_scenario)
+
+  def _get_base_scenario_name(self, test_name: str) -> str:
+    """Maps a Mobly test name to its scenario (i.e. test method) name.
+
+    Repeated tests are reported by Mobly as `<test_method>_<iteration>`, while
+    the scenario bookkeeping is keyed by the test method name.
+
+    Args:
+      test_name: The Mobly test name, with or without a repeat suffix.
+
+    Returns:
+      The test method name the given test name belongs to.
+    """
+    if test_name in self._scenario_configs:
+      return test_name
+    base, _, suffix = test_name.rpartition('_')
+    if base and suffix.isdigit():
+      return base
+    return test_name
+
+  def skip_remaining_iterations(self, reason: str) -> NoReturn:
+    """Skips the current iteration and every iteration of the same test method.
+
+    Use this when a condition discovered *during* a test proves that the
+    scenario must not be executed on this testbed at all, e.g. the scenario
+    turns out to be a duplicate of another test case. The framework then:
+
+    -   marks the current iteration as SKIP (via the standard Mobly skip
+        signal);
+    -   short-circuits every subsequent iteration of the *same* test method in
+        `setup_test`, so no device interaction happens;
+    -   reports the scenario as skipped in `teardown_class` and bypasses its
+        success-rate assertion.
+
+    Only the calling test method is affected. Other test methods of the same
+    class keep running and are still judged on their own results.
+
+    Because the decision is about the scenario itself and not about the device
+    under test, it intentionally overrides the BeToCQ verdict of iterations of
+    that scenario that already ran, including failed ones.
+
+    Note that only the BeToCQ verdict is overridden. Mobly has already written
+    the record of each finished iteration to its summary file by the time the
+    skip is requested, so an iteration that failed before the request keeps
+    being reported as failed by Mobly and in Sponge, and the runner still
+    exits non-zero. Only the class-level assertion in `teardown_class` is
+    bypassed.
+
+    Args:
+      reason: Human readable explanation, reported as the skip reason.
+
+    Raises:
+      ValueError: If called outside of a test method, where the scenario to
+        skip cannot be determined. Use `abort_class`/`skip_if` instead.
+      signals.TestSkip: Otherwise, to end the current iteration as skipped.
+    """
+    if self.current_test_info is None:
+      raise ValueError(
+          'skip_remaining_iterations must be called from a test method; use'
+          ' abort_class or skip_if to bypass the whole class.'
+      )
+    scenario_name = self._get_base_scenario_name(self.current_test_info.name)
+    self._skip_reason_by_scenario[scenario_name] = reason
+    raise signals.TestSkip(reason)
 
   def get_success_rate(self, scenario_name: str) -> float:
     """Returns the success rate target for a scenario.
@@ -129,6 +230,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
     return 1.0
 
   def setup_class(self) -> None:
+    self.register_test_class(self.__class__)
     self.metrics_manager = metrics.MetricsManager(
         self.TAG, metric_registry=self._metric_registry  # pyrefly: ignore[bad-argument-type]
     )
@@ -199,19 +301,17 @@ class PerformanceTestBase(base_test.BaseTestClass):
   def setup_test(self) -> None:
     if self.current_test_info is None:
       raise ValueError('current_test_info is None')
-    scenario_name = self.current_test_info.name
-    # Strip Mobly repeat suffix if present
-    parts = scenario_name.rsplit('_', 1)
-    base_scenario_name = scenario_name
-    if (
-        scenario_name not in self._scenario_configs
-        and len(parts) == 2
-        and parts[1].isdigit()
-        and parts[0] in self._scenario_configs
-    ):
-      base_scenario_name = parts[0]
+    test_name = self.current_test_info.name
+    base_scenario_name = self._get_base_scenario_name(test_name)
+    skip_reason = self._skip_reason_by_scenario.get(base_scenario_name)
+    if skip_reason is not None:
+      # A previous iteration of this test method determined that the scenario
+      # must not run. Skip before any device interaction happens. `on_skip`
+      # creates the iteration collector for the record.
+      logging.info('Skipping %s: %s', test_name, skip_reason)
+      raise signals.TestSkip(skip_reason)
     self.metrics_manager.start_iteration(
-        base_scenario_name, test_name=scenario_name
+        base_scenario_name, test_name=test_name
     )
     self.get_current_iteration_metrics().record(
         'start_time', datetime.datetime.now()
@@ -230,9 +330,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
   ) -> metrics.MetricsCollector | None:
     """Returns the collector matching the current test record, or None if bypassed."""
     metrics_mgr = getattr(self, 'metrics_manager', None)
-    if (
-        not metrics_mgr
-        or not getattr(metrics_mgr, 'iteration_collectors', None)
+    if not metrics_mgr or not getattr(
+        metrics_mgr, 'iteration_collectors', None
     ):
       return None
     col = metrics_mgr.iteration_collectors[-1]
@@ -344,6 +443,10 @@ class PerformanceTestBase(base_test.BaseTestClass):
     test class is considered failed. Scenarios with zero adjusted iterations
     (i.e., all iterations were skipped) are bypassed.
 
+    If a scenario requested `skip_remaining_iterations`, it is not applicable
+    to this testbed and is excluded from the verdict. Other scenarios of the
+    same class are still evaluated.
+
     Returns:
       True if all scenarios that had executed iterations meet their configured
       success rate targets, False otherwise.
@@ -351,9 +454,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
     # Group iteration collectors by scenario name
     scenario_collectors = collections.defaultdict(list)
     metrics_mgr = getattr(self, 'metrics_manager', None)
-    if (
-        not metrics_mgr
-        or not getattr(metrics_mgr, 'iteration_collectors', None)
+    if not metrics_mgr or not getattr(
+        metrics_mgr, 'iteration_collectors', None
     ):
       logging.info('is_test_class_passed: False (No iterations executed)')
       return False
@@ -368,6 +470,14 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
     # Verify each scenario independently
     for scenario_name, collectors in scenario_collectors.items():
+      if scenario_name in self._skip_reason_by_scenario:
+        logging.info(
+            'is_test_class_passed - Scenario "%s": SKIP (skip requested: %s)',
+            scenario_name,
+            self._skip_reason_by_scenario[scenario_name],
+        )
+        continue
+
       config = self._scenario_configs.get(scenario_name)
       if config is None:
         continue
@@ -431,9 +541,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
     """
     scenario_collectors = collections.defaultdict(list)
     metrics_mgr = getattr(self, 'metrics_manager', None)
-    if (
-        not metrics_mgr
-        or not getattr(metrics_mgr, 'iteration_collectors', None)
+    if not metrics_mgr or not getattr(
+        metrics_mgr, 'iteration_collectors', None
     ):
       logging.info('get_test_class_result_message: FAIL (Zero finished tests)')
       return 'FAIL: Test did not execute any iterations. Zero finished tests.'
@@ -449,6 +558,11 @@ class PerformanceTestBase(base_test.BaseTestClass):
     all_passed = True
 
     for scenario_name, collectors in scenario_collectors.items():
+      skip_reason = self._skip_reason_by_scenario.get(scenario_name)
+      if skip_reason is not None:
+        scenario_messages.append(f'[{scenario_name}] SKIP: {skip_reason}')
+        continue
+
       config = self._scenario_configs.get(scenario_name)
       if config is None:
         scenario_messages.append(f'[{scenario_name}] PASS')
@@ -493,7 +607,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
     any_skipped = any('SKIP' in msg for msg in scenario_messages)
     all_skipped = all('SKIP' in msg for msg in scenario_messages)
 
-    if all_skipped:
+    if all_skipped and not self._skip_reason_by_scenario:
       logging.info('get_test_class_result_message: SKIP')
       return 'SKIP'
 
@@ -512,11 +626,7 @@ class PerformanceTestBase(base_test.BaseTestClass):
   def on_skip(self, record: records.TestResultRecord) -> None:
     completed_metrics = self._get_active_collector(record)
     if completed_metrics is None:
-      scenario_name = record.test_name
-      parts = scenario_name.rsplit('_', 1)
-      base_scenario_name = (
-          parts[0] if len(parts) == 2 and parts[1].isdigit() else scenario_name
-      )
+      base_scenario_name = self._get_base_scenario_name(record.test_name)
       self.metrics_manager.start_iteration(
           scenario_name=base_scenario_name, test_name=record.test_name
       )
@@ -539,6 +649,49 @@ class PerformanceTestBase(base_test.BaseTestClass):
       self.metrics_manager.end_iteration()
     super().on_skip(record)
 
+  def _is_full_class_skipped(self) -> bool:
+    """Whether every test of the class was bypassed without ever running.
+
+    This is the shape produced by an intentional class-level bypass, e.g.
+    `abort_class_if` in `setup_class`. The caller additionally requires an
+    intentional TestAbortClass or TestSkip termination signal, to distinguish
+    this from an unexpected crash.
+
+    Comparing the number of skipped records against the number of requested
+    tests is not sufficient, for two reasons.
+
+    First, `requested` holds one entry per test *method*, while `skipped` holds
+    one record per *iteration*, so in a class with several test methods the two
+    counts can match by pure coincidence: one method skipping all of its
+    iterations while another one genuinely fails would be read as a full class
+    bypass and hide the failure. Requiring every requested test method to own a
+    skipped record rules that out, as a method that ran is not covered by a
+    skipped record.
+
+    Second, Mobly also generates skipped records for the remaining tests when a
+    test aborts the run mid-flight, e.g. `abort_all` raised from a running
+    iteration. Iterations did run then and produced real results, so the class
+    must be judged on those results rather than reported as skipped. Requiring
+    an empty `executed` list keeps this limited to classes that never started
+    an iteration.
+
+    Returns:
+      True if the class was bypassed in full before any iteration ran.
+    """
+    requested_tests = self.results.requested
+    scenarios_with_skipped_records = {
+        self._get_base_scenario_name(record.test_name)
+        for record in self.results.skipped
+    }
+    logging.info('requested_tests: %s', requested_tests)
+    logging.info('skipped_tests: %s', self.results.skipped)
+    return (
+        bool(requested_tests)
+        and not self.results.executed
+        and len(self.results.skipped) == len(requested_tests)
+        and set(requested_tests).issubset(scenarios_with_skipped_records)
+    )
+
   @override
   def teardown_class(self) -> None:
     try:
@@ -559,24 +712,31 @@ class PerformanceTestBase(base_test.BaseTestClass):
             ' metadata.'
         )
 
-      # Verify if the entire class execution was bypassed intentionally.
-      # If the number of skipped tests equals the total requested tests, it
-      # definitively proves a full-class bypass. Additionally, ensure at least
-      # one skipped record carries an intentional TestAbortClass or TestSkip
-      # termination signal (or details string) to distinguish from unexpected
-      # crashes.
-      requested_tests = getattr(self.results, 'requested', [])
-      is_full_class_skipped = requested_tests and len(
-          self.results.skipped
-      ) == len(requested_tests)
+      is_full_class_skipped = self._is_full_class_skipped()
       has_errors = len(getattr(self.results, 'error', [])) > 0
       logging.info('results: %s', self.results)
-      logging.info('requested_tests: %s', requested_tests)
-      logging.info('skipped_tests: %s', self.results.skipped)
       logging.info('is_full_class_skipped: %s', is_full_class_skipped)
       logging.info('has_errors: %s', has_errors)
+
+      # Test methods can dynamically request that their remaining iterations
+      # be skipped (e.g. the scenario turned out to be a duplicate of another
+      # test case). This is a deliberate bypass of the scenario itself, so it
+      # takes precedence over any iteration results collected before the
+      # request, including failures. The per-scenario flags are recorded on
+      # the scenario collectors further below.
+      if self._skip_reason_by_scenario:
+        logging.info(
+            'Scenarios requested to skip their remaining iterations: %s.'
+            ' Bypassing their assertions.',
+            self._skip_reason_by_scenario,
+        )
+      all_scenarios_skipped = bool(self._skip_reason_by_scenario) and all(
+          scenario_name in self._skip_reason_by_scenario
+          for scenario_name in self.metrics_manager.scenario_metrics
+      )
+
       intentional_skip_or_abort = False
-      if is_full_class_skipped and not has_errors:
+      if not all_scenarios_skipped and is_full_class_skipped and not has_errors:
         for r in self.results.skipped:
           logging.info('skipped record: %s', r.__dict__)
           result_str = getattr(r, 'result', '')
@@ -586,8 +746,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
 
       if intentional_skip_or_abort:
         logging.info(
-            'Class setup intentionally bypassed via abort_if/skip_if. Bypassing'
-            ' scenario assertions.'
+            'Class setup intentionally bypassed via abort_if/skip_if.'
+            ' Bypassing scenario assertions.'
         )
         self.metrics_manager.class_metrics.record('test_result', 'SKIP')
 
@@ -608,6 +768,10 @@ class PerformanceTestBase(base_test.BaseTestClass):
         self.metrics_helper.record_scenario_teardown_metrics(
             scenario_name, collector
         )
+        scenario_skip_reason = self._skip_reason_by_scenario.get(scenario_name)
+        collector.record('scenario_skipped', scenario_skip_reason is not None)
+        if scenario_skip_reason is not None:
+          collector.record('scenario_skip_reason', scenario_skip_reason)
         failed_count = 0
         failed_details = []
 
@@ -690,7 +854,8 @@ class PerformanceTestBase(base_test.BaseTestClass):
             mobly_display_group='test_stats',
         )
 
-      # Format final detailed result message
+      # Format final detailed result message. Scenarios that requested a skip
+      # are reported as `SKIP: <reason>` by the summary builder itself.
       final_result_message = self.get_test_class_result_message()
 
       # Record the complete detailed result message string inside 'test_result'
@@ -751,3 +916,25 @@ class FunctionTestBase(PerformanceTestBase):
     return self.metrics_helper.get_mobly_formatter(
         include_scenario_metrics=False
     )
+
+
+class BaseTestSuite(base_suite.BaseSuite):
+  """Base suite class that registers active test classes in the registry."""
+
+  def __init__(self, runner, config) -> None:
+    super().__init__(runner, config)
+    PerformanceTestBase.clear_registered_test_classes()
+
+  @override
+  def add_test_class(
+      self, clazz, config=None, tests=None, name_suffix=None
+  ) -> None:
+    super().add_test_class(
+        clazz, config=config, tests=tests, name_suffix=name_suffix
+    )
+    if (
+        not self._test_selector
+        or (clazz.__name__, name_suffix) in self._test_selector
+        or clazz.__name__ in self._test_selector
+    ):
+      PerformanceTestBase.register_test_class(clazz)

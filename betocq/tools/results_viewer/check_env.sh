@@ -1,0 +1,71 @@
+#!/bin/bash
+# BeToCQ Result Viewer - Environment Status Check Script
+# Checks host OS, Xcode & command line tools, codesigning identities,
+# CoreDevice & connected devices, Python runtime, background services, and firewall tunnels.
+
+echo "========================================================"
+echo "=== 1. HOST OS & HARDWARE ==="
+echo "========================================================"
+sw_vers 2>&1 || echo "sw_vers: not available (non-macOS host)"
+uname -a
+
+echo ""
+echo "========================================================"
+echo "=== 2. XCODE & COMMAND LINE TOOLS ==="
+echo "========================================================"
+echo "xcode-select path: $(xcode-select -p 2>&1 || echo 'not found')"
+echo "xcodebuild version:"
+xcodebuild -version 2>&1 || echo "xcodebuild: not found or failed"
+echo "CLTools package:"
+pkgutil --pkg-info=com.apple.pkg.CLTools_Executables 2>/dev/null | grep -E "version|install-time" || echo "CLTools package not registered"
+echo "Installed Xcode applications:"
+ls -ld /Applications/Xcode*.app 2>/dev/null || echo "None found in /Applications"
+
+echo ""
+echo "========================================================"
+echo "=== 3. CODESIGNING IDENTITIES ==="
+echo "========================================================"
+security find-identity -v -p codesigning 2>&1 || echo "security: not available or failed"
+
+echo ""
+echo "========================================================"
+echo "=== 4. COREDEVICE & DEVICES ==="
+echo "========================================================"
+echo "devicectl binary: $(xcrun --find devicectl 2>&1 || echo 'not found')"
+echo "devicectl list devices:"
+xcrun devicectl list devices 2>&1 | head -n 20 || echo "devicectl failed"
+echo "idevice_id list:"
+which idevice_id 2>/dev/null && idevice_id -l 2>&1 || echo "idevice_id: not found"
+
+echo ""
+echo "========================================================"
+echo "=== 5. PYTHON RUNTIME ==="
+echo "========================================================"
+echo "which python3: $(which python3 2>&1)"
+echo "python3 version: $(python3 --version 2>&1)"
+echo "sys.executable: $(python3 -c 'import sys; print(sys.executable)' 2>&1)"
+echo "Environment variables:"
+env | grep -E "^(PYTHON|VIRTUAL_ENV|DEVELOPER_DIR|SDKROOT|PATH)" | head -n 5
+
+echo ""
+echo "========================================================"
+echo "=== 6. UTILITIES & SERVICES ==="
+echo "========================================================"
+echo "idevice_id -l (USB):"
+idevice_id -l 2>&1 || echo "None found"
+echo "idevice_id -n (Network):"
+idevice_id -n 2>&1 || echo "None found"
+which adb 2>/dev/null && adb version 2>&1 | head -n 2 || echo "adb: not found"
+echo "Connected ADB devices:"
+which adb 2>/dev/null && adb devices -l 2>&1 || echo "adb devices: not found"
+echo "Running daemons:"
+ps aux | grep -E "usbmuxd|remotepairingd|CoreDeviceService" | grep -v grep || echo "None running"
+
+echo ""
+echo "========================================================"
+echo "=== 7. FIREWALL & TUNNELS ==="
+echo "========================================================"
+/usr/libexec/ApplicationFirewall/socketfilterfw --getglobalstate 2>&1 || echo "socketfilterfw: not available"
+echo "Active utun tunnel interfaces:"
+ifconfig 2>/dev/null | grep -E "^utun[0-9]+" || ip link show 2>/dev/null | grep -E "utun" || echo "None found"
+echo "========================================================"

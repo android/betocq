@@ -169,7 +169,7 @@ class NearbyConnectionV3Wrapper:
         )
     )
     self._endpoint_info = device_found_event.data['endpointInfo']
-    self.connection_quality_info.discovery_latency = datetime.timedelta(  # pyrefly: ignore[bad-assignment]
+    self.connection_quality_info.discovery_latency = datetime.timedelta(
         microseconds=device_found_event.data['discoveryTimeNs'] / 1_000
     )
 
@@ -217,7 +217,7 @@ class NearbyConnectionV3Wrapper:
             'onConnectionInitiated', timeout.total_seconds()
         )
     )
-    self.connection_quality_info.connection_latency = datetime.timedelta(  # pyrefly: ignore[bad-assignment]
+    self.connection_quality_info.connection_latency = datetime.timedelta(
         microseconds=d_connection_init_event.data['connectionTimeNs'] / 1_000
     )
 
@@ -320,11 +320,11 @@ class NearbyConnectionV3Wrapper:
         self._connection_medium.to_connection_medium()
     )
     self.connection_quality_info.upgrade_medium = (
-        constants.NearbyConnectionMedium(  # pyrefly: ignore[bad-assignment]
+        constants.NearbyConnectionMedium(
             discoverer_medium_connection_event.data['medium']
         )
     )
-    self.connection_quality_info.medium_upgrade_latency = datetime.timedelta(  # pyrefly: ignore[bad-assignment]
+    self.connection_quality_info.medium_upgrade_latency = datetime.timedelta(
         microseconds=discoverer_medium_connection_event.data['upgradeTimeNs']
         / 1_000
     )
@@ -333,11 +333,11 @@ class NearbyConnectionV3Wrapper:
       return
 
     if discoverer_medium_connection_event.data['isHighBwQuality']:
-      self.connection_quality_info.medium_upgrade_expected = True  # pyrefly: ignore[bad-assignment]
+      self.connection_quality_info.medium_upgrade_expected = True
       return
 
     self.test_failure_reason = (
-        constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE  # pyrefly: ignore[bad-assignment]
+        constants.SingleTestFailureReason.WIFI_MEDIUM_UPGRADE
     )
     upgrade_start_time = time.monotonic()
     end_time = (
@@ -356,16 +356,16 @@ class NearbyConnectionV3Wrapper:
       )
       if discoverer_medium_upgrade_event.data['isHighBwQuality']:
         self.connection_quality_info.medium_upgrade_latency = (
-            datetime.timedelta(  # pyrefly: ignore[bad-assignment]
+            datetime.timedelta(
                 seconds=time.monotonic() - upgrade_start_time
             )
         )
         self.connection_quality_info.upgrade_medium = (
-            constants.NearbyConnectionMedium(  # pyrefly: ignore[bad-assignment]
+            constants.NearbyConnectionMedium(
                 discoverer_medium_upgrade_event.data['medium']
             )
         )
-        self.connection_quality_info.medium_upgrade_expected = True  # pyrefly: ignore[bad-assignment]
+        self.connection_quality_info.medium_upgrade_expected = True
         self._discoverer.log.info(
             'upgraded to high quality medium: %s',
             self.connection_quality_info.upgrade_medium.name,

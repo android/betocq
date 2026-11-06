@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BeToCQ Test Explorer</title>
+  <title>BeToCQ Result Viewer</title>
   <script src="https://www.gstatic.com/antigravity/web/dev/tailwindcss.min.js"></script>
   <style>
     /* Custom scrollbars */
@@ -43,7 +43,10 @@
     <div class="flex items-center gap-4">
       <div class="w-14 h-14 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-semibold text-2xl shadow-md">B</div>
       <div>
-        <h1 class="text-xl font-semibold tracking-tight">BeToCQ Test Explorer</h1>
+        <div class="flex items-center gap-2.5">
+          <h1 class="text-xl font-semibold tracking-tight">BeToCQ Result Viewer</h1>
+          <span id="app-version" class="bg-blue-100 text-blue-700 text-xs font-semibold px-2 py-0.5 rounded-full border border-blue-200 shadow-xs">v{{VERSION}}</span>
+        </div>
         <p class="text-sm text-gray-500 mt-0.5">Local results dashboard, hierarchical breakdown & hierarchical artifacts tree</p>
       </div>
     </div>
@@ -58,113 +61,337 @@
   <!-- Top Notification / Status Banner (Visible when replacing/uploading a new folder) -->
   <div id="top-upload-status" class="hidden mb-6 p-4 rounded-2xl text-sm font-semibold flex items-center justify-between border shadow-sm transition-all"></div>
 
-  <!-- Upload Section (if no data) -->
-  <div id="upload-section" class="bg-white border border-gray-200 rounded-3xl p-10 mb-6 text-center border-dashed border-2 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors">
-    <div class="flex flex-col items-center justify-center gap-2">
-      <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
-      <h3 class="text-lg font-semibold text-gray-700">Upload Mobly Zip Results</h3>
-      <p class="text-sm text-gray-500">Drag and drop a .zip file, or click anywhere in this box to select</p>
-      <input type="file" id="file-input" class="hidden" accept=".zip" />
+  <!-- High-Level Primary Navigation: 2 High-Level Tabs (Result Viewer & Setup Wizard) -->
+  <div class="flex items-center justify-between border-b-2 border-gray-200 mb-5">
+    <div class="flex items-center gap-2">
+      <button onclick="switchMainTab('results_viewer')" id="main-tab-results" class="main-tab-btn px-6 py-3 font-bold text-sm tracking-tight transition-all text-blue-600 border-b-2 border-blue-600 -mb-[2px] flex items-center gap-2.5 cursor-pointer">
+        <span class="text-base">📊</span>
+        <span>Result Viewer</span>
+      </button>
+      <button onclick="switchMainTab('setup_wizard')" id="main-tab-setup" class="main-tab-btn px-6 py-3 font-bold text-sm tracking-tight transition-all text-gray-500 hover:text-gray-900 border-b-2 border-transparent -mb-[2px] flex items-center gap-2.5 cursor-pointer">
+        <span class="text-base">🧙</span>
+        <span>Setup Wizard</span>
+        <span id="setup-nav-badge" class="hidden w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+      </button>
     </div>
-    <div id="upload-status" class="mt-4 text-sm font-semibold hidden"></div>
   </div>
 
-  <div id="main-content" class="flex-1 flex flex-col hidden">
-      <!-- Tabs -->
+  <!-- Main Content Panels -->
+  <main class="flex-1 flex flex-col">
+    <!-- ======================================================== -->
+    <!-- 1. RESULT VIEWER (Primary Section) -->
+    <!-- ======================================================== -->
+    <div id="section-results_viewer" class="main-section flex-1 flex flex-col">
+      <!-- Sub-Navigation for Result Viewer -->
       <nav class="flex space-x-1 border-b border-gray-200 mb-6 overflow-x-auto relative">
-        <button onclick="switchTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-5 py-3 relative font-semibold text-sm transition-all text-blue-600 m3-tab-active">
+        <button onclick="switchResultsSubTab('dashboard')" id="tab-btn-dashboard" class="tab-btn px-5 py-2.5 relative font-semibold text-sm transition-all text-blue-600 m3-tab-active cursor-pointer">
           📊 Results Dashboard
         </button>
-        <button onclick="switchTab('breakdown')" id="tab-btn-breakdown" class="tab-btn px-5 py-3 relative font-semibold text-sm transition-all text-gray-500 hover:text-gray-900">
+        <button onclick="switchResultsSubTab('breakdown')" id="tab-btn-breakdown" class="tab-btn px-5 py-2.5 relative font-semibold text-sm transition-all text-gray-500 hover:text-gray-900 cursor-pointer">
           🌳 Hierarchical Breakdown
         </button>
-        <button onclick="switchTab('artifacts')" id="tab-btn-artifacts" class="tab-btn px-5 py-3 relative font-semibold text-sm transition-all text-gray-500 hover:text-gray-900">
+        <button onclick="switchResultsSubTab('artifacts')" id="tab-btn-artifacts" class="tab-btn px-5 py-2.5 relative font-semibold text-sm transition-all text-gray-500 hover:text-gray-900 cursor-pointer">
           📦 Artifacts (<span id="artifacts-count-badge">0</span>)
         </button>
       </nav>
 
-      <!-- Main Content Panels -->
-      <main class="flex-1 flex flex-col">
-        <!-- Results Dashboard Tab -->
-        <div id="tab-dashboard" class="tab-content flex-1 flex flex-col gap-6">
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="dashboard-stats">
-            <!-- Populated via JS -->
-          </div>
+      <!-- Results Dashboard Tab -->
+      <div id="tab-dashboard" class="tab-content flex-1 flex flex-col gap-6">
+      <!-- Upload Section (if no data) -->
+      <div id="upload-section" class="bg-white border border-gray-200 rounded-3xl p-10 mb-2 text-center border-dashed border-2 bg-gray-50 cursor-pointer hover:bg-gray-100 transition-colors shadow-sm">
+        <div class="flex flex-col items-center justify-center gap-2">
+          <svg class="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+          <h3 class="text-lg font-semibold text-gray-700">Upload Mobly Zip Results</h3>
+          <p class="text-sm text-gray-500">Drag and drop a .zip file, or click anywhere in this box to select</p>
+          <input type="file" id="file-input" class="hidden" accept=".zip" />
+        </div>
+        <div id="upload-status" class="mt-4 text-sm font-semibold hidden"></div>
+        <div class="mt-6 pt-4 border-t border-gray-200 text-xs text-gray-400 flex items-center justify-center gap-2">
+          <span>💡 Ready to check host & testbed readiness before or after test execution?</span>
+          <button onclick="switchTab('environment')" class="text-blue-600 hover:underline font-semibold cursor-pointer">Go to Environment Status ➔</button>
+        </div>
+      </div>
 
-          <!-- Pass Rate Banner & Progress Bar -->
-          <div id="dashboard-progress-card" class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm flex flex-col gap-4">
-            <!-- Populated via JS -->
-          </div>
+      <!-- Dashboard Data (visible when data is loaded) -->
+      <div id="dashboard-data-container" class="hidden flex flex-col gap-6">
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4" id="dashboard-stats">
+          <!-- Populated via JS -->
+        </div>
 
-          <!-- Test Class Summary Table -->
-          <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm text-gray-800">
-            <h3 class="text-lg font-semibold mb-4 border-b pb-2">Suite Overview by Test Class</h3>
-            <div class="overflow-x-auto">
-              <table class="w-full text-left text-sm">
-                <thead>
-                  <tr class="text-gray-400 font-semibold border-b border-gray-100 pb-2">
-                    <th class="py-2">Test Class</th>
-                    <th class="py-2">Test Executions</th>
-                    <th class="py-2">Passed</th>
-                    <th class="py-2">Failed</th>
-                    <th class="py-2">Pass Rate</th>
-                    <th class="py-2">Cleanups / Fixtures</th>
-                  </tr>
-                </thead>
-                <tbody id="dashboard-class-table" class="divide-y divide-gray-100">
-                  <!-- Populated via JS -->
-                </tbody>
-              </table>
+        <!-- Pass Rate Banner & Progress Bar -->
+        <div id="dashboard-progress-card" class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm flex flex-col gap-4">
+          <!-- Populated via JS -->
+        </div>
+
+        <!-- Test Class Summary Table -->
+        <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm text-gray-800">
+          <h3 class="text-lg font-semibold mb-4 border-b pb-2">Suite Overview by Test Class</h3>
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-sm">
+              <thead>
+                <tr class="text-gray-400 font-semibold border-b border-gray-100 pb-2">
+                  <th class="py-2">Test Class</th>
+                  <th class="py-2">Test Executions</th>
+                  <th class="py-2">Passed</th>
+                  <th class="py-2">Failed</th>
+                  <th class="py-2">Pass Rate</th>
+                  <th class="py-2">Cleanups / Fixtures</th>
+                </tr>
+              </thead>
+              <tbody id="dashboard-class-table" class="divide-y divide-gray-100">
+                <!-- Populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Hierarchical Breakdown Tab -->
+    <div id="tab-breakdown" class="tab-content hidden flex-1 flex flex-col gap-6">
+      <div id="breakdown-no-data" class="bg-white border border-gray-200 rounded-3xl p-12 text-center text-gray-500 shadow-sm">
+        <div class="text-4xl mb-3">🌳</div>
+        <h3 class="text-lg font-semibold text-gray-800">No Test Results Loaded</h3>
+        <p class="text-sm text-gray-500 mt-1 max-w-md mx-auto">Please upload a Mobly .zip test results archive in the Results Dashboard tab to explore test suites and iteration chips.</p>
+        <button onclick="switchTab('dashboard')" class="mt-5 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-xl font-semibold text-xs border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer">
+          Go to Results Dashboard
+        </button>
+      </div>
+      <div id="breakdown-data-container" class="hidden flex flex-col gap-6">
+        <!-- Mockup Header Instruction Banner -->
+        <div class="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm">
+          <h3 class="text-base font-bold text-gray-900">Hierarchical Test Suite Tree (Suite ➔ Test Case ➔ Iteration Chips)</h3>
+          <p class="text-xs text-gray-500 mt-1">Click any green tick <span class="bg-green-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">✓</span> or red badge <span class="bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">!</span> in the repeat row to jump directly to that iteration's logs, sub-step timings, and protocol state.</p>
+        </div>
+
+        <div id="hierarchical-tree" class="flex flex-col gap-6">
+          <!-- Populated via JS -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Artifacts Tab (Hierarchical Folder Tree View like BTX / Sponge) -->
+    <div id="tab-artifacts" class="tab-content hidden flex-1 flex flex-col gap-6">
+      <div id="artifacts-no-data" class="bg-white border border-gray-200 rounded-3xl p-12 text-center text-gray-500 shadow-sm">
+        <div class="text-4xl mb-3">📦</div>
+        <h3 class="text-lg font-semibold text-gray-800">No Artifacts Available</h3>
+        <p class="text-sm text-gray-500 mt-1 max-w-md mx-auto">Please upload a Mobly .zip test results archive in the Results Dashboard tab to explore logcats, bugreports, and YAML summaries.</p>
+        <button onclick="switchTab('dashboard')" class="mt-5 px-5 py-2.5 bg-blue-50 text-blue-600 rounded-xl font-semibold text-xs border border-blue-200 hover:bg-blue-100 transition-colors cursor-pointer">
+          Go to Results Dashboard
+        </button>
+      </div>
+      <div id="artifacts-data-container" class="hidden flex flex-col gap-6">
+        <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm text-gray-800 flex flex-col gap-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
+            <div>
+              <div class="text-xs font-bold text-gray-500 tracking-wider">
+                Target: <span id="artifacts-target-name" class="text-gray-900 font-mono text-sm font-semibold">OsmosisSuwAwareTest</span>
+              </div>
+              <h3 class="text-lg font-semibold text-gray-900 mt-1">Hierarchical Artifacts & Logs Tree</h3>
+              <p class="text-xs text-gray-500 mt-0.5">Click any file link or download button to download individual files, or click folder arrows to expand/collapse directories.</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <input type="text" id="artifact-filter" oninput="filterArtifacts()" placeholder="Filter artifacts (e.g. logcat, yaml)..." class="px-4 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 shadow-inner" />
             </div>
           </div>
-        </div>
 
-        <!-- Hierarchical Breakdown Tab -->
-        <div id="tab-breakdown" class="tab-content hidden flex-1 flex flex-col gap-6">
-          <!-- Mockup Header Instruction Banner -->
-          <div class="bg-white border border-gray-200 p-5 rounded-2xl shadow-sm">
-            <h3 class="text-base font-bold text-gray-900">Hierarchical Test Suite Tree (Suite ➔ Test Case ➔ Iteration Chips)</h3>
-            <p class="text-xs text-gray-500 mt-1">Click any green tick <span class="bg-green-600 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">✓</span> or red badge <span class="bg-red-500 text-white px-1.5 py-0.5 rounded text-[10px] font-bold">!</span> in the repeat row to jump directly to that iteration's logs, sub-step timings, and protocol state.</p>
+          <!-- Header Row -->
+          <div class="flex items-center justify-between py-2.5 px-4 bg-gray-50 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 tracking-wider uppercase">
+            <span>Artifact Name</span>
+            <div class="flex items-center gap-8">
+              <span>File Size</span>
+              <span class="w-24 text-right">Actions</span>
+            </div>
           </div>
 
-          <div id="hierarchical-tree" class="flex flex-col gap-6">
+          <!-- Hierarchical Tree Container -->
+          <div id="artifacts-tree-container" class="border border-gray-200 rounded-2xl overflow-hidden divide-y divide-gray-100 bg-white shadow-inner">
             <!-- Populated via JS -->
           </div>
         </div>
+      </div>
+    </div>
+    <!-- END RESULT VIEWER SECTION -->
 
-        <!-- Artifacts Tab (Hierarchical Folder Tree View like BTX / Sponge) -->
-        <div id="tab-artifacts" class="tab-content hidden flex-1 flex flex-col gap-6">
-          <div class="bg-white border border-gray-200 p-6 rounded-3xl shadow-sm text-gray-800 flex flex-col gap-4">
-            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-gray-100 pb-4">
-              <div>
-                <div class="text-xs font-bold text-gray-500 tracking-wider">
-                  Target: <span id="artifacts-target-name" class="text-gray-900 font-mono text-sm font-semibold">OsmosisSuwAwareTest</span>
+    <!-- ======================================================== -->
+    <!-- 2. SETUP WIZARD (Primary Section) -->
+    <!-- ======================================================== -->
+    <div id="section-setup_wizard" class="main-section hidden flex-1 flex flex-col">
+      <!-- Sub-Navigation for Setup Wizard -->
+      <nav class="flex space-x-1 border-b border-gray-200 mb-6 overflow-x-auto relative">
+        <button onclick="switchSetupSubTab('environment')" id="tab-btn-environment" class="tab-btn px-5 py-2.5 relative font-semibold text-sm transition-all text-blue-600 m3-tab-active cursor-pointer flex items-center gap-2">
+          <span>⚙️ Environment Status</span>
+          <span id="env-nav-badge" class="hidden w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+        </button>
+      </nav>
+
+      <!-- Environment Status Tab -->
+      <div id="tab-environment" class="tab-content flex-1 flex flex-col gap-6">
+      <!-- Top Diagnostic Banner & Action Controls -->
+      <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div class="flex items-center gap-4">
+          <div class="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-3xl shadow-xs shrink-0">
+            ⚙️
+          </div>
+          <div>
+            <div class="flex items-center gap-2.5 flex-wrap">
+              <h2 class="text-lg font-bold text-gray-900 tracking-tight">Test Station Environment & Readiness Status</h2>
+              <span id="env-overall-badge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200">Ready to Check</span>
+            </div>
+            <p class="text-xs text-gray-500 mt-1">Host OS, Xcode CLI tools, codesigning certificates, Apple CoreDevice, Android ADB, and background services diagnostics.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <button id="run-env-btn" onclick="fetchEnvironmentStatus(true)" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-2xl shadow-sm transition-all flex items-center gap-2 cursor-pointer hover:shadow">
+            <span id="run-env-icon">▶</span>
+            <span id="run-env-text">Run Diagnostic Checks</span>
+          </button>
+          <button onclick="copyEnvironmentOutput()" id="copy-env-btn" class="px-3.5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold text-xs rounded-2xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer">
+            📋 <span>Copy Full Log</span>
+          </button>
+          <a href="/api/check_env_script" download="check_env.sh" class="px-3.5 py-2.5 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 font-semibold text-xs rounded-2xl shadow-sm transition-colors flex items-center gap-1.5 cursor-pointer" title="Download check_env.sh script to run locally on your test machine">
+            📥 <span>Download Script</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- 1. Station & Host Environment (4 Cards) -->
+      <div>
+        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+          <span>🖥️</span> <span>Station & Host Environment</span>
+        </div>
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3" id="env-system-cards">
+          <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Host OS</div>
+            <div id="kpi-os-val" class="text-sm font-bold text-gray-900 mt-1 truncate">Checking...</div>
+            <div id="kpi-os-badge" class="mt-2 text-[10px] font-semibold text-gray-400">Not checked</div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Python Runtime</div>
+            <div id="kpi-python-val" class="text-sm font-bold text-gray-900 mt-1 truncate">Checking...</div>
+            <div id="kpi-python-badge" class="mt-2 text-[10px] font-semibold text-gray-400">Not checked</div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Xcode & CLI</div>
+            <div id="kpi-xcode-val" class="text-sm font-bold text-gray-900 mt-1 truncate">Checking...</div>
+            <div id="kpi-xcode-badge" class="mt-2 text-[10px] font-semibold text-gray-400">Not checked</div>
+          </div>
+          <div class="bg-white border border-gray-200 rounded-2xl p-4 shadow-sm flex flex-col justify-between">
+            <div class="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Codesigning</div>
+            <div id="kpi-codesign-val" class="text-sm font-bold text-gray-900 mt-1 truncate">Checking...</div>
+            <div id="kpi-codesign-badge" class="mt-2 text-[10px] font-semibold text-gray-400">Not checked</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Connected Test Devices (CoreDevice / iOS & Android ADB in separate group on next line) -->
+      <div>
+        <div class="text-[11px] font-bold text-gray-400 uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+          <span>📱</span> <span>Connected Test Devices (iOS & Android)</span>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4" id="env-devices-cards">
+          <!-- CoreDevice / iOS Card -->
+          <div class="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between transition-all hover:border-gray-300">
+            <div>
+              <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-2xl w-9 h-9 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center shrink-0">📱</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-gray-900">CoreDevice / iOS</h3>
+                    <p id="kpi-devices-val" class="text-xs text-gray-500 mt-0.5 font-medium">Checking devicectl...</p>
+                  </div>
                 </div>
-                <h3 class="text-lg font-semibold text-gray-900 mt-1">Hierarchical Artifacts & Logs Tree</h3>
-                <p class="text-xs text-gray-500 mt-0.5">Click any file link or download button to download individual files, or click folder arrows to expand/collapse directories.</p>
+                <span id="kpi-devices-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600 border border-gray-200">Not checked</span>
               </div>
-              <div class="flex items-center gap-3">
-                <input type="text" id="artifact-filter" oninput="filterArtifacts()" placeholder="Filter artifacts (e.g. logcat, yaml)..." class="px-4 py-2 text-xs border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 shadow-inner" />
+
+              <!-- Device Details Table / Grid -->
+              <div class="mt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div class="bg-gray-50/80 p-2.5 rounded-xl border border-gray-100">
+                  <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Device Model</span>
+                  <div id="kpi-ios-model" class="text-xs font-semibold text-gray-800 mt-0.5 truncate">-</div>
+                </div>
+                <div class="bg-gray-50/80 p-2.5 rounded-xl border border-gray-100">
+                  <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">OS Version</span>
+                  <div id="kpi-ios-version" class="text-xs font-semibold text-gray-800 mt-0.5 truncate">-</div>
+                </div>
+                <div class="sm:col-span-2 bg-gray-50/80 p-2.5 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                  <div class="overflow-hidden">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">UDID Identifier</span>
+                    <div id="kpi-ios-udid" class="text-xs font-mono font-semibold text-gray-800 mt-0.5 select-all break-all">-</div>
+                  </div>
+                  <button onclick="copyElementText('kpi-ios-udid', this)" class="shrink-0 px-2 py-1 bg-white hover:bg-gray-100 text-gray-600 rounded-lg text-[10px] font-semibold border border-gray-200 transition-colors cursor-pointer" title="Copy UDID">
+                    📋 Copy
+                  </button>
+                </div>
               </div>
             </div>
+          </div>
 
-            <!-- Header Row -->
-            <div class="flex items-center justify-between py-2.5 px-4 bg-gray-50 rounded-xl border border-gray-200 text-xs font-bold text-gray-700 tracking-wider uppercase">
-              <span>Artifact Name</span>
-              <div class="flex items-center gap-8">
-                <span>File Size</span>
-                <span class="w-24 text-right">Actions</span>
+          <!-- Android ADB Card -->
+          <div class="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm flex flex-col justify-between transition-all hover:border-gray-300">
+            <div>
+              <div class="flex items-center justify-between pb-3 border-b border-gray-100">
+                <div class="flex items-center gap-2.5">
+                  <span class="text-2xl w-9 h-9 rounded-xl bg-green-50 border border-green-100 flex items-center justify-center shrink-0">🤖</span>
+                  <div>
+                    <h3 class="text-sm font-bold text-gray-900">Android ADB</h3>
+                    <p id="kpi-adb-val" class="text-xs text-gray-500 mt-0.5 font-medium">Checking adb...</p>
+                  </div>
+                </div>
+                <span id="kpi-adb-badge" class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600 border border-gray-200">Not checked</span>
               </div>
-            </div>
 
-            <!-- Hierarchical Tree Container -->
-            <div id="artifacts-tree-container" class="border border-gray-200 rounded-2xl overflow-hidden divide-y divide-gray-100 bg-white shadow-inner">
-              <!-- Populated via JS -->
+              <!-- Device Details Table / Grid -->
+              <div class="mt-3.5 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div class="bg-gray-50/80 p-2.5 rounded-xl border border-gray-100">
+                  <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Device Model</span>
+                  <div id="kpi-android-model" class="text-xs font-semibold text-gray-800 mt-0.5 truncate">-</div>
+                </div>
+                <div class="bg-gray-50/80 p-2.5 rounded-xl border border-gray-100">
+                  <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Connection State</span>
+                  <div id="kpi-android-state" class="text-xs font-semibold text-gray-800 mt-0.5 truncate">-</div>
+                </div>
+                <div class="sm:col-span-2 bg-gray-50/80 p-2.5 rounded-xl border border-gray-100 flex items-center justify-between gap-2">
+                  <div class="overflow-hidden">
+                    <span class="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Serial Number</span>
+                    <div id="kpi-android-serial" class="text-xs font-mono font-semibold text-gray-800 mt-0.5 select-all break-all">-</div>
+                  </div>
+                  <button onclick="copyElementText('kpi-android-serial', this)" class="shrink-0 px-2 py-1 bg-white hover:bg-gray-100 text-gray-600 rounded-lg text-[10px] font-semibold border border-gray-200 transition-colors cursor-pointer" title="Copy Serial #">
+                    📋 Copy
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </main>
-  </div>
+      </div>
+
+      <!-- Diagnostic Sections Container -->
+      <div id="env-sections-container" class="flex flex-col gap-4">
+        <!-- Diagnostic Cards rendered via JS -->
+      </div>
+
+      <!-- Raw Terminal Console Drawer (Collapsible) -->
+      <div class="bg-white border border-gray-200 rounded-3xl p-6 shadow-sm flex flex-col gap-3">
+        <div class="flex items-center justify-between cursor-pointer select-none" onclick="toggleFullTerminal()">
+          <div class="flex items-center gap-2 font-bold text-sm text-gray-800">
+            <span id="full-term-caret" class="text-xs text-gray-400 transition-transform">▼</span>
+            <span>Raw Diagnostic Terminal Output (<code class="font-mono text-xs bg-gray-100 px-1.5 py-0.5 rounded text-gray-700">check_env.sh</code>)</span>
+          </div>
+          <div class="flex items-center gap-3">
+            <span id="env-timestamp-label" class="text-xs text-gray-400 font-mono"></span>
+            <button onclick="event.stopPropagation(); copyEnvironmentOutput();" class="text-xs font-semibold text-blue-600 hover:text-blue-700 cursor-pointer">Copy Raw</button>
+          </div>
+        </div>
+        <div id="full-terminal-drawer" class="mt-2">
+          <div class="p-4 bg-[#14161f] border border-gray-800 rounded-2xl overflow-x-auto text-[#e2e8f0] font-mono text-xs leading-relaxed max-h-96 shadow-inner">
+            <pre id="env-raw-output" class="whitespace-pre-wrap break-all">Click "Run Diagnostic Checks" above to run check_env.sh commands.</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- END SETUP WIZARD SECTION -->
+  </main>
 
   <!-- Artifact Content Preview Modal -->
   <div id="artifact-modal" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-sm">
@@ -216,8 +443,8 @@
             <input type="text" id="bug-component-id" value="2105900" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label class="block font-bold text-gray-800 mb-1">Assignee LDAP (Optional)</label>
-            <input type="text" id="bug-assignee" placeholder="e.g. username@google.com" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
+            <label class="block font-bold text-gray-800 mb-1">Assignee Email (Optional)</label>
+            <input type="text" id="bug-assignee" placeholder="e.g. user@example.com" class="w-full px-3 py-2 border border-gray-300 rounded-xl font-mono text-xs focus:ring-2 focus:ring-blue-500 focus:outline-none" />
           </div>
         </div>
         <!-- Throughput & Shielding Rules Checklist -->
@@ -406,23 +633,460 @@
       return name;
     }
 
-    function switchTab(tabId) {
-      document.querySelectorAll('.tab-content').forEach(el => {
-        el.classList.add('hidden');
-      });
+    // Environment Diagnostics state
+    let envData = null;
+    let envLoading = false;
 
-      const target = document.getElementById('tab-' + tabId);
+    let currentMainTab = 'results_viewer';
+    let currentResultsSubTab = 'dashboard';
+    let currentSetupSubTab = 'environment';
+
+    function switchMainTab(mainTabId) {
+      currentMainTab = mainTabId;
+
+      // Toggle main sections
+      const resultsSec = document.getElementById('section-results_viewer');
+      const setupSec = document.getElementById('section-setup_wizard');
+      if (resultsSec) resultsSec.classList.toggle('hidden', mainTabId !== 'results_viewer');
+      if (setupSec) setupSec.classList.toggle('hidden', mainTabId !== 'setup_wizard');
+
+      // Update primary tab buttons
+      const resultsBtn = document.getElementById('main-tab-results');
+      const setupBtn = document.getElementById('main-tab-setup');
+      if (resultsBtn) {
+        if (mainTabId === 'results_viewer') {
+          resultsBtn.classList.remove('text-gray-500', 'border-transparent');
+          resultsBtn.classList.add('text-blue-600', 'border-blue-600');
+        } else {
+          resultsBtn.classList.remove('text-blue-600', 'border-blue-600');
+          resultsBtn.classList.add('text-gray-500', 'border-transparent');
+        }
+      }
+      if (setupBtn) {
+        if (mainTabId === 'setup_wizard') {
+          setupBtn.classList.remove('text-gray-500', 'border-transparent');
+          setupBtn.classList.add('text-blue-600', 'border-blue-600');
+        } else {
+          setupBtn.classList.remove('text-blue-600', 'border-blue-600');
+          setupBtn.classList.add('text-gray-500', 'border-transparent');
+        }
+      }
+
+      // If switching to Setup Wizard, trigger environment diagnostic scan if not yet loaded
+      if (mainTabId === 'setup_wizard' && !envData && !envLoading) {
+        fetchEnvironmentStatus(false);
+      }
+    }
+
+    function switchResultsSubTab(subTabId) {
+      currentResultsSubTab = subTabId;
+
+      ['dashboard', 'breakdown', 'artifacts'].forEach(id => {
+        const contentEl = document.getElementById('tab-' + id);
+        if (contentEl) contentEl.classList.toggle('hidden', id !== subTabId);
+
+        const btnEl = document.getElementById('tab-btn-' + id);
+        if (btnEl) {
+          if (id === subTabId) {
+            btnEl.classList.remove('text-gray-500');
+            btnEl.classList.add('m3-tab-active', 'text-blue-600');
+          } else {
+            btnEl.classList.remove('m3-tab-active', 'text-blue-600');
+            btnEl.classList.add('text-gray-500');
+          }
+        }
+      });
+    }
+
+    function switchSetupSubTab(subTabId) {
+      currentSetupSubTab = subTabId;
+
+      const target = document.getElementById('tab-' + subTabId);
       if (target) target.classList.remove('hidden');
 
-      document.querySelectorAll('.tab-btn').forEach(el => {
-        el.classList.remove('m3-tab-active', 'text-blue-600');
-        el.classList.add('text-gray-500');
-      });
+      const btn = document.getElementById('tab-btn-' + subTabId);
+      if (btn) {
+        btn.classList.remove('text-gray-500');
+        btn.classList.add('m3-tab-active', 'text-blue-600');
+      }
 
-      const activeBtn = document.getElementById('tab-btn-' + tabId);
-      if (activeBtn) {
-        activeBtn.classList.remove('text-gray-500');
-        activeBtn.classList.add('m3-tab-active', 'text-blue-600');
+      if (subTabId === 'environment' && !envData && !envLoading) {
+        fetchEnvironmentStatus(false);
+      }
+    }
+
+    // Unified router for existing internal switchTab calls
+    function switchTab(tabId) {
+      if (tabId === 'environment') {
+        switchMainTab('setup_wizard');
+        switchSetupSubTab('environment');
+      } else {
+        switchMainTab('results_viewer');
+        switchResultsSubTab(tabId);
+      }
+    }
+
+    function fetchEnvironmentStatus(forceRun = false) {
+      if (envLoading) return;
+      envLoading = true;
+
+      const runBtn = document.getElementById('run-env-btn');
+      const runIcon = document.getElementById('run-env-icon');
+      const runText = document.getElementById('run-env-text');
+      const overallBadge = document.getElementById('env-overall-badge');
+      const rawPre = document.getElementById('env-raw-output');
+
+      if (runBtn) runBtn.disabled = true;
+      if (runIcon) runIcon.innerHTML = '<svg class="animate-spin h-3.5 w-3.5 text-white inline" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>';
+      if (runText) runText.textContent = 'Running Diagnostics...';
+      if (overallBadge) {
+        overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-50 text-blue-700 border border-blue-200 animate-pulse';
+        overallBadge.textContent = '⏳ Diagnosing...';
+      }
+      if (rawPre) {
+        rawPre.textContent = 'Executing diagnostic commands from check_env.sh in background...\nPlease wait a moment.';
+      }
+
+      // Reset KPI cards to checking state
+      ['kpi-os-val', 'kpi-python-val', 'kpi-xcode-val', 'kpi-devices-val', 'kpi-adb-val', 'kpi-codesign-val', 'kpi-ios-model', 'kpi-ios-udid', 'kpi-ios-version', 'kpi-android-model', 'kpi-android-serial', 'kpi-android-state'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = 'Checking...';
+      });
+      const resetIosBadge = document.getElementById('kpi-devices-badge');
+      if (resetIosBadge) {
+        resetIosBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600 border border-gray-200';
+        resetIosBadge.textContent = 'Checking...';
+      }
+      const resetAdbBadge = document.getElementById('kpi-adb-badge');
+      if (resetAdbBadge) {
+        resetAdbBadge.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-gray-100 text-gray-600 border border-gray-200';
+        resetAdbBadge.textContent = 'Checking...';
+      }
+
+      const method = forceRun ? 'POST' : 'GET';
+      fetch('/api/check_env', { method })
+        .then(res => res.json())
+        .then(data => {
+          envLoading = false;
+          if (runBtn) runBtn.disabled = false;
+          if (runIcon) runIcon.textContent = '▶';
+          if (runText) runText.textContent = 'Run Diagnostic Checks';
+
+          if (data && data.success) {
+            envData = data;
+            renderEnvironmentDiagnostics(data);
+          } else {
+            if (overallBadge) {
+              overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200';
+              overallBadge.textContent = '❌ Failed to Check';
+            }
+            if (rawPre) {
+              rawPre.textContent = 'Error executing environment checks: ' + (data ? data.error : 'Unknown error');
+            }
+          }
+        })
+        .catch(err => {
+          envLoading = false;
+          if (runBtn) runBtn.disabled = false;
+          if (runIcon) runIcon.textContent = '▶';
+          if (runText) runText.textContent = 'Run Diagnostic Checks';
+          if (overallBadge) {
+            overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200';
+            overallBadge.textContent = '❌ Connection Error';
+          }
+          if (rawPre) {
+            rawPre.textContent = 'Network or server error running checks: ' + err;
+          }
+        });
+    }
+
+    function renderEnvironmentDiagnostics(data) {
+      if (!data) return;
+      const overallBadge = document.getElementById('env-overall-badge');
+      const navBadge = document.getElementById('env-nav-badge');
+      const timestampLabel = document.getElementById('env-timestamp-label');
+      const rawPre = document.getElementById('env-raw-output');
+      const container = document.getElementById('env-sections-container');
+
+      if (timestampLabel) {
+        timestampLabel.textContent = `Last Checked: ${data.timestamp || 'Just now'}`;
+      }
+      if (rawPre) {
+        rawPre.textContent = data.raw_output || '(no output)';
+      }
+
+      // Update overall banner badge
+      const status = data.overall_status || 'INFO';
+      if (overallBadge) {
+        if (status === 'PASS') {
+          overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200';
+          overallBadge.textContent = '✓ Environment Ready';
+        } else if (status === 'WARN') {
+          overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-100 text-amber-900 border border-amber-200';
+          overallBadge.textContent = '⚠️ Warnings Detected';
+        } else if (status === 'FAIL') {
+          overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200';
+          overallBadge.textContent = '❌ Failures Detected';
+        } else {
+          overallBadge.className = 'px-2.5 py-0.5 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200';
+          overallBadge.textContent = 'ℹ️ Diagnostics Complete';
+        }
+      }
+
+      if (navBadge) {
+        navBadge.classList.remove('hidden', 'bg-green-500', 'bg-amber-500', 'bg-red-500', 'bg-blue-500');
+        if (status === 'PASS') navBadge.classList.add('bg-green-500');
+        else if (status === 'WARN') navBadge.classList.add('bg-amber-500');
+        else if (status === 'FAIL') navBadge.classList.add('bg-red-500');
+        else navBadge.classList.add('bg-blue-500');
+      }
+
+      const setupBadge = document.getElementById('setup-nav-badge');
+      if (setupBadge) {
+        setupBadge.classList.remove('hidden', 'bg-green-500', 'bg-amber-500', 'bg-red-500', 'bg-blue-500');
+        if (status === 'PASS') setupBadge.classList.add('bg-green-500');
+        else if (status === 'WARN') setupBadge.classList.add('bg-amber-500');
+        else if (status === 'FAIL') setupBadge.classList.add('bg-red-500');
+        else setupBadge.classList.add('bg-blue-500');
+      }
+
+      // Populate Quick KPI Summary Cards
+      const sections = data.sections || [];
+      const secMap = {};
+      sections.forEach(s => { secMap[s.id] = s; });
+
+      function updateKpi(valId, badgeId, sec, defaultLabel, passSuffix) {
+        const valEl = document.getElementById(valId);
+        const badgeEl = document.getElementById(badgeId);
+        if (!valEl || !badgeEl) return;
+        if (!sec) {
+          valEl.textContent = 'N/A';
+          badgeEl.textContent = 'Not detected';
+          badgeEl.className = 'mt-2 text-[10px] font-semibold text-gray-400';
+          return;
+        }
+        valEl.textContent = sec.summary || defaultLabel;
+        valEl.title = sec.summary || defaultLabel;
+        const st = sec.status || 'INFO';
+        if (st === 'PASS') {
+          badgeEl.className = 'mt-2 text-[10px] font-bold text-green-600';
+          badgeEl.textContent = `✓ ${passSuffix || 'Ready'}`;
+        } else if (st === 'WARN') {
+          badgeEl.className = 'mt-2 text-[10px] font-bold text-amber-600';
+          badgeEl.textContent = '⚠️ Attention needed';
+        } else if (st === 'FAIL') {
+          badgeEl.className = 'mt-2 text-[10px] font-bold text-red-600';
+          badgeEl.textContent = '❌ Missing / Failed';
+        } else {
+          badgeEl.className = 'mt-2 text-[10px] font-semibold text-gray-500';
+          badgeEl.textContent = 'ℹ️ Scanned';
+        }
+      }
+
+      updateKpi('kpi-os-val', 'kpi-os-badge', secMap['host_os'], 'Host OS', 'Operational');
+      updateKpi('kpi-python-val', 'kpi-python-badge', secMap['python_runtime'], 'Python 3', 'Runtime Ready');
+      updateKpi('kpi-xcode-val', 'kpi-xcode-badge', secMap['xcode_tools'], 'Xcode & CLI', 'Tools Ready');
+      updateKpi('kpi-codesign-val', 'kpi-codesign-badge', secMap['codesigning'], 'Codesigning', 'Identities Valid');
+
+      // Populate device model, serial / UDID, and version/state from devices_summary
+      const devSummary = data.devices_summary || {};
+      const iosInfo = devSummary.ios || {};
+      const androidInfo = devSummary.android || {};
+
+      const iosValEl = document.getElementById('kpi-devices-val');
+      const iosModelEl = document.getElementById('kpi-ios-model');
+      const iosUdidEl = document.getElementById('kpi-ios-udid');
+      const iosVersionEl = document.getElementById('kpi-ios-version');
+      const iosBadgeEl = document.getElementById('kpi-devices-badge');
+
+      if (iosValEl) {
+        iosValEl.textContent = secMap['devices']?.summary || (iosInfo.connected ? 'Apple devicectl active' : 'devicectl checked');
+      }
+      if (iosModelEl) {
+        iosModelEl.textContent = iosInfo.model || (iosInfo.connected ? 'iOS Device' : 'No device detected');
+        iosModelEl.title = iosInfo.model || '';
+      }
+      if (iosUdidEl) {
+        iosUdidEl.textContent = iosInfo.udid || (iosInfo.connected ? '' : 'N/A');
+        iosUdidEl.title = iosInfo.udid || '';
+      }
+      if (iosVersionEl) {
+        iosVersionEl.textContent = iosInfo.version || (iosInfo.connected ? 'iOS' : 'N/A');
+        iosVersionEl.title = iosInfo.version || '';
+      }
+      if (iosBadgeEl) {
+        if (iosInfo.connected) {
+          iosBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-200';
+          iosBadgeEl.textContent = `✓ ${iosInfo.count || 1} Connected (devicectl)`;
+        } else if (secMap['devices']?.status === 'PASS') {
+          iosBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200';
+          iosBadgeEl.textContent = 'ℹ️ devicectl OK (0 devices)';
+        } else {
+          iosBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200';
+          iosBadgeEl.textContent = 'Not detected';
+        }
+      }
+
+      const adbValEl = document.getElementById('kpi-adb-val');
+      const androidModelEl = document.getElementById('kpi-android-model');
+      const androidSerialEl = document.getElementById('kpi-android-serial');
+      const androidStateEl = document.getElementById('kpi-android-state');
+      const androidBadgeEl = document.getElementById('kpi-adb-badge');
+
+      if (adbValEl) {
+        adbValEl.textContent = secMap['utilities_services']?.summary || (androidInfo.connected ? 'ADB active' : 'ADB checked');
+      }
+      if (androidModelEl) {
+        androidModelEl.textContent = androidInfo.model || (androidInfo.connected ? 'Android Device' : 'No device detected');
+        androidModelEl.title = androidInfo.model || '';
+      }
+      if (androidSerialEl) {
+        androidSerialEl.textContent = androidInfo.serial || (androidInfo.connected ? '' : 'N/A');
+        androidSerialEl.title = androidInfo.serial || '';
+      }
+      if (androidStateEl) {
+        androidStateEl.textContent = androidInfo.state ? `Connected (${androidInfo.state})` : (androidInfo.connected ? 'Connected' : 'N/A');
+        androidStateEl.title = androidInfo.state || '';
+      }
+      if (androidBadgeEl) {
+        if (androidInfo.connected) {
+          androidBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-green-50 text-green-700 border border-green-200';
+          androidBadgeEl.textContent = `✓ ${androidInfo.count || 1} Connected (adb)`;
+        } else if (secMap['utilities_services']?.status === 'PASS') {
+          androidBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-blue-700 border border-blue-200';
+          androidBadgeEl.textContent = 'ℹ️ ADB OK (0 devices)';
+        } else {
+          androidBadgeEl.className = 'px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200';
+          androidBadgeEl.textContent = 'Not detected';
+        }
+      }
+
+      // Render Detailed Sections Cards
+      if (container) {
+        let sectionsHtml = '';
+        sections.forEach(sec => {
+          const isPass = sec.status === 'PASS';
+          const isWarn = sec.status === 'WARN';
+          const isFail = sec.status === 'FAIL';
+
+          let statusBadgeClass = 'bg-blue-50 text-blue-700 border-blue-200';
+          let statusIcon = 'ℹ️';
+          if (isPass) {
+            statusBadgeClass = 'bg-green-50 text-green-700 border-green-200';
+            statusIcon = '✓';
+          } else if (isWarn) {
+            statusBadgeClass = 'bg-amber-50 text-amber-800 border-amber-200';
+            statusIcon = '⚠️';
+          } else if (isFail) {
+            statusBadgeClass = 'bg-red-50 text-red-700 border-red-200';
+            statusIcon = '❌';
+          }
+
+          const commandsChips = (sec.commands || []).map(cmd =>
+            `<code class="px-2 py-0.5 bg-gray-100 text-gray-700 rounded text-[11px] font-mono border border-gray-200">${cmd}</code>`
+          ).join(' ');
+
+          sectionsHtml += `
+            <div class="bg-white border border-gray-200 rounded-3xl p-5 shadow-sm transition-all hover:border-gray-300">
+              <div class="flex flex-col md:flex-row md:items-center justify-between gap-3 cursor-pointer select-none" onclick="toggleEnvSection('${sec.id}')">
+                <div class="flex items-center gap-3">
+                  <span class="text-2xl w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center shrink-0 shadow-2xs">${sec.icon}</span>
+                  <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <h3 class="text-sm font-bold text-gray-900">${sec.title}</h3>
+                      <span class="px-2 py-0.5 rounded-full text-[10px] font-bold border ${statusBadgeClass}">
+                        ${statusIcon} ${sec.status}
+                      </span>
+                    </div>
+                    <p class="text-xs text-gray-500 mt-0.5 font-medium">${sec.summary || 'Commands evaluated'}</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-3 self-end md:self-auto">
+                  <button onclick="event.stopPropagation(); copySectionOutput('${sec.id}')" id="copy-btn-${sec.id}" class="px-2.5 py-1 text-xs text-gray-600 hover:text-gray-900 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-xl font-semibold transition-colors flex items-center gap-1 cursor-pointer" title="Copy section output">
+                    📋 <span>Copy</span>
+                  </button>
+                  <button class="w-7 h-7 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-bold text-xs transition-colors cursor-pointer">
+                    <span id="caret-${sec.id}">▼</span>
+                  </button>
+                </div>
+              </div>
+
+              <!-- Command Chips Preview -->
+              <div class="mt-3 flex items-center gap-2 flex-wrap text-xs text-gray-500 border-t border-gray-100 pt-2.5">
+                <span class="text-[11px] font-semibold text-gray-400">Commands:</span>
+                <div class="flex flex-wrap gap-1.5 items-center">
+                  ${commandsChips}
+                </div>
+              </div>
+
+              <!-- Expandable Terminal Drawer -->
+              <div id="env-drawer-${sec.id}" class="mt-3 pt-2">
+                <div class="p-3.5 bg-[#14161f] border border-gray-800 rounded-2xl overflow-x-auto text-[#e2e8f0] font-mono text-xs leading-relaxed max-h-80 shadow-inner">
+                  <pre class="whitespace-pre-wrap break-all">${sec.output || '(no output)'}</pre>
+                </div>
+              </div>
+            </div>
+          `;
+        });
+        container.innerHTML = sectionsHtml;
+      }
+    }
+
+    function toggleEnvSection(secId) {
+      const drawer = document.getElementById('env-drawer-' + secId);
+      const caret = document.getElementById('caret-' + secId);
+      if (drawer) {
+        drawer.classList.toggle('hidden');
+        if (caret) caret.textContent = drawer.classList.contains('hidden') ? '▶' : '▼';
+      }
+    }
+
+    function copySectionOutput(secId) {
+      if (!envData || !envData.sections) return;
+      const sec = envData.sections.find(s => s.id === secId);
+      if (!sec) return;
+      navigator.clipboard.writeText(sec.output || '').then(() => {
+        const btn = document.getElementById('copy-btn-' + secId);
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<span>✓ Copied!</span>';
+          setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        }
+      });
+    }
+
+    function copyEnvironmentOutput() {
+      const text = (envData && envData.raw_output) ? envData.raw_output : (document.getElementById('env-raw-output')?.textContent || '');
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.getElementById('copy-env-btn');
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '<span>✓ Copied!</span>';
+          setTimeout(() => { btn.innerHTML = orig; }, 2000);
+        }
+      });
+    }
+
+    function copyElementText(elId, btn) {
+      const el = document.getElementById(elId);
+      if (!el) return;
+      const text = el.textContent.trim();
+      if (!text || text === '-' || text === 'N/A' || text.startsWith('Checking')) return;
+      navigator.clipboard.writeText(text).then(() => {
+        if (btn) {
+          const orig = btn.innerHTML;
+          btn.innerHTML = '✓ Copied!';
+          setTimeout(() => { btn.innerHTML = orig; }, 1500);
+        }
+      });
+    }
+
+    function toggleFullTerminal() {
+      const drawer = document.getElementById('full-terminal-drawer');
+      const caret = document.getElementById('full-term-caret');
+      if (drawer) {
+        drawer.classList.toggle('hidden');
+        if (caret) caret.textContent = drawer.classList.contains('hidden') ? '▶' : '▼';
       }
     }
 
@@ -764,7 +1428,6 @@
         const uploadSection = document.getElementById('upload-section');
         const fileInput = document.getElementById('file-input');
         const uploadStatus = document.getElementById('upload-status');
-        const mainContent = document.getElementById('main-content');
 
         // Check if server already has data on load
         fetch('/api/results')
@@ -859,8 +1522,21 @@
 
         function renderDashboard(data) {
             globalData = data;
-            uploadSection.classList.add('hidden');
-            mainContent.classList.remove('hidden');
+            switchMainTab('results_viewer');
+            switchResultsSubTab('dashboard');
+            const uploadSec = document.getElementById('upload-section');
+            const dashData = document.getElementById('dashboard-data-container');
+            const breakdownNoData = document.getElementById('breakdown-no-data');
+            const breakdownData = document.getElementById('breakdown-data-container');
+            const artifactsNoData = document.getElementById('artifacts-no-data');
+            const artifactsData = document.getElementById('artifacts-data-container');
+
+            if (uploadSec) uploadSec.classList.add('hidden');
+            if (dashData) dashData.classList.remove('hidden');
+            if (breakdownNoData) breakdownNoData.classList.add('hidden');
+            if (breakdownData) breakdownData.classList.remove('hidden');
+            if (artifactsNoData) artifactsNoData.classList.add('hidden');
+            if (artifactsData) artifactsData.classList.remove('hidden');
 
             const s = data.summary || {};
             const req = s.requested || 0;

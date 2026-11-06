@@ -33,6 +33,7 @@ BLE_PERFORMANCE_TEST_SUCCESS_RATE_TARGET = 0.98
 SCC_PERFORMANCE_TEST_COUNT = 20
 SCC_PERFORMANCE_TEST_MAX_CONSECUTIVE_ERROR = 3
 WIFI_AWARE_SCC_PERFORMANCE_TEST_COUNT = 10
+WIFI_AWARE_DBS_SCC_PERFORMANCE_TEST_COUNT = 8
 
 PROGRAMMABLE_AP_CHANNEL_2G = 6
 PROGRAMMABLE_AP_CHANNEL_5G = 36
@@ -40,7 +41,7 @@ PROGRAMMABLE_AP_CHANNEL_5G_DFS = 52
 
 NEARBY_RESET_WAIT_TIME = datetime.timedelta(seconds=2)
 WIFI_DISCONNECTION_DELAY = datetime.timedelta(seconds=6)
-TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC = 10
+TARGET_POST_WIFI_CONNECTION_IDLE_TIME_SEC = 3
 WIFI_AWARE_AVAILABLE_WAIT_TIME = datetime.timedelta(seconds=10)
 WIFI_AWARE_AFTER_CONNECTION_START_THROUGHPUT_WAIT_TIME_SEC = datetime.timedelta(
     seconds=60
@@ -56,7 +57,8 @@ SECOND_CONNECTION_INIT_TIMEOUT = datetime.timedelta(seconds=10)
 SECOND_CONNECTION_RESULT_TIMEOUT = datetime.timedelta(seconds=25)
 CONNECTION_BANDWIDTH_CHANGED_TIMEOUT = datetime.timedelta(seconds=25)
 WIFI_2G_20M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=60)
-WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
+WIFI_50M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=60)
+WIFI_100M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=60)
 WIFI_200M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=100)
 WIFI_500M_PAYLOAD_TRANSFER_TIMEOUT = datetime.timedelta(seconds=250)
 WIFI_STA_CONNECTING_TIME_OUT = datetime.timedelta(seconds=25)
@@ -92,6 +94,7 @@ RSSI_HIGH_THRESHOLD = -15
 TRANSFER_FILE_SIZE_500MB = 500 * 1024  # kB
 TRANSFER_FILE_SIZE_200MB = 200 * 1024  # kB
 TRANSFER_FILE_SIZE_100MB = 100 * 1024  # kB
+TRANSFER_FILE_SIZE_50MB = 50 * 1024  # kB
 TRANSFER_FILE_SIZE_20MB = 20 * 1024  # kB
 TRANSFER_FILE_SIZE_1MB = 1024  # kB
 TRANSFER_FILE_SIZE_1KB = 1  # kB
@@ -146,6 +149,10 @@ class TestParameters:
   run_aware_test: bool = False
   requires_bt_multiplex: bool = False
   allow_unrooted_device: bool = False
+  # Whether Google Play Protect (package verifiers) has already been disabled
+  # by the test runner or tester. When True, skips package verifier disable/
+  # enable steps and suppresses package verifier warnings during testing.
+  play_protect_disabled_by_runner_or_tester: bool = False
   do_nc_wlan_file_transfer_test: bool = True
   delay_nc_discovery_request: bool = False
   is_tdls_enabled_in_dct_mode: bool = False
@@ -317,7 +324,6 @@ class WifiD2DType(enum.IntEnum):
   MCC_2G_WFD_5G_STA = 4
   MCC_2G_WFD_5G_INDOOR_STA = 5
   MCC_5G_WFD_2G_STA = 6
-  MCC_5G_WFD_5G_DFS_STA = 7
   MCC_5G_HS_5G_DFS_STA = 8
   # 2 Android devices connected to different APs.
   MCC_5G_AND_5G_DFS_STA = 9
@@ -336,6 +342,7 @@ class WifiD2DType(enum.IntEnum):
 @enum.unique
 class WifiConcurrencyMode(enum.IntEnum):
   """The enum for WiFi concurrency mode."""
+
   UNKNOWN = 0
   SCC_2G = 1
   SCC_5G = 2
@@ -347,6 +354,7 @@ class WifiConcurrencyMode(enum.IntEnum):
 @enum.unique
 class WifiDbsWfdStatus(enum.IntEnum):
   """The enum for WiFi DBS for WFD mode."""
+
   UNKNOWN = 0
   DBS_WFD_ENABLED = 1
   DBS_WFD_DISABLED = 2
@@ -390,8 +398,7 @@ def get_wifi_concurrency_mode_from_d2d_type(
     case WifiD2DType.MCC_5G_WFD_2G_STA:
       return WifiConcurrencyMode.MCC_5G_P2P_2G_STA
     case (
-        WifiD2DType.MCC_5G_WFD_5G_DFS_STA
-        | WifiD2DType.MCC_5G_HS_5G_DFS_STA
+        WifiD2DType.MCC_5G_HS_5G_DFS_STA
         | WifiD2DType.MCC_5G_AND_5G_DFS_STA
     ):
       return WifiConcurrencyMode.MCC_5G_P2P_5G_STA
@@ -402,7 +409,6 @@ def get_wifi_concurrency_mode_from_d2d_type(
 _WIFI_D2D_TYPES_MCC = (
     WifiD2DType.MCC_2G_WFD_5G_STA,
     WifiD2DType.MCC_2G_WFD_5G_INDOOR_STA,
-    WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
     WifiD2DType.MCC_5G_HS_5G_DFS_STA,
     WifiD2DType.MCC_5G_WFD_2G_STA,
     WifiD2DType.MCC_5G_AND_5G_DFS_STA,
@@ -436,7 +442,6 @@ _WIFI_D2D_TYPES_5G_STA = (
 
 _WIFI_D2D_TYPES_DFS_5G_STA = (
     WifiD2DType.SCC_5G_DFS,
-    WifiD2DType.MCC_5G_WFD_5G_DFS_STA,
     WifiD2DType.MCC_5G_HS_5G_DFS_STA,
     WifiD2DType.XCC_5G_DFS_STA,
 )
@@ -862,7 +867,6 @@ class NcTestRuntime:
   iperf_to_d2d_throughput_ratio: float = IPERF_TO_D2D_THROUGHPUT_RATIO_DEF
   is_discoverer_network_owner: bool = False
   wlan_throughput_cap_mbps: float = WLAN_MEDIUM_THROUGHPUT_CAP_MBPS
-  all_tests_should_be_skipped: bool = False
 
 
 @dataclasses.dataclass(frozen=True)
