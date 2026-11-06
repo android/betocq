@@ -21,15 +21,15 @@ by running environment checks (via check_env.sh or modular diagnostic commands).
 from collections.abc import Sequence
 import dataclasses
 import datetime
+import importlib.resources
 import os
-import pkgutil
 import re
 import subprocess
 import sys
 from typing import Any
 import zipfile
+import zipimport
 
-PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.results_viewer"
 CHECK_ENV_RESOURCE_PATH = "check_env.sh"
 
 _IOS_DEVICECTL_PATTERN = re.compile(
@@ -126,19 +126,25 @@ def get_check_env_script() -> bytes:
   Returns:
     The raw bytes of check_env.sh.
   """
-  base_dir = os.path.dirname(os.path.abspath(__file__))
-  candidate_paths = [
-      os.path.join(base_dir, "check_env.sh"),
-      os.path.join(base_dir, "scripts", "check_env.sh"),
-  ]
-  for path in candidate_paths:
-    if os.path.isfile(path):
-      with open(path, "rb") as f:
-        return f.read()
+  if os.path.isfile(__file__):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate_paths = [
+        os.path.join(base_dir, "check_env.sh"),
+        os.path.join(base_dir, "scripts", "check_env.sh"),
+    ]
+    for path in candidate_paths:
+      if os.path.isfile(path):
+        with open(path, "rb") as f:
+          return f.read()
 
+  loader = __spec__.loader if __spec__ is not None else None
+  loader_archive = (
+      loader.archive if isinstance(loader, zipimport.zipimporter) else ""
+  )
   candidate_zips = [
+      loader_archive,
       os.environ.get("_PARFILE", ""),
-      getattr(sys, "argv", [""])[0],
+      sys.argv[0] if sys.argv else "",
       __file__,
   ]
   for zip_candidate in candidate_zips:
@@ -151,12 +157,14 @@ def get_check_env_script() -> bytes:
       except (OSError, zipfile.BadZipFile, KeyError):
         pass
 
+  package_name = __package__ or "betocq.tools.results_viewer"
   try:
-    data = pkgutil.get_data(
-        PACKAGE_NAME,
-        CHECK_ENV_RESOURCE_PATH,
+    data = (
+        importlib.resources.files(package_name)
+        .joinpath(*CHECK_ENV_RESOURCE_PATH.split("/"))
+        .read_bytes()
     )
-  except (OSError, ImportError, ValueError):
+  except (OSError, ImportError, TypeError, ValueError, AttributeError):
     data = None
   if data:
     return data
@@ -179,7 +187,7 @@ def _run_single_command_section(script: str, timeout_seconds: int = 15) -> str:
     return combined if combined else "(no output)"
   except subprocess.TimeoutExpired:
     return f"Command timed out after {timeout_seconds}s"
-  except Exception as e:  # pylint: disable=broad-exception-caught
+  except (OSError, ValueError, subprocess.SubprocessError) as e:
     return f"Execution error: {e}"
 
 

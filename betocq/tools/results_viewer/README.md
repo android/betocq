@@ -42,7 +42,6 @@ BeToCQ Result Viewer provides an instant local web dashboard to:
     aggregator, and recursive artifact indexer.
 -   **`templates/index.html`**: Material 3 / Tailwind single-page application
     dashboard.
--   **`BUILD`**: Blaze build rules defining targets and unit tests.
 
 ## Usage
 

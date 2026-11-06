@@ -16,13 +16,15 @@
 
 import argparse
 import atexit
+from collections.abc import Callable, Sequence
 import dataclasses
 import email.parser
 import enum
+import http
 import http.server
+import importlib.resources
 import json
 import os
-import pkgutil
 import shutil
 import socket
 import socketserver
@@ -33,48 +35,22 @@ from typing import Any
 import urllib.parse
 import webbrowser
 import zipfile
+import zipimport
 
-# Bootstrap sys.path when running standalone .par binaries built with
-# no_launcher. This allows standard zipimport to find third-party
-# libraries (portpicker, yaml).
-# stored inside the archive under google3/third_party/py/.
-for _p in list(sys.path):
-  _tp_path = os.path.join(_p, "google3/third_party/py")
-  if _tp_path not in sys.path:
-    sys.path.append(_tp_path)
-
-_current_dir = os.path.dirname(os.path.abspath(__file__))
-if _current_dir not in sys.path:
-  sys.path.append(_current_dir)
-_repo_root = os.path.abspath(os.path.join(_current_dir, "../../.."))
-if _repo_root not in sys.path:
-  sys.path.append(_repo_root)
+if os.path.isfile(__file__):
+  _repo_root = os.path.abspath(
+      os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../..")
+  )
+  if _repo_root not in sys.path:
+    sys.path.append(_repo_root)
 
 try:
-  import portpicker  # pylint: disable=g-import-not-at-top
+  import portpicker
 except ImportError:
   portpicker = None
-
-
-class _DummyRpcError(Exception):
-  """Fallback exception type when pywraprpc is not available."""
-
-
-try:
-  from google3.google.devtools.issuetracker.v1 import issuetracker_builders  # pylint: disable=g-import-not-at-top
-  from google3.google.devtools.issuetracker.v1 import issuetracker_client  # pylint: disable=g-import-not-at-top
-  from google3.net.rpc.python import pywraprpc  # pylint: disable=g-import-not-at-top
-
-  _RpcException: type[Exception] = pywraprpc.RPCException
-except ImportError:
-  issuetracker_builders = None
-  issuetracker_client = None
-  pywraprpc = None
-  _RpcException: type[Exception] = _DummyRpcError
-
-from betocq.tools.results_viewer import mobly_parser  # pylint: disable=g-import-not-at-top
-from betocq.tools.results_viewer import setup_wizard  # pylint: disable=g-import-not-at-top
-from betocq.tools.results_viewer import version  # pylint: disable=g-import-not-at-top
+from betocq.tools.results_viewer import mobly_parser
+from betocq.tools.results_viewer import setup_wizard
+from betocq.tools.results_viewer import version
 
 
 class ApiEndpoint(enum.StrEnum):
@@ -103,7 +79,13 @@ class ContentType(enum.StrEnum):
 
 @dataclasses.dataclass
 class ArtifactResponse:
-  """Payload structure for single artifact content response."""
+  """Payload structure for single artifact content response.
+
+  Attributes:
+    filename: Base name of the artifact file.
+    path: Relative path of the artifact inside the results directory.
+    content: Decoded UTF-8 text content of the artifact.
+  """
 
   filename: str
   path: str
@@ -112,7 +94,12 @@ class ArtifactResponse:
 
 @dataclasses.dataclass
 class UploadResponse:
-  """Payload structure for upload status response."""
+  """Payload structure for upload status response.
+
+  Attributes:
+    message: Human-readable status message describing the upload outcome.
+    data: Parsed Mobly results object or fallback dictionary.
+  """
 
   message: str
   data: dict[str, Any] | mobly_parser.ParseResult
@@ -120,14 +107,25 @@ class UploadResponse:
 
 @dataclasses.dataclass
 class ErrorResponse:
-  """Payload structure for error responses."""
+  """Payload structure for error responses.
+
+  Attributes:
+    error: Human-readable error message.
+  """
 
   error: str
 
 
 @dataclasses.dataclass
 class FileBugResponse:
-  """Payload structure for file bug status response."""
+  """Payload structure for file bug status response.
+
+  Attributes:
+    success: Whether bug creation or fallback URL generation succeeded.
+    message: Status or error message returned to the UI.
+    issue_id: Created Issue Tracker numeric ID string, if created via RPC.
+    issue_url: Direct URL to the created issue or pre-populated filing form.
+  """
 
   success: bool
   message: str
@@ -135,13 +133,32 @@ class FileBugResponse:
   issue_url: str | None = None
 
 
-PACKAGE_NAME = "google3.wireless.android.platform.testing.bettertogether.betocq.tools.results_viewer"
+@dataclasses.dataclass(frozen=True)
+class BugFilingRequest:
+  """Parameters for filing a bug report from Result Viewer.
+
+  Attributes:
+    summary: Title of the bug report.
+    description: Detailed body text of the bug report.
+    component_id: Issue Tracker component ID string.
+    attachment_paths: Local file paths of artifacts to attach to the issue.
+    assignee: Optional Issue Tracker assignee email or username.
+  """
+
+  summary: str
+  description: str
+  component_id: str
+  attachment_paths: Sequence[str]
+  assignee: str = ""
+
+
+BugFiler = Callable[[BugFilingRequest], FileBugResponse]
+
 TEMPLATE_RESOURCE_PATH = "templates/index.html"
 DEFAULT_COMPONENT_ID = "2105900"
 _MAX_DESCRIPTION_URL_CHARS = 1800
 _MAX_ARTIFACT_READ_BYTES = 2 * 1024 * 1024  # 2MB
 _ISSUETRACKER_NEW_ISSUE_URL = "https://issuetracker.google.com/issues/new?"
-_ISSUETRACKER_ISSUE_URL_PREFIX = "https://issuetracker.google.com/issues/"
 _TEMP_DIR_PREFIX = "betocq_results_viewer_"
 _BROWSER_OPEN_DELAY_SECONDS = 1.25
 
@@ -180,24 +197,30 @@ def _read_template_from_zip(zip_candidate: str) -> bytes | None:
 
 
 def get_template_html() -> bytes:
-  """Retrieves the index.html template from disk, par zip, or explicit pkgutil.
+  """Retrieves the index.html template from disk, par zip, or package resources.
 
   Returns:
     The raw HTML template bytes, or an error HTML snippet if not found.
   """
-  base_dir = os.path.dirname(os.path.abspath(__file__))
-  candidate_template_paths = [
-      os.path.join(base_dir, "templates", "index.html"),
-      os.path.join(base_dir, "index.html"),
-  ]
-  for template_path in candidate_template_paths:
-    if os.path.isfile(template_path):
-      with open(template_path, "rb") as f:
-        return f.read()
+  if os.path.isfile(__file__):
+    base_dir = os.path.dirname(os.path.abspath(__file__))
+    candidate_template_paths = [
+        os.path.join(base_dir, "templates", "index.html"),
+        os.path.join(base_dir, "index.html"),
+    ]
+    for template_path in candidate_template_paths:
+      if os.path.isfile(template_path):
+        with open(template_path, "rb") as f:
+          return f.read()
 
+  loader = __spec__.loader if __spec__ is not None else None
+  loader_archive = (
+      loader.archive if isinstance(loader, zipimport.zipimporter) else ""
+  )
   candidate_zips = [
+      loader_archive,
       os.environ.get("_PARFILE", ""),
-      getattr(sys, "argv", [""])[0],
+      sys.argv[0] if sys.argv else "",
       __file__,
   ]
   for zip_candidate in candidate_zips:
@@ -205,12 +228,14 @@ def get_template_html() -> bytes:
     if data:
       return data
 
+  package_name = __package__ or "betocq.tools.results_viewer"
   try:
-    data = pkgutil.get_data(
-        PACKAGE_NAME,
-        TEMPLATE_RESOURCE_PATH,
+    data = (
+        importlib.resources.files(package_name)
+        .joinpath(*TEMPLATE_RESOURCE_PATH.split("/"))
+        .read_bytes()
     )
-  except (OSError, ImportError, ValueError):
+  except (OSError, ImportError, TypeError, ValueError, AttributeError):
     data = None
   if data:
     return data
@@ -259,124 +284,71 @@ def _extract_zip_payload(post_data: bytes, content_type: str) -> bytes | None:
   return None
 
 
-def _create_buganizer_issue(
+def build_external_issue_response(
     summary: str,
     description: str,
     component_id: str,
-    attachment_paths: list[str],
     assignee: str = "",
 ) -> FileBugResponse:
-  """Creates an Issue Tracker ticket sequentially and attaches specified files.
+  """Builds a FileBugResponse with a pre-populated Issue Tracker URL."""
+  params = {
+      "component": component_id,
+      "title": summary,
+      "description": description[:_MAX_DESCRIPTION_URL_CHARS],
+  }
+  if assignee:
+    params["assignee"] = assignee
+  web_url = _ISSUETRACKER_NEW_ISSUE_URL + urllib.parse.urlencode(params)
+  return FileBugResponse(
+      success=True,
+      message=(
+          "External Partner Mode (No internal API access): Click below to"
+          " open Google Issue Tracker with pre-populated failure details:"
+      ),
+      issue_url=web_url,
+  )
 
-  Adheres to sequential execution and retention policy conflict rules.
+
+def default_bug_filer(request: BugFilingRequest) -> FileBugResponse:
+  """Validates component ID and builds an external Issue Tracker URL response.
 
   Args:
-    summary: The issue summary/title.
-    description: The issue body description.
-    component_id: The Issue Tracker component ID.
-    attachment_paths: List of file paths to attach to the issue.
-    assignee: Optional user email to assign the issue to.
+    request: Structured bug filing parameters from the HTTP request.
 
   Returns:
-    A FileBugResponse instance containing status and issue metadata.
+    A FileBugResponse containing a pre-populated external Issue Tracker URL, or
+    an error response if component_id is not a valid integer.
   """
   try:
-    numeric_component_id = int(component_id)
+    int(request.component_id)
   except ValueError:
     return FileBugResponse(
         success=False,
-        message=f"Invalid component ID: {component_id!r}. Must be an integer.",
-    )
-
-  if issuetracker_builders is None or issuetracker_client is None:
-    # External Partner Mode: No internal API credentials available
-    params = {
-        "component": component_id,
-        "title": summary,
-        "description": description[:_MAX_DESCRIPTION_URL_CHARS],
-    }
-    if assignee:
-      params["assignee"] = assignee
-    web_url = _ISSUETRACKER_NEW_ISSUE_URL + urllib.parse.urlencode(params)
-    return FileBugResponse(
-        success=True,
         message=(
-            "External Partner Mode (No internal API access): Click below to"
-            " open Google Issue Tracker with pre-populated failure details:"
+            f"Invalid component ID: {request.component_id!r}. Must be an"
+            " integer."
         ),
-        issue_url=web_url,
     )
-
-  create = issuetracker_builders.CreateIssueRequestBuilder(numeric_component_id)
-  create.SetTitle(summary)
-  create.SetComment(description)
-  if assignee:
-    create.SetAssignee(assignee)
-
-  for full_path in attachment_paths:
-    if os.path.isfile(full_path):
-      filename = os.path.basename(full_path)
-      try:
-        with open(full_path, "rb") as f:
-          content_bytes = f.read()
-      except OSError:
-        continue
-      if (
-          filename.endswith(".txt")
-          or filename.endswith(".log")
-          or "logcat" in filename
-      ):
-        create.AddPlaintextAttachment(filename, content_bytes)
-      else:
-        create.AddAttachment(
-            filename, ContentType.OCTET_STREAM.value, content_bytes
-        )
-
-  try:
-    auth_helper = issuetracker_client.LocalOrBorgWithLoquat()
-    client = issuetracker_client.Build(use_prod=True, auth_helper=auth_helper)
-    issue = client.stub.CreateIssue(create.Build())
-    write_requests = create.BuildAttachmentsWriteRequests(issue)
-    if write_requests:
-      issuetracker_client.WriteAttachments(client, write_requests)
-  except _RpcException as e:
-    err_str = str(e).lower()
-    if "retention" in err_str:
-      return FileBugResponse(
-          success=False,
-          message=(
-              "Issue Tracker rejected due to conflicting data retention"
-              " settings. Please re-file or check target component retention."
-          ),
-      )
-    # External Partner Mode: No internal API credentials available
-    params = {
-        "component": component_id,
-        "title": summary,
-        "description": description[:_MAX_DESCRIPTION_URL_CHARS],
-    }
-    if assignee:
-      params["assignee"] = assignee
-    web_url = (
-        _ISSUETRACKER_NEW_ISSUE_URL
-        + urllib.parse.urlencode(params)
-    )
-    return FileBugResponse(
-        success=True,
-        message=(
-            "External Partner Mode (No internal API access): Click below to"
-            " open Google Issue Tracker with pre-populated failure details:"
-        ),
-        issue_url=web_url,
-    )
-
-  issue_id = str(issue.issue_id)
-  return FileBugResponse(
-      success=True,
-      message=f"Successfully created Issue Tracker ticket {issue_id}",
-      issue_id=issue_id,
-      issue_url=f"{_ISSUETRACKER_ISSUE_URL_PREFIX}{issue_id}",
+  return build_external_issue_response(
+      summary=request.summary,
+      description=request.description,
+      component_id=request.component_id,
+      assignee=request.assignee,
   )
+
+
+_active_bug_filer: BugFiler = default_bug_filer
+
+
+def set_bug_filer(bug_filer: BugFiler | None) -> None:
+  """Configures the active bug-filing callback used by /api/file_bug.
+
+  Args:
+    bug_filer: Callback to invoke for bug filing requests. Passing None restores
+      default_bug_filer.
+  """
+  global _active_bug_filer
+  _active_bug_filer = bug_filer if bug_filer is not None else default_bug_filer
 
 
 class ResultViewerRequestHandler(http.server.BaseHTTPRequestHandler):
@@ -499,7 +471,37 @@ class ResultViewerRequestHandler(http.server.BaseHTTPRequestHandler):
     self.end_headers()
     self.wfile.write(script_bytes)
 
-  def do_GET(self) -> None:  # pylint: disable=invalid-name
+  def handle_one_request(self) -> None:
+    """Reads a single HTTP request and dispatches GET and POST commands."""
+    try:
+      self.raw_requestline = self.rfile.readline(65537)
+      if len(self.raw_requestline) > 65536:
+        self.requestline = ""
+        self.request_version = ""
+        self.command = ""
+        self.send_error(http.HTTPStatus.REQUEST_URI_TOO_LONG)
+        return
+      if not self.raw_requestline:
+        self.close_connection = True
+        return
+      if not self.parse_request():
+        return
+      if self.command == "GET":
+        self.handle_get()
+      elif self.command == "POST":
+        self.handle_post()
+      else:
+        self.send_error(
+            http.HTTPStatus.NOT_IMPLEMENTED,
+            f"Unsupported method ({self.command!r})",
+        )
+        return
+      self.wfile.flush()
+    except TimeoutError as err:
+      self.log_error("Request timed out: %r", err)
+      self.close_connection = True
+
+  def handle_get(self) -> None:
     """Handles HTTP GET requests."""
     if self.path == ApiEndpoint.INDEX.value or self.path.startswith("/?"):
       self._handle_index()
@@ -591,19 +593,25 @@ class ResultViewerRequestHandler(http.server.BaseHTTPRequestHandler):
         if common_path == results_dir_abs and os.path.isfile(full_path):
           attachment_paths.append(full_path)
 
-    with BUG_FILING_LOCK:
-      response = _create_buganizer_issue(
-          summary=summary,
-          description=description,
-          component_id=component_id,
-          attachment_paths=attachment_paths,
-          assignee=assignee,
+    request = BugFilingRequest(
+        summary=summary,
+        description=description,
+        component_id=component_id,
+        attachment_paths=attachment_paths,
+        assignee=assignee,
+    )
+    try:
+      with BUG_FILING_LOCK:
+        response = _active_bug_filer(request)
+    except (RuntimeError, OSError, ValueError, TypeError) as err:
+      response = FileBugResponse(
+          success=False, message=f"Failed to create ticket: {err}"
       )
 
     status_code = 200 if response.success else 500
     self._send_json(response, status_code)
 
-  def do_POST(self) -> None:  # pylint: disable=invalid-name
+  def handle_post(self) -> None:
     """Handles HTTP POST requests for result uploads."""
     if self.path == ApiEndpoint.FILE_BUG.value:
       self._handle_file_bug()
@@ -670,7 +678,8 @@ class ResultViewerRequestHandler(http.server.BaseHTTPRequestHandler):
     )
 
   def log_message(self, format_str: str, *args: Any) -> None:
-    """Overrides BaseHTTPRequestHandler.log_message to suppress console log noise."""
+    """Suppresses default BaseHTTPRequestHandler console log output."""
+    del format_str, args
 
 
 # Backward-compatibility aliases
@@ -678,8 +687,14 @@ ResultsViewerRequestHandler = ResultViewerRequestHandler
 TestExplorerRequestHandler = ResultViewerRequestHandler
 
 
+class ReusableTCPServer(socketserver.TCPServer):
+  """TCP server allowing immediate address reuse on restart."""
+
+  allow_reuse_address = True
+
+
 def pick_unused_port() -> int:
-  """Picks an unused TCP port using portpicker if available, otherwise stdlib socket."""
+  """Picks an unused TCP port via portpicker or stdlib socket fallback."""
   if portpicker is not None:
     return portpicker.pick_unused_port()
   with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -687,8 +702,18 @@ def pick_unused_port() -> int:
     return int(s.getsockname()[1])
 
 
-def main() -> None:
-  """Parses CLI flags and launches the Result Viewer HTTP web server."""
+def main(
+    bug_filer: BugFiler | None = None,
+    argv: Sequence[str] | None = None,
+) -> None:
+  """Parses CLI flags and launches the Result Viewer HTTP web server.
+
+  Args:
+    bug_filer: Optional custom bug-filing handler. Passing None uses
+      default_bug_filer.
+    argv: Optional CLI argument sequence. Passing None reads from sys.argv[1:].
+  """
+  set_bug_filer(bug_filer)
   parser = argparse.ArgumentParser(description="BeToCQ Result Viewer")
   parser.add_argument(
       "--version",
@@ -714,7 +739,7 @@ def main() -> None:
       default=0,
       help="Port to run server on. If 0 or omitted, picks an available port.",
   )
-  args = parser.parse_args()
+  args = parser.parse_args(argv)
 
   target_path = args.results_dir or args.results_path
   if target_path:
@@ -731,13 +756,9 @@ def main() -> None:
   print(f"[*] Starting BeToCQ Result Viewer at http://localhost:{port}/ ...")
   threading.Timer(
       _BROWSER_OPEN_DELAY_SECONDS,
-      lambda: webbrowser.open(f"http://localhost:{port}/"),
+      webbrowser.open,
+      args=[f"http://localhost:{port}/"],
   ).start()
-
-  class ReusableTCPServer(socketserver.TCPServer):
-    """TCP server allowing immediate address reuse on restart."""
-
-    allow_reuse_address = True
 
   with ReusableTCPServer(("", port), ResultViewerRequestHandler) as httpd:
     try:
