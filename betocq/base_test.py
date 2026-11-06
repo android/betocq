@@ -25,11 +25,12 @@ from mobly import utils
 from mobly.controllers import android_device
 from mobly.controllers.android_device_lib import adb
 from mobly.controllers.android_device_lib import errors
+import yaml
+
 from mobly.controllers.wifi import local_sniffer_device
 from mobly.controllers.wifi import openwrt_device
 from mobly.controllers.wifi.lib import wifi_configs
-import yaml
-
+from betocq import ap_utils
 from betocq import apa_utils
 from betocq import constants
 from betocq import setup_utils
