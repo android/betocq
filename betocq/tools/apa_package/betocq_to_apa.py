@@ -1590,6 +1590,7 @@ def package_for_apa(
 
 
 def main(argv: Sequence[str]) -> None:
+  """Validates CLI flags and packages BeToCQ results for APA."""
   if len(argv) > 1:
     raise app.UsageError("Too many command-line arguments.")
   if not _INPUT_DIR.value:
@@ -1604,7 +1605,12 @@ def main(argv: Sequence[str]) -> None:
   )
 
 
-if __name__ == "__main__":
+def cli_main() -> None:
+  """Entry point for execution as a pip-installed console script."""
   flags.mark_flag_as_required("input_dir")
   logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
   app.run(main)
+
+
+if __name__ == "__main__":
+  cli_main()
