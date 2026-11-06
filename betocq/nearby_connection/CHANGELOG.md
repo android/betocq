@@ -1,5 +1,15 @@
 # BeToCQ test suite release history
 
+## 3.2.0 (11/06/2026)
+### New
+* Consolidate 5 GHz Wi-Fi Direct (WFD) DFS and DBS directed tests into `XccWfdDfs5gStaTest` and `XccWfdDbs2gStaTest`, and move deprecated directed tests under `directed_tests/deprecated/`.
+* Add Android Partner Approvals (APA) packaging support (`betocq_to_apa` CLI and `apa_utils.py`).
+* Rename Test Explorer to BeToCQ Result Viewer (`betocq/tools/results_viewer`) and add an Environment Status diagnostic tab (`setup_wizard.py` and `check_env.sh`).
+* Validate Wi-Fi chipset model resolvability from firmware version and check GMSCore Nearby Hotspot configuration during device setup.
+### Bug fixes
+* Force-stop stale snippet and instrumentation processes before loading snippets, and guard APK installs against package verifiers.
+* Add support for skipping remaining scenario iterations when hardware capabilities are unsupported, and log non-retryable Nearby API exceptions in snippets.
+
 ## 3.1.1 (08/27/2026)
 ### New
 * Introduce a local test result viewer - betocq-result-viewer

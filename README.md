@@ -39,8 +39,9 @@ inputs to customize the test case and set the right performance expectations.
 In the directed and CUJ tests, depending on the device capabilities,
 test cases are defined to cover:
 
-- Different Wi-Fi concurrencies: single-channel concurrency (SCC) versus
-  multi-channel concurrency (MCC)
+- Different Wi-Fi concurrencies: single-channel concurrency (SCC),
+  multi-channel concurrency (MCC), and adaptive concurrency (`XCC`, which runs
+  in SCC or MCC mode depending on device capabilities)
 - Different wireless channels: 2G, 5G, 5G DFS, and 5G indoor
 
 The test cases uses the following naming convention:
@@ -55,11 +56,11 @@ For example, `scc_indoor_5g_wfd_sta_test` means:
 - Transfer medium is WFD.
 - Both STA and WFD are connected to 5G indoor channel (for example, 5180 in JP).
 
-Similarly, `mcc_5g_all_wifi_non_dbs_2g_sta_test` means:
+Similarly, `xcc_wfd_dbs_2g_sta_test` means:
 
-- Transfer medium can be any 5G Wi-Fi medium.
-- STA is connected to the 2G band and the transfer medium is connected to the 5G band.
-- Device isn't capable of DBS and so it operates in MCC mode.
+- Transfer medium is WFD (5G on DBS-capable devices, or 5G/2G MCC on non-DBS devices).
+- STA is connected to the 2G band.
+- Operates in SCC/DBS mode if the device supports DBS, or MCC mode otherwise.
 
 Each test case runs multiple iterations to collect the following stats:
 
@@ -79,15 +80,13 @@ capabilities. For example:
 - `scc_indoor_5g_wfd_sta_test` is skipped if the device doesn't
  support WFD group owner (GO) at the 5G indoor channel.
 
-- `mcc_5g_all_wifi_non_dbs_2g_sta_test` is skipped for DBS capable devices.
-
 The test cases execution depends on the device capability, so it's
 important to fill in the device capabilities section correctly in the test
 configuration file. We'll discuss this in more detail in the following sections.
 
-The DBS capable device pair with both `enable_sta_dfs_channel_for_peer_network`
-and `enable_sta_indoor_channel_for_peer_network` set to `False` executes
-the following list of test cases:
+The 5G-capable device pair with `enable_sta_indoor_channel_for_peer_network`
+set to `False` executes the following list of test cases in
+`betocq_onboarding_test_suite`:
 
 <table>
   <tr>
@@ -103,45 +102,9 @@ the following list of test cases:
    <td>US</td>
   </tr>
   <tr>
-   <td>Bt2GWifiCoexTest</td>
-   <td>WFD</td>
-   <td>2437</td>
-   <td>US</td>
-  </tr>
-  <tr>
    <td>BtPerformanceTest</td>
    <td>BT classic</td>
    <td>N/A</td>
-   <td>US</td>
-  </tr>
-  <tr>
-   <td>Mcc2gWfdWw5gStaTest</td>
-   <td>WFD</td>
-   <td>5180</td>
-   <td>00</td>
-  </tr>
-  <tr>
-   <td>Mcc5gHotspotDfs5gStaTest</td>
-   <td>Hotspot</td>
-   <td>5260</td>
-   <td>US</td>
-  </tr>
-  <tr>
-   <td>Mcc5gWfdDfs5gStaTest</td>
-   <td>WFD</td>
-   <td>5260</td>
-   <td>US</td>
-  </tr>
-  <tr>
-   <td>Scc2gWfdStaTest</td>
-   <td>WFD</td>
-   <td>2437</td>
-   <td>US</td>
-  </tr>
-  <tr>
-   <td>Scc5gWfdDbs2gStaTest</td>
-   <td>WFD</td>
-   <td>2437</td>
    <td>US</td>
   </tr>
   <tr>
@@ -157,14 +120,20 @@ the following list of test cases:
    <td>US</td>
   </tr>
   <tr>
-   <td>Scc5gAllWifiStaTest</td>
-   <td>All Wi-Fi mediums</td>
-   <td>5180</td>
+   <td>XccWfdDfs5gStaTest</td>
+   <td>WFD</td>
+   <td>5260</td>
    <td>US</td>
   </tr>
   <tr>
-   <td>Scc5gAllWifiDbs2gStaTest</td>
-   <td>All Wi-Fi mediums</td>
+   <td>XccWfdDbs2gStaTest</td>
+   <td>WFD</td>
+   <td>2437</td>
+   <td>US</td>
+  </tr>
+  <tr>
+   <td>Bt2gWifiCoexTest</td>
+   <td>WFD</td>
    <td>2437</td>
    <td>US</td>
   </tr>
@@ -434,11 +403,11 @@ Depending on your validation target, execute the appropriate test suite command:
 
 ### Viewing test results
 
-You can view and analyze test execution results locally using **BeToCQ Test Explorer**, or upload them using **`results_uploader`**.
+You can view and analyze test execution results locally using **BeToCQ Result Viewer**, or upload them using **`results_uploader`**.
 
-#### Option 1: Using BeToCQ Test Explorer (Local Web Dashboard) (Recommended)
+#### Option 1: Using BeToCQ Result Viewer (Local Web Dashboard) (Recommended)
 
-When you install the `betocq` package via `pip`, it includes the `betocq-result-viewer` command-line tool (powered by `betocq_test_explorer` in `betocq/tools/test_explorer`),
+When you install the `betocq` package via `pip`, it includes the `betocq-result-viewer` command-line tool (in `betocq/tools/results_viewer`),
 which launches a lightweight local web dashboard to parse, visualize, and triage Mobly test results:
 
 1.  **Launch with a results directory or `.zip` file:**
@@ -451,9 +420,9 @@ which launches a lightweight local web dashboard to parse, visualize, and triage
     ```
     This opens your default browser where you can drag and drop any Mobly `.zip` test result archive.
 
-*Note: If running directly from a source checkout without installing the wheel, you can invoke the script directly via `python3 betocq/tools/test_explorer/server.py`.*
+*Note: If running directly from a source checkout without installing the wheel, you can invoke the script directly via `python3 betocq/tools/results_viewer/server.py`.*
 
-For more details and options (such as specifying a custom `--port`), refer to the [BeToCQ Test Explorer README](./betocq/tools/test_explorer/README.md).
+For more details and options (such as specifying a custom `--port`), refer to the [BeToCQ Result Viewer README](./betocq/tools/results_viewer/README.md).
 
 #### Option 2: Using `results_uploader` (Optional)
 
