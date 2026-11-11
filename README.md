@@ -432,6 +432,45 @@ Alternatively, you can use [`results_uploader`](https://github.com/android/mobly
 2.  **Upload results:** Pass the `-u` flag when running `mobly_runner` to automatically upload results upon test completion, or run `results_uploader` directly on your output directory.
 
 
+### Packaging results for Android Partner Approvals (`betocq_to_apa`)
+
+Starting in version `3.2.0`, installing the `betocq` package via `pip` includes the `betocq_to_apa` command-line tool (in `betocq/tools/apa_package/betocq_to_apa.py`), which converts BeToCQ Mobly test outputs into an Android Partner Approvals (APA)-compatible `.zip` archive for submission to the [Android Partner Approvals portal](https://partner.android.com/approvals).
+
+#### Prerequisites
+
+*   Keep the preconfigured `metrics_json_filename` and `apa_info` block in `cuj_and_test_config.yml` (for example, under the `Quickstart` testbed) unchanged unless instructed otherwise.
+*   When `enforce_same_fingerprint: True` is set in `apa_info` (such as in `Quickstart`), both the source and target devices must run the exact same `build_fingerprint`.
+
+#### Package the APA `.zip` archive
+
+By default, Mobly saves each run's output under `/tmp/logs/mobly/<TestBedName>/<MM-DD-YYYY_HH-MM-SS-SSS>/` (with a `/tmp/logs/mobly/<TestBedName>/latest` symlink) and prints `Artifacts are saved in "<path>"` when execution finishes.
+
+1.  **Package a single test run (or a parent folder containing runs of the same suite):**
+    ```bash
+    betocq_to_apa \
+      --input_dir=/tmp/logs/mobly/Quickstart/latest \
+      --output_dir=/tmp/betocq/results
+    ```
+
+2.  **Merge split runs or retries** (for example, separate 2G/5G and 5G DFS runs, or re-runs of failed test cases; all runs must share the same `apa_suite_plan` and target `build_fingerprint`):
+    ```bash
+    betocq_to_apa \
+      --input_dir=/tmp/logs/mobly/Quickstart/<run1_timestamp>,/tmp/logs/mobly/Quickstart/<run2_timestamp> \
+      --output_dir=/tmp/betocq/results
+    ```
+
+**Flags:**
+*   `--input_dir` *(required)*: Path to a Mobly run folder containing `test_summary.yaml` (and `report-log-files/<apa_module_name>.reportlog.json`), a comma-separated list of run folders, or a parent directory whose immediate subdirectories contain `test_summary.yaml`.
+*   `--output_dir` *(optional, default: `/tmp/betocq/results`)*: Output directory where the `<timestamp>.zip` package (containing `test_result.xml`, `test_result.html`, `report-log-files/`, and `non-tradefed_results/`) and its unzipped directory are written.
+*   `--resultstore_link` *(optional)*: ResultStore / BTX invocation URL to include in the report metadata if results were uploaded with `results_uploader`.
+
+*Note: If running directly from a source checkout without installing the wheel, invoke the script via `python3 betocq/tools/apa_package/betocq_to_apa.py`.*
+
+#### Upload to Android Partner Approvals
+
+Navigate to the [Android Partner Approvals portal](https://partner.android.com/approvals), select your target device build, and upload the generated `<output_dir>/<timestamp>.zip` archive under **Test Reports / Attachments**.
+
+
 ### Debugging test failures
 
 If you encounter test failures, you could reference the
